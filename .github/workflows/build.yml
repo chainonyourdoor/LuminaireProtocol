@@ -1,0 +1,190 @@
+name: "✨ Luminaire Protocol"
+
+on:
+  workflow_dispatch:
+    inputs:
+      UPDATE_ARSENAL:
+        description: "Force fresh Clang, Kernel, AK3"
+        type: choice
+        default: "no"
+        options:
+          - "yes"
+          - "no"
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+
+  prep:
+    name: "🛠️ Prep Arsenal"
+    runs-on: ubuntu-latest
+
+    env:
+      PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+
+    steps:
+      - name: "🌀 Clone LuminaireProtocol"
+        run: |
+          git clone --filter=blob:none \
+            "https://x-access-token:${PERSONAL_TOKEN}@github.com/chainonyourdoor/LuminaireProtocol" \
+            .
+
+      - name: "♻️ Restore arsenal cache"
+        if: inputs.UPDATE_ARSENAL != 'yes'
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/ccache-bin
+            ~/.apt-cache
+            ~/clang-cache
+            ~/ak3-cache
+            ~/kernel-cache
+          key: arsenal-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: arsenal-${{ github.ref_name }}-
+
+      - name: "📦 Install Dependencies"
+        run: |
+          MISSING=()
+          for pkg in bc bison flex libssl-dev libelf-dev dwarves cpio git curl wget zip patch rsync; do
+            dpkg -s "$pkg" &>/dev/null || MISSING+=("$pkg")
+          done
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            if ls ~/.apt-cache/*.deb &>/dev/null 2>&1; then
+              sudo cp -rn ~/.apt-cache/. /var/cache/apt/archives/ 2>/dev/null || true
+            else
+              sudo apt-get update -qq
+            fi
+            sudo apt-get install -y --no-install-recommends "${MISSING[@]}"
+            mkdir -p ~/.apt-cache
+            sudo cp /var/cache/apt/archives/*.deb ~/.apt-cache/ 2>/dev/null || true
+          fi
+
+      - name: "🛠️ Prep Arsenal"
+        env:
+          USE_CLANG_CACHE:  ${{ inputs.UPDATE_ARSENAL != 'yes' }}
+          USE_KERNEL_CACHE: ${{ inputs.UPDATE_ARSENAL != 'yes' }}
+          USE_AK3_CACHE:    ${{ inputs.UPDATE_ARSENAL != 'yes' }}
+          PREP_MODE:        "true"
+        run: bash build.sh
+
+      - name: "💾 Save arsenal cache"
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/ccache-bin
+            ~/.apt-cache
+            ~/clang-cache
+            ~/ak3-cache
+            ~/kernel-cache
+          key: arsenal-${{ github.ref_name }}-${{ github.run_id }}
+
+      - name: "🧹 Cleanup old arsenal caches"
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+        run: |
+          CACHES=$(gh api \
+            "/repos/${{ github.repository }}/actions/caches?per_page=100" \
+            --jq ".actions_caches[] | select(.key | startswith(\"arsenal-${{ github.ref_name }}-\")) | select(.key != \"arsenal-${{ github.ref_name }}-${{ github.run_id }}\") | .id")
+          if [ -n "$CACHES" ]; then
+            for ID in $CACHES; do
+              gh api --method DELETE "/repos/${{ github.repository }}/actions/caches/${ID}" || true
+            done
+          fi
+
+  build:
+    needs: prep
+    name: "✨ Build Luminaire Protocol"
+    runs-on: ubuntu-latest
+
+    env:
+      PERSONAL_TOKEN:           ${{ secrets.PERSONAL_TOKEN }}
+      TELEGRAM_BOT_TOKEN:       ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID:         ${{ secrets.TELEGRAM_CHAT_ID }}
+      TELEGRAM_THREAD_ID_BUILD: ${{ secrets.TELEGRAM_THREAD_ID_BUILD }}
+      TELEGRAM_THREAD_ID_LOG:   ${{ secrets.TELEGRAM_THREAD_ID_LOG }}
+      CCACHE_DIR:               ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE:           "5G"
+
+    steps:
+      - name: "🌀 Clone LuminaireProtocol"
+        run: |
+          git clone --filter=blob:none \
+            "https://x-access-token:${PERSONAL_TOKEN}@github.com/chainonyourdoor/LuminaireProtocol" \
+            .
+
+      - name: "🧰 Setup Swap Space"
+        uses: thejerrybao/setup-swap-space@v1
+        with:
+          swap-size-gb: 12
+
+      - name: "♻️ Restore arsenal cache"
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/ccache-bin
+            ~/.apt-cache
+            ~/clang-cache
+            ~/ak3-cache
+            ~/kernel-cache
+          key: arsenal-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: arsenal-${{ github.ref_name }}-
+
+      - name: "♻️ Restore ccache data"
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-data-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: ccache-data-${{ github.ref_name }}-
+
+      - name: "📦 Install Dependencies"
+        run: |
+          MISSING=()
+          for pkg in bc bison flex libssl-dev libelf-dev dwarves cpio git curl wget zip patch rsync; do
+            dpkg -s "$pkg" &>/dev/null || MISSING+=("$pkg")
+          done
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            if ls ~/.apt-cache/*.deb &>/dev/null 2>&1; then
+              sudo cp -rn ~/.apt-cache/. /var/cache/apt/archives/ 2>/dev/null || true
+            else
+              sudo apt-get update -qq
+            fi
+            sudo apt-get install -y --no-install-recommends "${MISSING[@]}"
+          fi
+
+      - name: "✨ Build Luminaire Protocol"
+        env:
+          USE_CLANG_CACHE:            "true"
+          USE_KERNEL_CACHE:           "true"
+          USE_AK3_CACHE:              "true"
+          CCACHE_IS_KERNEL_COMPILING: "true"
+        run: bash build.sh
+
+      - name: "📊 Ccache stats"
+        if: always()
+        run: |
+          [ -f "$HOME/ccache-bin/ccache" ] && \
+            $HOME/ccache-bin/ccache --show-stats || true
+
+      - name: "💾 Save ccache data"
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-data-${{ github.ref_name }}-${{ github.run_id }}
+
+      - name: "🧹 Cleanup old ccache"
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+        run: |
+          CACHES=$(gh api \
+            "/repos/${{ github.repository }}/actions/caches?per_page=100" \
+            --jq ".actions_caches[] | select(.key | startswith(\"ccache-data-${{ github.ref_name }}-\")) | select(.key != \"ccache-data-${{ github.ref_name }}-${{ github.run_id }}\") | .id")
+          if [ -n "$CACHES" ]; then
+            for ID in $CACHES; do
+              gh api --method DELETE "/repos/${{ github.repository }}/actions/caches/${ID}" || true
+            done
+          fi
