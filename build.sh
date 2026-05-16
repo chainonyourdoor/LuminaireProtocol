@@ -219,16 +219,6 @@ main() {
     cp "${ROOT_DIR}/susfs4ksu/kernel_patches/include/linux/"* "${KERNEL_DIR}/common/include/linux/"
     cp "${ROOT_DIR}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch" ./
 
-    # Apply KSU manual hooks patch (fixes init panic with tracepoint mode)
-    cd "${KERNEL_DIR}/common"
-    patch -p1 --fuzz 3 < "${ROOT_DIR}/kernel_patches/wild/hooks/ksu_hooks.patch" \
-        || log "KSU hooks patch: some non-critical hunks failed, continuing..."
-    log "KSU hooks patch applied ✅"
-
-    # Apply SUSFS proc/base.c fix for android14-6.1
-    patch -p1 < "${ROOT_DIR}/kernel_patches/wild/susfs_fix_patches/v2.1.0/a14-6.1/base.c.patch" \
-        || log "SUSFS base.c fix skipped (may already be applied)"
-
     # Apply KernelSU-Next SUSFS patch
     cd "${KERNEL_DIR}/KernelSU-Next"
     cp "${ROOT_DIR}/kernel_patches/wild/ksun-293ca01-susfs-v2.1.0-a14-6.1-ef16cbce.patch" ./
