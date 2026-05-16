@@ -181,6 +181,24 @@ main() {
     KSU_GIT_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo 'v0.0.1')"
     sed -i "s/^KSU_VERSION_TAG_FALLBACK := v0.0.1$/KSU_VERSION_TAG_FALLBACK := ${KSU_GIT_TAG}/" Kbuild
 
+    # Patch sucompat: skip UID=0 (root) processes to prevent init panic on MIUI/HyperOS
+    SUCOMPAT_FILE="${KERNEL_DIR}/KernelSU-Next/kernel/sucompat.c"
+    [ -f "$SUCOMPAT_FILE" ] || error "sucompat.c not found!"
+    python3 -c "
+import re, sys
+content = open('${KERNEL_DIR}/KernelSU-Next/kernel/sucompat.c').read()
+skip_check = '\n\t/* Skip UID=0 processes (e.g. init) to prevent early boot panic */\n\tif (current_uid().val == 0)\n\t\treturn 0;\n'
+patched = re.sub(
+    r'(int ksu_handle_execveat_sucompat[^{]+\{)',
+    lambda m: m.group(0) + skip_check,
+    content, count=1
+)
+if patched == content:
+    sys.exit(1)
+open('${KERNEL_DIR}/KernelSU-Next/kernel/sucompat.c', 'w').write(patched)
+" || error "sucompat UID=0 patch failed!"
+    log "sucompat UID=0 skip patch applied ✅"
+
     log "KernelSU-Next setup ✅ (version: ${KSU_VERSION}, tag: ${KSU_GIT_TAG})"
     echo "KSU_VERSION=${KSU_VERSION}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
     echo "KSU_GIT_TAG=${KSU_GIT_TAG}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
