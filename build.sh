@@ -26,6 +26,7 @@ ARCH="arm64"
 
 VARIANT="${VARIANT:-VANILLA}"
 PREP_MODE="${PREP_MODE:-false}"
+WARMING_MODE="${WARMING_MODE:-false}"
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORK_DIR="${ROOT_DIR}/workspace"
@@ -42,6 +43,8 @@ export CCACHE_DIR="${CCACHE_DIR:-${ROOT_DIR}/.ccache}"
 export CCACHE_MAXSIZE="${CCACHE_MAXSIZE:-5G}"
 export CCACHE_COMPRESS=1
 export CCACHE_COMPRESSLEVEL=1
+
+export GIT_CLONE_PROTECTION_ACTIVE=false
 
 DATE=$(date +"%b%d")
 ZIP_NAME="LuminaireProtocol-${DATE}R${GITHUB_RUN_NUMBER:-0}.zip"
@@ -82,8 +85,22 @@ main() {
     run_fixes
     run_patches
     build_kernel
+
+    if [ "$WARMING_MODE" = "true" ]; then
+        log "========================================"
+        log "  🔥 Warming Complete — skipping packaging"
+        log "========================================"
+        exit 0
+    fi
+
     package_anykernel3
     send_telegram
+
+    echo ""
+    log "========================================"
+    log "  ✅ Build Complete! — ${ZIP_NAME}"
+    log "========================================"
+    echo ""
 }
 
 # ======================================================
@@ -157,7 +174,14 @@ run_fixes() {
     for patch in "${PATCH_REPO}/patches/"*.patch; do
         [ -f "$patch" ] || continue
         log "Applying patch: $(basename "$patch")..."
-        patch -p1 -d "$KERNEL_SRC" < "$patch" || error "Patch failed: $(basename "$patch")"
+        if patch -p1 --dry-run --forward -d "$KERNEL_SRC" < "$patch" > /dev/null 2>&1; then
+            patch -p1 -d "$KERNEL_SRC" < "$patch" || error "Patch failed: $(basename "$patch")"
+            log "$(basename "$patch") applied ✅"
+        elif patch -p1 --dry-run --reverse -d "$KERNEL_SRC" < "$patch" > /dev/null 2>&1; then
+            log "$(basename "$patch") already applied, skipping."
+        else
+            error "$(basename "$patch") failed — conflict!"
+        fi
     done
 
     log "All fixes applied ✅"
@@ -233,6 +257,10 @@ build_kernel() {
     log "Build completed in ${BUILD_SECONDS}s ✅"
     echo "BUILD_SECONDS=${BUILD_SECONDS}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
 
+    echo "::endgroup::"
+
+    echo "::group::📊 Ccache Stats"
+    [ -f "$CCACHE_BIN" ] && $CCACHE_BIN --show-stats 2>/dev/null || true
     echo "::endgroup::"
 }
 

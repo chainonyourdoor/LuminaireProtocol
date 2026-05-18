@@ -1,12 +1,12 @@
-name: "✨ Luminaire Protocol"
+name: "🔥 Cache Warming"
 
 on:
   workflow_dispatch:
     inputs:
       UPDATE_ARSENAL:
-        description: "Update Arsenal"
+        description: "Refresh Arsenal"
         type: choice
-        default: "no"
+        default: "yes"
         options:
           - "yes"
           - "no"
@@ -20,11 +20,13 @@ on:
 
 env:
   DEBIAN_FRONTEND: noninteractive
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_MAXSIZE: "5G"
 
 jobs:
 
   # ======================================================
-  # 📦 PREP — Download tools, save arsenal cache
+  # 📦 PREP
   # ======================================================
   prep:
     name: "📦 Prep Arsenal"
@@ -32,8 +34,8 @@ jobs:
     timeout-minutes: 30
 
     env:
-      PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
-      PREP_MODE:      "true"
+      PERSONAL_TOKEN:   ${{ secrets.PERSONAL_TOKEN }}
+      PREP_MODE:        "true"
       USE_CLANG_CACHE:  ${{ inputs.UPDATE_ARSENAL != 'yes' }}
       USE_KERNEL_CACHE: ${{ inputs.UPDATE_ARSENAL != 'yes' }}
       USE_AK3_CACHE:    ${{ inputs.UPDATE_ARSENAL != 'yes' }}
@@ -88,25 +90,20 @@ jobs:
           fi
 
   # ======================================================
-  # 🏗️ BUILD — Restore arsenal, build kernel
+  # 🔥 WARM
   # ======================================================
-  build:
-    name: "✨ Build Luminaire Protocol"
+  warm:
+    name: "🔥 Warm Cache"
     runs-on: ubuntu-latest
     timeout-minutes: 60
     needs: prep
 
     env:
-      PERSONAL_TOKEN:           ${{ secrets.PERSONAL_TOKEN }}
-      TELEGRAM_BOT_TOKEN:       ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHAT_ID:         ${{ secrets.TELEGRAM_CHAT_ID }}
-      TELEGRAM_THREAD_ID_BUILD: ${{ secrets.TELEGRAM_THREAD_ID_BUILD }}
-      TELEGRAM_THREAD_ID_LOG:   ${{ secrets.TELEGRAM_THREAD_ID_LOG }}
-      USE_KERNEL_CACHE:         "true"
-      USE_AK3_CACHE:            "true"
-      CCACHE_DIR:               ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE:           "5G"
-      ENABLE_LTO:               ${{ inputs.ENABLE_LTO }}
+      PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+      WARMING_MODE:   "true"
+      CCACHE_DIR:     ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: "5G"
+      ENABLE_LTO:     ${{ inputs.ENABLE_LTO }}
 
     steps:
       - name: "🌀 Clone LuminaireProtocol"
@@ -139,11 +136,25 @@ jobs:
           key: ccache-data-${{ inputs.ENABLE_LTO == 'THIN' && 'lto-' || '' }}${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: ccache-data-${{ inputs.ENABLE_LTO == 'THIN' && 'lto-' || '' }}${{ github.ref_name }}-
 
-      - name: "✨ Build"
+      - name: "🔥 Warm"
         env:
           USE_CLANG_CACHE:            "true"
+          USE_KERNEL_CACHE:           "true"
+          USE_AK3_CACHE:              "true"
           CCACHE_IS_KERNEL_COMPILING: "true"
         run: bash build.sh
+
+      - name: "📊 Ccache stats"
+        id: stats
+        if: always()
+        run: |
+          MISSES=0
+          if [ -f "$HOME/ccache-bin/ccache" ]; then
+            $HOME/ccache-bin/ccache --show-stats
+            MISSES=$($HOME/ccache-bin/ccache --show-stats \
+              | grep "Misses:" | awk '{sum+=$2} END{print sum+0}')
+          fi
+          echo "misses=${MISSES}" >> $GITHUB_OUTPUT
 
       - name: "💾 Save ccache data"
         if: always()
@@ -152,31 +163,43 @@ jobs:
           path: ${{ github.workspace }}/.ccache
           key: ccache-data-${{ inputs.ENABLE_LTO == 'THIN' && 'lto-' || '' }}${{ github.ref_name }}-${{ github.run_id }}
 
-      - name: "💾 Save kernel source"
-        if: always()
-        uses: actions/cache/save@v5
-        with:
-          path: ~/kernel-cache
-          key: kernel-src-${{ github.ref_name }}
+      - name: "🔁 Re-trigger if not fully warmed"
+        if: steps.stats.outputs.misses != '0'
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+        run: |
+          gh workflow run warming.yml \
+            --ref ${{ github.ref_name }} \
+            --field UPDATE_ARSENAL=no \
+            --field ENABLE_LTO=${{ inputs.ENABLE_LTO }}
 
-      - name: "🧹 Cleanup old caches"
+      - name: "📣 Notify Telegram"
+        if: steps.stats.outputs.misses == '0'
+        run: |
+          LTO_LABEL="None"
+          [ "${{ inputs.ENABLE_LTO }}" = "THIN" ] && LTO_LABEL="Thin"
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            ${TELEGRAM_THREAD_ID_LOG:+-d message_thread_id="${TELEGRAM_THREAD_ID_LOG}"} \
+            -d text="🔥 Cache Fully Warmed%0A%0ALTO: ${LTO_LABEL}%0AHit rate: 100%" \
+            -d parse_mode="HTML" || true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_THREAD_ID_LOG: ${{ secrets.TELEGRAM_THREAD_ID_LOG }}
+
+      - name: "🧹 Cleanup old ccache"
         if: always()
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
         run: |
-          cleanup_cache() {
-            local PREFIX="$1"
-            local CURRENT_KEY="$2"
-            local CACHES
-            CACHES=$(gh api \
-              "/repos/${{ github.repository }}/actions/caches?per_page=100" \
-              --jq ".actions_caches[] | select(.key | startswith(\"${PREFIX}\")) | select(.key != \"${CURRENT_KEY}\") | .id")
-            if [ -n "$CACHES" ]; then
-              for ID in $CACHES; do
-                gh api --method DELETE "/repos/${{ github.repository }}/actions/caches/${ID}" || true
-              done
-            fi
-          }
           LTO_PREFIX="${{ inputs.ENABLE_LTO == 'THIN' && 'lto-' || '' }}"
-          cleanup_cache "ccache-data-${LTO_PREFIX}${{ github.ref_name }}-" \
-            "ccache-data-${LTO_PREFIX}${{ github.ref_name }}-${{ github.run_id }}"
+          CURRENT="ccache-data-${LTO_PREFIX}${{ github.ref_name }}-${{ github.run_id }}"
+          CACHES=$(gh api \
+            "/repos/${{ github.repository }}/actions/caches?per_page=100" \
+            --jq ".actions_caches[] | select(.key | startswith(\"ccache-data-${LTO_PREFIX}${{ github.ref_name }}-\")) | select(.key != \"${CURRENT}\") | .id")
+          if [ -n "$CACHES" ]; then
+            for ID in $CACHES; do
+              gh api --method DELETE "/repos/${{ github.repository }}/actions/caches/${ID}" || true
+            done
+          fi

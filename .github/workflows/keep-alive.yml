@@ -1,0 +1,39 @@
+name: "🫀 Keep Cache Alive"
+
+on:
+  schedule:
+    - cron: "0 0 */5 * *"
+  workflow_dispatch:
+
+jobs:
+
+  keep-alive:
+    name: "🫀 Touch All Caches"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "♻️ Touch arsenal cache"
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/clang-cache
+            ~/ccache-bin
+            ~/ak3-cache
+            ~/kernel-cache
+            ~/.apt-cache
+          key: arsenal-${{ github.ref_name }}-__keepalive__
+          restore-keys: arsenal-${{ github.ref_name }}-
+
+      - name: "♻️ Touch ccache data"
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-data-${{ github.ref_name }}-__keepalive__
+          restore-keys: ccache-data-${{ github.ref_name }}-
+
+      - name: "♻️ Touch ccache data (LTO)"
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-data-lto-${{ github.ref_name }}-__keepalive__
+          restore-keys: ccache-data-lto-${{ github.ref_name }}-
