@@ -24,7 +24,7 @@ env:
 jobs:
 
   # ======================================================
-  # 📦 PREP — Download tools, save arsenal cache
+  # 📦 PREP
   # ======================================================
   prep:
     name: "📦 Prep Arsenal"
@@ -42,10 +42,9 @@ jobs:
       - name: "🌀 Clone LuminaireProtocol"
         run: |
           git clone --filter=blob:none \
-            "https://x-access-token:${PERSONAL_TOKEN}@github.com/chainonyourdoor/LuminaireProtocol" \
-            .
+            "https://x-access-token:${PERSONAL_TOKEN}@github.com/chainonyourdoor/LuminaireProtocol" .
 
-      - name: "♻️ Restore arsenal cache"
+      - name: "♻️ Restore arsenal"
         if: inputs.UPDATE_ARSENAL != 'yes'
         uses: actions/cache/restore@v5
         with:
@@ -59,9 +58,11 @@ jobs:
           restore-keys: arsenal-${{ github.ref_name }}-
 
       - name: "📦 Run Prep"
+        env:
+          PHASE: prep
         run: bash build.sh
 
-      - name: "💾 Save arsenal cache"
+      - name: "💾 Save arsenal"
         if: always()
         uses: actions/cache/save@v5
         with:
@@ -73,7 +74,7 @@ jobs:
             ~/.apt-cache
           key: arsenal-${{ github.ref_name }}-${{ github.run_id }}
 
-      - name: "🧹 Cleanup old arsenal caches"
+      - name: "🧹 Cleanup old arsenal"
         if: always()
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
@@ -88,7 +89,7 @@ jobs:
           fi
 
   # ======================================================
-  # 🏗️ BUILD — Restore arsenal, build kernel
+  # 🏗️ BUILD
   # ======================================================
   build:
     name: "✨ Build Luminaire Protocol"
@@ -104,6 +105,8 @@ jobs:
       TELEGRAM_THREAD_ID_LOG:   ${{ secrets.TELEGRAM_THREAD_ID_LOG }}
       USE_KERNEL_CACHE:         "true"
       USE_AK3_CACHE:            "true"
+      USE_CLANG_CACHE:          "true"
+      CCACHE_IS_KERNEL_COMPILING: "true"
       CCACHE_DIR:               ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE:           "5G"
       ENABLE_LTO:               ${{ inputs.ENABLE_LTO }}
@@ -112,15 +115,14 @@ jobs:
       - name: "🌀 Clone LuminaireProtocol"
         run: |
           git clone --filter=blob:none \
-            "https://x-access-token:${PERSONAL_TOKEN}@github.com/chainonyourdoor/LuminaireProtocol" \
-            .
+            "https://x-access-token:${PERSONAL_TOKEN}@github.com/chainonyourdoor/LuminaireProtocol" .
 
       - name: "🧰 Setup Swap Space"
         uses: thejerrybao/setup-swap-space@v1
         with:
           swap-size-gb: 12
 
-      - name: "♻️ Restore arsenal cache"
+      - name: "♻️ Restore arsenal"
         uses: actions/cache/restore@v5
         with:
           path: |
@@ -132,20 +134,26 @@ jobs:
           key: arsenal-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: arsenal-${{ github.ref_name }}-
 
-      - name: "♻️ Restore ccache data"
+      - name: "♻️ Restore ccache"
         uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/.ccache
           key: ccache-data-${{ inputs.ENABLE_LTO == 'THIN' && 'lto-' || '' }}${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: ccache-data-${{ inputs.ENABLE_LTO == 'THIN' && 'lto-' || '' }}${{ github.ref_name }}-
 
-      - name: "✨ Build"
-        env:
-          USE_CLANG_CACHE:            "true"
-          CCACHE_IS_KERNEL_COMPILING: "true"
-        run: bash build.sh
+      - name: "🔧 Prepare Workspace"
+        run: PHASE=prepare bash build.sh
 
-      - name: "💾 Save ccache data"
+      - name: "🩹 Apply Patches"
+        run: PHASE=patches bash build.sh
+
+      - name: "🏗️ Build Kernel"
+        run: PHASE=build bash build.sh
+
+      - name: "📦 Package & Upload"
+        run: PHASE=package bash build.sh
+
+      - name: "💾 Save ccache"
         if: always()
         uses: actions/cache/save@v5
         with:
@@ -157,19 +165,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
         run: |
-          cleanup_cache() {
-            local PREFIX="$1"
-            local CURRENT_KEY="$2"
-            local CACHES
-            CACHES=$(gh api \
-              "/repos/${{ github.repository }}/actions/caches?per_page=100" \
-              --jq ".actions_caches[] | select(.key | startswith(\"${PREFIX}\")) | select(.key != \"${CURRENT_KEY}\") | .id")
-            if [ -n "$CACHES" ]; then
-              for ID in $CACHES; do
-                gh api --method DELETE "/repos/${{ github.repository }}/actions/caches/${ID}" || true
-              done
-            fi
-          }
           LTO_PREFIX="${{ inputs.ENABLE_LTO == 'THIN' && 'lto-' || '' }}"
-          cleanup_cache "ccache-data-${LTO_PREFIX}${{ github.ref_name }}-" \
-            "ccache-data-${LTO_PREFIX}${{ github.ref_name }}-${{ github.run_id }}"
+          CURRENT="ccache-data-${LTO_PREFIX}${{ github.ref_name }}-${{ github.run_id }}"
+          CACHES=$(gh api \
+            "/repos/${{ github.repository }}/actions/caches?per_page=100" \
+            --jq ".actions_caches[] | select(.key | startswith(\"ccache-data-${LTO_PREFIX}${{ github.ref_name }}-\")) | select(.key != \"${CURRENT}\") | .id")
+          if [ -n "$CACHES" ]; then
+            for ID in $CACHES; do
+              gh api --method DELETE "/repos/${{ github.repository }}/actions/caches/${ID}" || true
+            done
+          fi
