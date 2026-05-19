@@ -32,8 +32,8 @@ jobs:
     timeout-minutes: 30
 
     env:
-      PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
-      PREP_MODE:      "true"
+      PERSONAL_TOKEN:   ${{ secrets.PERSONAL_TOKEN }}
+      PREP_MODE:        "true"
       USE_CLANG_CACHE:  ${{ inputs.UPDATE_ARSENAL != 'yes' }}
       USE_KERNEL_CACHE: ${{ inputs.UPDATE_ARSENAL != 'yes' }}
       USE_AK3_CACHE:    ${{ inputs.UPDATE_ARSENAL != 'yes' }}
@@ -151,13 +151,6 @@ jobs:
         with:
           path: ${{ github.workspace }}/.ccache
           key: ccache-data-${{ inputs.ENABLE_LTO == 'THIN' && 'lto-' || '' }}${{ github.ref_name }}-${{ github.run_id }}
-
-      - name: "💾 Save kernel source"
-        if: always()
-        uses: actions/cache/save@v5
-        with:
-          path: ~/kernel-cache
-          key: kernel-src-${{ github.ref_name }}
 
       - name: "🧹 Cleanup old caches"
         if: always()
