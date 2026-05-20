@@ -202,7 +202,7 @@ run_fixes() {
 
 run_patches() {
     echo "::group::🩹 Patches"
-    export KBUILD_BUILD_TIMESTAMP="$(date)"
+    export KBUILD_BUILD_TIMESTAMP="$(git -C "$KERNEL_SRC" log -1 --format=%cd --date=format:'%a %b %d %T %Z %Y' 2>/dev/null || date)"
 
     touch "${KERNEL_SRC}/.scmversion"
 
