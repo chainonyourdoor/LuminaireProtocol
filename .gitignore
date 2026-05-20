@@ -1,0 +1,19 @@
+# Build workspace
+workspace/
+out/
+
+# Toolchain & compilers
+greenforce-clang/
+ccache-bin/
+ccache-wrappers/
+
+# Cache
+.ccache/
+
+# Logs & zip output
+*.log
+*.zip
+
+# Python cache
+__pycache__/
+*.pyc
