@@ -141,3 +141,4 @@ jobs:
         with:
           ccache-key: ccache-data-${{ inputs.variant }}-${{ inputs.enable_lto == 'THIN' && 'lto-' || '' }}${{ github.ref_name }}-${{ github.run_id }}
           ccache-prefix: ccache-data-${{ inputs.variant }}-${{ inputs.enable_lto == 'THIN' && 'lto-' || '' }}${{ github.ref_name }}-
+          gh-token: ${{ secrets.PERSONAL_TOKEN }}

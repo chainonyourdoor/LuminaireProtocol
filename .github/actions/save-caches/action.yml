@@ -6,6 +6,8 @@ inputs:
     required: true
   ccache-prefix:
     required: true
+  gh-token:
+    required: true
 
 runs:
   using: composite
@@ -19,7 +21,7 @@ runs:
     - name: "🧹 Cleanup old caches"
       shell: bash
       env:
-        GH_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ inputs.gh-token }}
       run: |
         CURRENT="${{ inputs.ccache-key }}"
         PREFIX="${{ inputs.ccache-prefix }}"
