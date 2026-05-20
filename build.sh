@@ -26,7 +26,6 @@ ARCH="arm64"
 VARIANT="${VARIANT:-VANILLA}"
 PREP_MODE="${PREP_MODE:-false}"
 WARMING_MODE="${WARMING_MODE:-false}"
-PHASE="${PHASE:-all}"
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORK_DIR="${ROOT_DIR}/workspace"
@@ -46,17 +45,8 @@ export CCACHE_COMPRESS=1
 export CCACHE_COMPRESSLEVEL=1
 
 export GIT_CLONE_PROTECTION_ACTIVE=false
-
-DATE=$(date +"%b%d")
-ZIP_NAME="LuminaireProtocol-${DATE}R${GITHUB_RUN_NUMBER:-0}.zip"
-
-LOG_FILE="/tmp/luminaire-$(date +%s).log"
-touch "$LOG_FILE"
-
-
 export KBUILD_BUILD_USER="$BUILD_USER"
 export KBUILD_BUILD_HOST="$BUILD_HOST"
-export KBUILD_BUILD_TIMESTAMP="$(date)"
 export KCFLAGS="-w"
 
 MAKE_ARGS=(
@@ -70,6 +60,13 @@ MAKE_ARGS=(
     LOCALVERSION="-${KERNEL_NAME}"
     -j"$(nproc --all)"
 )
+
+DATE=$(date +"%b%d")
+ZIP_NAME="LuminaireProtocol-${DATE}R${GITHUB_RUN_NUMBER:-0}.zip"
+
+LOG_FILE="/tmp/luminaire-$(date +%s).log"
+touch "$LOG_FILE"
+
 # ======================================================
 # 🚀 MAIN
 # ======================================================
@@ -77,73 +74,43 @@ MAKE_ARGS=(
 main() {
     exec 1> >(tee -a "$LOG_FILE") 2>&1
 
+    echo ""
+    log "========================================"
+    log "  ✨ Luminaire Protocol — ${VARIANT}"
+    log "  🖥️ CPU: $(nproc --all) cores"
+    log "  💾 RAM: $(free -h | grep Mem | awk '{print $2}')"
+    log "  📅 $(date)"
+    log "========================================"
+    echo ""
+
     mkdir -p "$KERNEL_DIR" "$OUT_DIR"
 
-    case "$PHASE" in
-        prep)
-            clone_patch_repo
-            run_setup
-            download_kernel_source
-            ;;
-        prepare)
-            clone_patch_repo
-            run_setup
-            download_kernel_source
-            ;;
-        patches)
-            run_fixes
-            run_patches
-            ;;
-        build)
-            build_kernel
-            ;;
-        package)
-            package_anykernel3
-            send_telegram
-            ;;
-        all)
-            echo ""
-            log "========================================"
-            log "  ✨ Luminaire Protocol Build Start"
-            log "  🖥️ CPU: $(nproc --all) cores"
-            log "  💾 RAM: $(free -h | grep Mem | awk '{print $2}')"
-            log "  📅 $(date)"
-            log "========================================"
-            echo ""
+    clone_patch_repo
+    run_setup
+    download_kernel_source
 
-            clone_patch_repo
+    if [ "$PREP_MODE" = "true" ]; then
+        log "✅ Prep Complete!"
+        exit 0
+    fi
 
-            if [ "$PREP_MODE" = "true" ]; then
-                run_setup
-                download_kernel_source
-                log "  ✅ Prep Complete!"
-                exit 0
-            fi
+    run_fixes
+    run_patches
+    build_kernel
 
-            run_setup
-            download_kernel_source
-            run_fixes
-            run_patches
-            build_kernel
+    if [ "$WARMING_MODE" = "true" ]; then
+        log "🔥 Warming Complete — skipping packaging"
+        exit 0
+    fi
 
-            if [ "$WARMING_MODE" = "true" ]; then
-                log "  🔥 Warming Complete — skipping packaging"
-                exit 0
-            fi
+    package_anykernel3
+    send_telegram
 
-            package_anykernel3
-            send_telegram
-
-            echo ""
-            log "========================================"
-            log "  ✅ Build Complete! — ${ZIP_NAME}"
-            log "========================================"
-            echo ""
-            ;;
-        *)
-            error "Unknown PHASE: ${PHASE}"
-            ;;
-    esac
+    echo ""
+    log "========================================"
+    log "  ✅ Build Complete! — ${ZIP_NAME}"
+    log "========================================"
+    echo ""
 }
 
 # ======================================================
@@ -151,30 +118,35 @@ main() {
 # ======================================================
 
 clone_patch_repo() {
+    echo "::group::🔑 Luminaire-Patch"
     log "Cloning Luminaire-Patch..."
     git clone --depth=1 \
         https://x-access-token:${PERSONAL_TOKEN}@github.com/chainonyourdoor/Luminaire-Patch.git \
         "${ROOT_DIR}/Luminaire-Patch"
+    echo "::endgroup::"
 }
 
 # ======================================================
-# 📦 RUN SETUP
+# 📦 SETUP
 # ======================================================
 
 run_setup() {
+    echo "::group::📦 Setup"
     for script in "${PATCH_REPO}/setup/"*.sh; do
-        log "Running setup: $(basename "$script")..."
+        log "Running: $(basename "$script")..."
         source "$script" || error "Setup failed: $(basename "$script")"
     done
+    echo "::endgroup::"
 }
 
 # ======================================================
-# 📥 DOWNLOAD KERNEL SOURCE
+# 📥 KERNEL SOURCE
 # ======================================================
 
 download_kernel_source() {
+    echo "::group::📥 Kernel Source"
     if [ "${USE_KERNEL_CACHE:-false}" = "true" ] && [ -d "${HOME}/kernel-cache/common" ]; then
-        log "Restoring kernel source from cache..."
+        log "Restoring from cache..."
         cp -a "${HOME}/kernel-cache/." "${KERNEL_DIR}/"
         log "Kernel source restored ✅"
     else
@@ -187,22 +159,22 @@ download_kernel_source() {
         mkdir -p "${HOME}/kernel-cache"
         rsync -a "${KERNEL_DIR}/" "${HOME}/kernel-cache/"
     fi
-
     SUBLEVEL="$(grep '^SUBLEVEL = ' "${KERNEL_SRC}/Makefile" | awk '{print $3}')"
     log "Kernel source ready ✅ (sublevel: ${SUBLEVEL})"
     echo "SUBLEVEL=${SUBLEVEL}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
+    echo "::endgroup::"
 }
 
 # ======================================================
-# 🔧 RUN FIXES
+# 🔧 FIXES
 # ======================================================
 
 run_fixes() {
+    echo "::group::🔧 Fixes"
     for fix in "${PATCH_REPO}/fixes/"*.sh; do
         log "Applying: $(basename "$fix")..."
         source "$fix" || error "Fix failed: $(basename "$fix")"
     done
-
     for patch in "${PATCH_REPO}/patches/"*.patch; do
         [ -f "$patch" ] || continue
         log "Applying patch: $(basename "$patch")..."
@@ -215,15 +187,17 @@ run_fixes() {
             error "$(basename "$patch") failed — conflict!"
         fi
     done
-
     log "All fixes applied ✅"
+    echo "::endgroup::"
 }
 
 # ======================================================
-# 🩹 RUN PATCHES (defconfig)
+# 🩹 PATCHES
 # ======================================================
 
 run_patches() {
+    echo "::group::🩹 Patches"
+    export KBUILD_BUILD_TIMESTAMP="$(date)"
 
     touch "${KERNEL_SRC}/.scmversion"
 
@@ -237,6 +211,7 @@ run_patches() {
     make "${MAKE_ARGS[@]}" olddefconfig || error "olddefconfig failed!"
 
     log "Patches applied ✅"
+    echo "::endgroup::"
 }
 
 # ======================================================
@@ -244,6 +219,7 @@ run_patches() {
 # ======================================================
 
 build_kernel() {
+    echo "::group::🏗️ Build Kernel"
     log "Building kernel..."
     START_TIME=$(date +%s)
 
@@ -267,9 +243,11 @@ build_kernel() {
     BUILD_SECONDS=$(( $(date +%s) - START_TIME ))
     log "Build completed in ${BUILD_SECONDS}s ✅"
     echo "BUILD_SECONDS=${BUILD_SECONDS}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
+    echo "::endgroup::"
 
-    log "Ccache stats:"
+    echo "::group::📊 Ccache Stats"
     [ -f "$CCACHE_BIN" ] && $CCACHE_BIN --show-stats 2>/dev/null || true
+    echo "::endgroup::"
 }
 
 # ======================================================
@@ -277,6 +255,7 @@ build_kernel() {
 # ======================================================
 
 package_anykernel3() {
+    echo "::group::📦 Package AnyKernel3"
     if [ "${USE_AK3_CACHE:-false}" = "true" ] && [ -d "${HOME}/ak3-cache" ]; then
         cp -a "${HOME}/ak3-cache/." "${AK3_DIR}/"
         log "AnyKernel3 restored from cache ✅"
@@ -309,6 +288,7 @@ package_anykernel3() {
     log "ZIP ready: ${ZIP_NAME} ✅"
     echo "ZIP_NAME=${ZIP_NAME}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
     echo "ZIP_PATH=${ZIP_PATH}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
+    echo "::endgroup::"
 }
 
 # ======================================================
@@ -316,6 +296,7 @@ package_anykernel3() {
 # ======================================================
 
 send_telegram() {
+    echo "::group::📲 Telegram"
     LINUX_VERSION=$(make -C "$KERNEL_SRC" kernelversion 2>/dev/null | \
         grep -v "make" | head -n 1 | tr -d '[:space:]' || true)
 
@@ -326,10 +307,12 @@ send_telegram() {
             -F "document=@${ZIP_PATH};filename=${ZIP_NAME}" \
             -F "caption=✨ <b>Luminaire Protocol</b>
 Linux     : ${LINUX_VERSION:-N/A}
+Variant   : ${VARIANT}
 Compiler  : ${COMPILER_STRING:-N/A}
 Date      : $(date +'%d %b %Y')" \
             -F "parse_mode=HTML" || true
     fi
+    echo "::endgroup::"
 }
 
 # ======================================================

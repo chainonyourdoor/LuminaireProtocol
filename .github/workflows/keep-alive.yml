@@ -6,13 +6,12 @@ on:
   workflow_dispatch:
 
 jobs:
-
   keep-alive:
     name: "🫀 Touch All Caches"
     runs-on: ubuntu-latest
 
     steps:
-      - name: "♻️ Touch arsenal cache"
+      - name: "♻️ Touch arsenal"
         uses: actions/cache/restore@v5
         with:
           path: |
@@ -24,16 +23,9 @@ jobs:
           key: arsenal-${{ github.ref_name }}-__keepalive__
           restore-keys: arsenal-${{ github.ref_name }}-
 
-      - name: "♻️ Touch ccache data"
+      - name: "♻️ Touch ccache VANILLA"
         uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ccache-data-${{ github.ref_name }}-__keepalive__
-          restore-keys: ccache-data-${{ github.ref_name }}-
-
-      - name: "♻️ Touch ccache data (LTO)"
-        uses: actions/cache/restore@v5
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache-data-lto-${{ github.ref_name }}-__keepalive__
-          restore-keys: ccache-data-lto-${{ github.ref_name }}-
+          key: ccache-data-VANILLA-${{ github.ref_name }}-__keepalive__
+          restore-keys: ccache-data-VANILLA-${{ github.ref_name }}-

@@ -1,0 +1,32 @@
+name: "Restore Caches"
+description: "Restore arsenal and ccache"
+
+inputs:
+  arsenal-key:
+    required: true
+  ccache-key:
+    required: true
+  ccache-restore-keys:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: "♻️ Restore arsenal"
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          ~/clang-cache
+          ~/ccache-bin
+          ~/ak3-cache
+          ~/kernel-cache
+          ~/.apt-cache
+        key: ${{ inputs.arsenal-key }}
+        restore-keys: arsenal-${{ github.ref_name }}-
+
+    - name: "♻️ Restore ccache"
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ github.workspace }}/.ccache
+        key: ${{ inputs.ccache-key }}
+        restore-keys: ${{ inputs.ccache-restore-keys }}
