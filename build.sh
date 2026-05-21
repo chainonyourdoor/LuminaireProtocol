@@ -49,6 +49,7 @@ export CCACHE_COMPRESSLEVEL=1
 export GIT_CLONE_PROTECTION_ACTIVE=false
 export KBUILD_BUILD_USER="$BUILD_USER"
 export KBUILD_BUILD_HOST="$BUILD_HOST"
+export KBUILD_BUILD_VERSION=1
 export KCFLAGS="-w"
 
 MAKE_ARGS=(
@@ -202,7 +203,6 @@ run_fixes() {
 run_patches() {
     echo "::group::🩹 Patches"
     export KBUILD_BUILD_TIMESTAMP="$(git -C "$KERNEL_SRC" log -1 --format=%cd --date=format:'%a %b %d %T %Z %Y' 2>/dev/null || date)"
-    export KBUILD_BUILD_VERSION=1
 
     touch "${KERNEL_SRC}/.scmversion"
 
