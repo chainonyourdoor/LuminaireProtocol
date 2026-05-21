@@ -36,7 +36,7 @@ jobs:
   # 🧰 PREPARATION
   # ======================================================
   prep:
-    name: "🧰 Arsenal Preparation"
+    name: "Arsenal Preparation"
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -48,12 +48,12 @@ jobs:
       USE_AK3_CACHE:    ${{ inputs.update_arsenal != 'yes' }}
 
     steps:
-      - name: "🌀 Clone LuminaireProtocol"
+      - name: "Clone LuminaireProtocol"
         run: |
           git clone --filter=blob:none \
             "https://x-access-token:${PERSONAL_TOKEN}@github.com/chainonyourdoor/LuminaireProtocol" .
 
-      - name: "♻️ Restore Arsenal Cache"
+      - name: "Restore Arsenal Cache"
         if: inputs.update_arsenal != 'yes'
         uses: actions/cache/restore@v5
         with:
@@ -66,10 +66,10 @@ jobs:
           key: arsenal-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: arsenal-${{ github.ref_name }}-
 
-      - name: "🚀 Run Preparation"
+      - name: "Run Preparation"
         run: bash build.sh
 
-      - name: "💾 Save Arsenal Cache"
+      - name: "Save Arsenal Cache"
         if: always()
         uses: actions/cache/save@v5
         with:
@@ -81,7 +81,7 @@ jobs:
             ~/.apt-cache
           key: arsenal-${{ github.ref_name }}-${{ github.run_id }}
 
-      - name: "🧹 Cleanup Old Arsenal"
+      - name: "Cleanup Old Arsenal"
         if: always()
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
