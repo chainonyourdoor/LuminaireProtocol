@@ -94,6 +94,11 @@ main() {
     run_setup
     download_kernel_source
 
+    log "🔍 Kernel android/ dir:"
+    ls "${KERNEL_SRC}/android/" 2>/dev/null | head -20 || log "android/ not found"
+    log "🔍 localversion files:"
+    find "${KERNEL_SRC}" -maxdepth 2 -name "localversion*" 2>/dev/null || true
+
     if [ "$PREP_MODE" = "true" ]; then
         log "✅ Prep Complete!"
         exit 0
