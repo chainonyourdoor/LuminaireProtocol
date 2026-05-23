@@ -77,16 +77,11 @@ MAKE_ARGS=(
 DATE=$(date +"%b%d")
 ZIP_NAME="LuminaireAnykernel3-${DATE}R${GITHUB_RUN_NUMBER:-0}.zip"
 
-LOG_FILE="/tmp/luminaire-$(date +%s).log"
-touch "$LOG_FILE"
-
 # ======================================================
 # 🚀 MAIN
 # ======================================================
 
 main() {
-    exec 1> >(tee -a "$LOG_FILE") 2>&1
-
     echo ""
     log "========================================"
     log "  ✨ Luminaire Protocol — ${VARIANT}"
@@ -117,7 +112,6 @@ main() {
     fi
 
     package_anykernel3
-    send_telegram
 
     echo ""
     log "========================================"
@@ -309,63 +303,11 @@ package_anykernel3() {
 }
 
 # ======================================================
-# 📲 TELEGRAM
-# ======================================================
-
-send_telegram() {
-    echo "::group::📲 Telegram"
-    LINUX_VERSION=$(make -C "$KERNEL_SRC" kernelversion 2>/dev/null | \
-        grep -v "make" | head -n 1 | tr -d '[:space:]' || true)
-
-    log "[TG] BOT_TOKEN  : ${TELEGRAM_BOT_TOKEN:+set (hidden)}"
-    log "[TG] CHAT_ID    : ${TELEGRAM_CHAT_ID:+set (hidden)}"
-    log "[TG] ZIP_PATH   : ${ZIP_PATH:-NOT SET}"
-    log "[TG] ZIP exists : $([ -f "${ZIP_PATH:-}" ] && echo 'YES' || echo 'NO')"
-
-    if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ] && [ -f "${ZIP_PATH:-}" ]; then
-        log "Sending ZIP to Telegram..."
-        CURL_ARGS=(
-            -s -X POST
-            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
-            -F "chat_id=${TELEGRAM_CHAT_ID}"
-            -F "document=@${ZIP_PATH};filename=${ZIP_NAME}"
-            -F "caption=<b>Luminaire ${VARIANT}</b>
-Linux     : ${LINUX_VERSION:-N/A}
-Compiler  : ${COMPILER_STRING:-N/A}
-Date      : $(date +'%d %b %Y')"
-            -F "parse_mode=HTML"
-        )
-        [ -n "${TELEGRAM_THREAD_ID_BUILD:-}" ] && \
-            CURL_ARGS+=(-F "message_thread_id=${TELEGRAM_THREAD_ID_BUILD}")
-        RESPONSE=$(curl "${CURL_ARGS[@]}" || true)
-        log "Telegram response: ${RESPONSE}"
-        echo "${RESPONSE}" | grep -q '"ok":true' \
-            && log "ZIP sent to Telegram ✅" \
-            || log "⚠️ Telegram ZIP send may have failed!"
-    else
-        [ -z "${TELEGRAM_BOT_TOKEN:-}" ] && log "⚠️ TELEGRAM_BOT_TOKEN is not set!"
-        [ -z "${TELEGRAM_CHAT_ID:-}" ]   && log "⚠️ TELEGRAM_CHAT_ID is not set!"
-        [ ! -f "${ZIP_PATH:-}" ]         && log "⚠️ ZIP file not found: ${ZIP_PATH:-NOT SET}"
-        log "⚠️ Skipping Telegram ZIP send — condition not met!"
-    fi
-    echo "::endgroup::"
-}
-
-# ======================================================
 # 🧹 CLEANUP
 # ======================================================
 
 cleanup() {
-    if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ] && [ -f "${LOG_FILE:-}" ]; then
-        CAPTION="📄 Build Log"
-        [ -n "${BUILD_SECONDS:-}" ] && \
-            CAPTION="✅ ${BUILD_SECONDS}s | 📦 ${ZIP_NAME:-unknown}"
-        curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
-            -F "chat_id=${TELEGRAM_CHAT_ID}" \
-            ${TELEGRAM_THREAD_ID_LOG:+-F "message_thread_id=${TELEGRAM_THREAD_ID_LOG}"} \
-            -F "document=@${LOG_FILE};filename=build-$(date +%Y%m%d-%H%M).log" \
-            -F "caption=${CAPTION}" || true
-    fi
+    true
 }
 trap cleanup EXIT
 
