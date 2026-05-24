@@ -131,11 +131,25 @@ jobs:
 
           [ ! -s "${LOG_FILE}" ] && { echo "Log file empty"; exit 0; }
 
+          BUILD_INFO=$(gh api \
+            "repos/${REPO}/actions/runs/${RUN_ID}/artifacts" \
+            --jq '.artifacts[] | select(.name == "build-info") | .id' 2>/dev/null | head -1)
+
+          VARIANT_INFO=""
+          if [ -n "$BUILD_INFO" ]; then
+            gh api "repos/${REPO}/actions/artifacts/${BUILD_INFO}/zip" > /tmp/build-info.zip 2>/dev/null
+            unzip -p /tmp/build-info.zip build-info.txt > /tmp/build-info.txt 2>/dev/null || true
+            if [ -f /tmp/build-info.txt ]; then
+              source /tmp/build-info.txt 2>/dev/null || true
+              VARIANT_INFO=" — ${VARIANT} ${KERNEL_VERSION} (${BUILD_SYSTEM})"
+            fi
+          fi
+
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
             -F "chat_id=${TELEGRAM_CHAT_ID}" \
             -F "message_thread_id=${TELEGRAM_THREAD_ID}" \
             -F "document=@${LOG_FILE};filename=$(basename ${LOG_FILE})" \
-            -F "caption=📋 Full Log — ${WF_NAME} #${RUN_NUMBER}" \
+            -F "caption=Full Log — Luminaire${VARIANT_INFO} #${RUN_NUMBER}" \
             > /dev/null || true
 
-          rm -f "${LOG_FILE}"
+          rm -f "${LOG_FILE}" /tmp/build-info.zip /tmp/build-info.txt

@@ -69,6 +69,12 @@ main() {
         exit 0
     fi
 
+    cat > /tmp/build-info.txt << EOF
+VARIANT=${VARIANT}
+KERNEL_VERSION=${KERNEL_VERSION}
+BUILD_SYSTEM=${BUILD_SYSTEM}
+EOF
+
     run_release
 
     echo "========================================"
