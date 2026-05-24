@@ -89,11 +89,11 @@ main() {
 }
 
 # ======================================================
-# 🔑 CLONE PATCH REPO
+# 🌀 CLONE PATCH REPO
 # ======================================================
 
 clone_patch_repo() {
-    echo "::group::🔑 Luminaire-Patch"
+    echo "::group::🌀 Luminaire-Patch"
     if [ -d "${ROOT_DIR}/Luminaire-Patch/.git" ]; then
         log "Luminaire-Patch already exists, skipping clone."
     else
@@ -149,16 +149,12 @@ download_kernel_source() {
 }
 
 # ======================================================
-# 🏷️ BRANDING — LOAD VARS
+# 🏷️ BRANDING
 # ======================================================
 
 load_branding() {
     source "${LUMINAIRE_PATCH_DIR}/branding/branding.sh"
 }
-
-# ======================================================
-# 🏷️ BRANDING — APPLY PATCH
-# ======================================================
 
 run_branding() {
     echo "::group::🏷️ Branding"
@@ -253,7 +249,7 @@ build_kernel() {
 }
 
 # ======================================================
-# 🎁 RELEASE
+# 🚀 RELEASE
 # ======================================================
 
 run_release() {
