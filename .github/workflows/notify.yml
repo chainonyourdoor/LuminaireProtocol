@@ -8,6 +8,7 @@ on:
       - "🔥 Cache Warming"
       - "🌀 Sync Kernel Source"
     types:
+      - requested
       - completed
 
 jobs:
@@ -72,12 +73,17 @@ jobs:
         run: |
           if [ "$WF_STATUS" = "success" ]; then
             ICON="✅"
-          else
+            STATUS_TEXT="success"
+          elif [ "$WF_STATUS" = "failure" ]; then
             ICON="❌"
+            STATUS_TEXT="failure"
+          else
+            ICON="🚀"
+            STATUS_TEXT="started"
           fi
 
           TEXT=$(printf '%s Workflow : <a href="%s">%s #%s</a>\nBranch : <code>%s</code>\nStatus : <code>%s</code>' \
-            "$ICON" "$WF_URL" "$WF_NAME" "$WF_RUN" "$WF_BRANCH" "$WF_STATUS")
+            "$ICON" "$WF_URL" "$WF_NAME" "$WF_RUN" "$WF_BRANCH" "$STATUS_TEXT")
 
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d "chat_id=${TELEGRAM_CHAT_ID}" \
