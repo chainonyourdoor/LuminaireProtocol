@@ -24,6 +24,7 @@ case "${KERNEL_VERSION}" in
 esac
 
 KERNEL_BRANCH="${ANDROID_VERSION}-${KERNEL_VERSION}-lts"
+KLEAF_MANIFEST_BRANCH="common-${ANDROID_VERSION}-${KERNEL_VERSION}"
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LUMINAIRE_PATCH_DIR="${ROOT_DIR}/Luminaire-Patch/common"
@@ -156,7 +157,7 @@ _download_kleaf() {
                 -o /usr/local/bin/repo && chmod +x /usr/local/bin/repo
         mkdir -p "$KERNEL_DIR" && cd "$KERNEL_DIR"
         repo init -u https://android.googlesource.com/kernel/manifest \
-            -b "${KERNEL_BRANCH}" --depth=1 -q || error "repo init failed!"
+            -b "${KLEAF_MANIFEST_BRANCH}" --depth=1 -q || error "repo init failed!"
         repo sync -c -j"$(nproc --all)" --no-tags --no-clone-bundle -q \
             || error "repo sync failed!"
         cd "$ROOT_DIR"
