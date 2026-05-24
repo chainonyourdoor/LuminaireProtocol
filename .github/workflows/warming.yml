@@ -36,7 +36,7 @@ on:
 
 jobs:
   Luminaire:
-    uses: ./.github/workflows/kernel-build.yml
+    uses: ./.github/workflows/_kernel-build.yml
     with:
       variant:         ${{ inputs.variant }}
       kernel_version:  ${{ inputs.kernel_version }}
