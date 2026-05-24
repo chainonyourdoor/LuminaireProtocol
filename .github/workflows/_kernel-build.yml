@@ -139,7 +139,11 @@ jobs:
 
       - name: "Build"
         run: bash build.sh
-
+        
+      - name: "📊 Ccache Stats"
+        if: always ()
+        run: ~/ccache-bin/ccache --show-stats
+        
       - name: "Save ${{ inputs.variant }} Cache"
         uses: ./.github/actions/save-caches
         if: always()
