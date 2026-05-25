@@ -1,5 +1,5 @@
 name: "🔥 Cache Warming"
-run-name: "🔥 ${{ inputs.kernel_version }} | ${{ inputs.build_system }}"
+run-name: "${{ inputs.kernel_version }} | ${{ inputs.build_system }}"
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ on:
         type: boolean
         default: true
       resukisu_susfs:
-        description: "ReSukiSU + SuSFS"
+        description: "ReSukiSU+SuSFS"
         type: boolean
         default: false
       update_arsenal:
