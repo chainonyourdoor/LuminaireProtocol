@@ -25,14 +25,6 @@ on:
         description: "VANILLA"
         type: boolean
         default: true
-      ksu:
-        description: "KSU"
-        type: boolean
-        default: false
-      ksu_vfs:
-        description: "KSU VFS"
-        type: boolean
-        default: false
       update_arsenal:
         description: "Update Arsenal"
         type: choice
@@ -69,8 +61,6 @@ jobs:
         run: |
           variants=()
           ${{ inputs.vanilla }} && variants+=("VANILLA")
-          ${{ inputs.ksu }}     && variants+=("KSU")
-          ${{ inputs.ksu_vfs }} && variants+=("KSU_VFS")
 
           if [ ${#variants[@]} -eq 0 ]; then
             echo "No variants selected!"
