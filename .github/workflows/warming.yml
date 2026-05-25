@@ -21,6 +21,14 @@ on:
           - "6.1"
           - "6.6"
           - "6.12"
+      vanilla:
+        description: "VANILLA"
+        type: boolean
+        default: true
+      resukisu_susfs:
+        description: "ReSukiSU + SuSFS"
+        type: boolean
+        default: false
       update_arsenal:
         description: "Refresh Arsenal"
         type: choice
@@ -41,8 +49,8 @@ jobs:
     uses: ./.github/workflows/_kernel-build.yml
     with:
       build_system:   ${{ inputs.build_system }}
-      variant:        "VANILLA"
-      vanilla:        true
+      vanilla:        ${{ inputs.vanilla }}
+      resukisu_susfs: ${{ inputs.resukisu_susfs }}
       kernel_version: ${{ inputs.kernel_version }}
       update_arsenal: ${{ inputs.update_arsenal }}
       enable_lto:     ${{ inputs.enable_lto }}
