@@ -16,5 +16,5 @@ else
         "${KERNEL_DIR}/common" || error "Failed to clone kernel!"
     log "Saving to cache..."
     mkdir -p "${HOME}/kernel-cache"
-    rsync -a "${KERNEL_DIR}/" "${HOME}/kernel-cache/"
+    rsync -a --delete "${KERNEL_DIR}/" "${HOME}/kernel-cache/"
 fi

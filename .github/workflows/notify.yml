@@ -35,9 +35,12 @@ jobs:
             TEXT=$(printf '%s\n\nMessage:\n<pre>%s</pre>' "$TEXT" "$BODY")
           fi
 
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+          RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d "chat_id=${TELEGRAM_CHAT_ID}" \
             -d "message_thread_id=${TELEGRAM_THREAD_ID}" \
             -d "parse_mode=HTML" \
             -d "disable_web_page_preview=true" \
-            --data-urlencode "text=${TEXT}" > /dev/null
+            --data-urlencode "text=${TEXT}")
+          echo "$RESPONSE" | grep -q '"ok":true' \
+            && echo "Notify sent ✅" \
+            || echo "⚠️ Notify failed: $RESPONSE"
