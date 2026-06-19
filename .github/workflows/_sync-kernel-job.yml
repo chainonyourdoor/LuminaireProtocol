@@ -54,7 +54,7 @@ jobs:
           curl -fsSL \
             -H "Authorization: token ${{ secrets.SYNC_TOKEN }}" \
             -H "Accept: application/vnd.github.v3.raw" \
-            "https://api.github.com/repos/chainonyourdoor/LuminaireProtocol/contents/Luminaire/download/fast_parallel_download.py" \
+            "https://api.github.com/repos/chainonyourdoor/LuminaireProtocol/contents/luminaire/download/fast_parallel_download.py" \
             -o fast_parallel_download.py
           python3 fast_parallel_download.py
 
