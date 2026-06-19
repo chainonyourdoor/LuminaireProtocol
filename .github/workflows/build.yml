@@ -43,11 +43,6 @@ on:
           - "NONE"
           - "THIN"
           - "FULL"
-      _addons:
-        description: "Add-ons"
-        type: string
-        default: ""
-        required: false
       bbg:
         description: "BBG (Baseband Guard)"
         type: boolean
