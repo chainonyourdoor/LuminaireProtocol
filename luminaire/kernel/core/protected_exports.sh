@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# 🗑️ FIX — REMOVE PROTECTED EXPORTS
+# 🗑️ REMOVE PROTECTED EXPORTS
 # ======================================================
 
 rm -rf "${KERNEL_DIR}/common/android/abi_gki_protected_exports_"*
