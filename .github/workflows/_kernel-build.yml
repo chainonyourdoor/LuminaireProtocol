@@ -195,8 +195,7 @@ jobs:
         if: inputs.build_system != 'KLEAF'
         uses: ./.github/actions/restore-caches
         with:
-          ccache-key: ccache-data-${{ matrix.variant }}-${{ inputs.kernel_version }}-${{ inputs.enable_lto != 'NONE' && 'lto-' || '' }}${{ github.ref_name }}-${{ github.run_id }}
-          ccache-restore-keys: ccache-data-${{ matrix.variant }}-${{ inputs.kernel_version }}-${{ inputs.enable_lto != 'NONE' && 'lto-' || '' }}${{ github.ref_name }}-
+          ccache-prefix: ccache-data-${{ matrix.variant }}-${{ inputs.kernel_version }}-${{ inputs.enable_lto != 'NONE' && 'lto-' || '' }}${{ github.ref_name }}-
           gh-token: ${{ secrets.PERSONAL_TOKEN }}
 
       - name: "Disk Usage"
@@ -213,7 +212,6 @@ jobs:
         if: always() && inputs.build_system != 'KLEAF'
         uses: ./.github/actions/save-caches
         with:
-          ccache-key: ccache-data-${{ matrix.variant }}-${{ inputs.kernel_version }}-${{ inputs.enable_lto != 'NONE' && 'lto-' || '' }}${{ github.ref_name }}-${{ github.run_id }}
           ccache-prefix: ccache-data-${{ matrix.variant }}-${{ inputs.kernel_version }}-${{ inputs.enable_lto != 'NONE' && 'lto-' || '' }}${{ github.ref_name }}-
           gh-token: ${{ secrets.PERSONAL_TOKEN }}
 
@@ -225,4 +223,5 @@ jobs:
           path: /tmp/build-info.txt
           retention-days: 1
           if-no-files-found: ignore
+
           
