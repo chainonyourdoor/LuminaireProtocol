@@ -30,22 +30,6 @@ make "${MAKE_ARGS[@]}" "$DEFCONFIG" || error "Defconfig failed!"
 log "Applying Luminaire configs..."
 source "${LUMINAIRE_PATCH_DIR}/kernel/config/defconfig.sh"
 
-# Handle LTO configuration for MAKE
-if [ -n "${ENABLE_LTO}" ] && [ "${ENABLE_LTO}" != "NONE" ]; then
-    log "Configuring LTO: ${ENABLE_LTO}"
-    case "${ENABLE_LTO}" in
-        THIN)
-            "${KERNEL_SRC}/scripts/config" --file "${OUT_DIR}/.config" --enable CONFIG_LTO --enable CONFIG_LTO_CLANG --disable CONFIG_LTO_CLANG_FULL
-            ;;
-        FULL)
-            "${KERNEL_SRC}/scripts/config" --file "${OUT_DIR}/.config" --enable CONFIG_LTO --enable CONFIG_LTO_CLANG --enable CONFIG_LTO_CLANG_FULL
-            ;;
-        *)
-            warn "Unknown LTO mode: ${ENABLE_LTO}"
-            ;;
-    esac
-fi
-
 log "Syncing config..."
 make "${MAKE_ARGS[@]}" olddefconfig || error "olddefconfig failed!"
 

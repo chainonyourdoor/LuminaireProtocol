@@ -58,6 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set.outputs.matrix }}
+      addons: ${{ steps.set.outputs.addons }}
 
     env:
       PERSONAL_TOKEN:  ${{ secrets.PERSONAL_TOKEN }}
@@ -99,6 +100,13 @@ jobs:
 
           matrix_json=$(printf '%s\n' "${variants[@]}" | jq -cs '{include: .}')
           echo "matrix=${matrix_json}" >> $GITHUB_OUTPUT
+
+          # Build addons string without leading comma
+          addons=""
+          ${{ inputs.bbg }}         && addons="${addons:+$addons,}bbg"         || true
+          ${{ inputs.droidspaces }} && addons="${addons:+$addons,}droidspaces" || true
+          ${{ inputs.nomount }}     && addons="${addons:+$addons,}nomount"     || true
+          echo "addons=${addons}" >> $GITHUB_OUTPUT
 
       - name: "Restore Arsenal Cache"
         if: inputs.update_arsenal != 'yes'
@@ -178,7 +186,7 @@ jobs:
       ENABLE_LTO:                  ${{ inputs.enable_lto }}
       WARMING_MODE:                ${{ inputs.warming_mode }}
       BUILD_SYSTEM:                ${{ inputs.build_system }}
-      ADDONS:                      ${{ inputs.addons }}
+      ADDONS:                      ${{ needs.prepare-matrix.outputs.addons }}
       # MAKE only — KLEAF uses Bazel internal cache
       CCACHE_DIR:                  ${{ inputs.build_system == 'MAKE' && format('{0}/.ccache', github.workspace) || '' }}
       CCACHE_MAXSIZE:              ${{ inputs.build_system == 'MAKE' && '5G' || '' }}

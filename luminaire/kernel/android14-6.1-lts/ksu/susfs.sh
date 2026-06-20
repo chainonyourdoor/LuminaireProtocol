@@ -11,7 +11,7 @@ SUSFS_DIR="/tmp/susfs4ksu"
 log "Cloning SuSFS (${SUSFS_BRANCH})..."
 [ -d "$SUSFS_DIR" ] && rm -rf "$SUSFS_DIR"
 retry 3 run_quiet git clone -q --depth=1 -b "$SUSFS_BRANCH" "$SUSFS_REPO" "$SUSFS_DIR" \
-    || { warn "SuSFS clone failed after 3 attempts — skipping (kernel will build WITHOUT SuSFS)"; return 0; }
+    || error "SuSFS clone failed after 3 attempts!"
 
 log "Copying SuSFS source files..."
 cp "${SUSFS_DIR}/kernel_patches/fs/susfs.c"                  "${KERNEL_SRC}/fs/susfs.c"
