@@ -61,7 +61,38 @@ PYEOF
 log "Branding applied ✅"
 
 # ======================================================
-# 3. Kconfig
+# 3. SuSFS Hook Bridge
+# ======================================================
+# syscall_hooks.patch injects ksu_handle_*() call points into
+# vanilla kernel syscall paths (fs/exec.c, fs/open.c, fs/stat.c,
+# etc.) — bridging SukiSU-Ultra's syscall_hook_manager architecture
+# to the classic inline-hook API expected by susfs4ksu patches.
+# Must be applied BEFORE susfs.sh runs.
+
+SUKISU_PATCH_REPO="https://github.com/ShirkNeko/SukiSU_patch.git"
+SUKISU_PATCH_DIR="/tmp/sukisu_patch"
+
+log "Cloning SukiSU_patch (hook bridge)..."
+[ -d "$SUKISU_PATCH_DIR" ] && rm -rf "$SUKISU_PATCH_DIR"
+retry 3 run_quiet git clone -q --depth=1 "$SUKISU_PATCH_REPO" "$SUKISU_PATCH_DIR" \
+    || error "SukiSU_patch: failed to clone!"
+
+HOOK_PATCH="${SUKISU_PATCH_DIR}/hooks/syscall_hooks.patch"
+if [ -f "$HOOK_PATCH" ]; then
+    if patch -p1 --fuzz=3 --dry-run --reverse -d "$KERNEL_SRC" < "$HOOK_PATCH" > /dev/null 2>&1; then
+        log "syscall_hooks already applied, skipping."
+    else
+        patch -p1 --fuzz=3 --forward -d "$KERNEL_SRC" < "$HOOK_PATCH" \
+            && log "syscall_hooks patch applied ✅" \
+            || warn "syscall_hooks: some hunks failed — SuSFS integration may be degraded"
+    fi
+else
+    warn "syscall_hooks.patch not found in SukiSU_patch repo"
+fi
+rm -rf "$SUKISU_PATCH_DIR"
+
+# ======================================================
+# 4. Kconfig
 # ======================================================
 
 log "Enabling KSU configs..."
