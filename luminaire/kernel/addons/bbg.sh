@@ -5,6 +5,8 @@ cd "${KERNEL_SRC}"
 BBG_SETUP=$(wget --no-verbose -O- --timeout=30 --tries=3 \
     "https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh") \
     || error "BBG: failed to download setup.sh!"
+[ -n "$BBG_SETUP" ] || error "BBG: setup.sh is empty!"
+echo "$BBG_SETUP" | grep -q "^#!" || error "BBG: setup.sh looks invalid (no shebang)!"
 echo "$BBG_SETUP" | bash || error "BBG: setup.sh failed!"
 [ -L "${KERNEL_SRC}/security/baseband-guard" ] \
     || error "BBG: inject failed — security/baseband-guard symlink not found!"

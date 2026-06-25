@@ -15,6 +15,8 @@ cd "$KERNEL_SRC"
 RESUKISU_SETUP=$(curl -LSs --fail --retry 3 \
     "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh") \
     || error "ReSukiSU: failed to download setup.sh!"
+[ -n "$RESUKISU_SETUP" ] || error "ReSukiSU: setup.sh is empty!"
+echo "$RESUKISU_SETUP" | grep -q "^#!" || error "ReSukiSU: setup.sh looks invalid (no shebang)!"
 echo "$RESUKISU_SETUP" | bash || error "ReSukiSU: setup.sh failed!"
 [ -d "${KERNEL_SRC}/KernelSU" ] || error "ReSukiSU: KernelSU dir not found after setup!"
 cd "$ROOT_DIR"
