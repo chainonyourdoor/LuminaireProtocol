@@ -28,6 +28,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: "Checkout LuminaireProtocol"
+        uses: actions/checkout@v7
+
       - name: "Free up disk space"
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
@@ -51,11 +54,7 @@ jobs:
       - name: "Download kernel source"
         run: |
           cd kernel
-          curl -fsSL \
-            -H "Authorization: token ${{ secrets.SYNC_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3.raw" \
-            "https://api.github.com/repos/chainonyourdoor/LuminaireProtocol/contents/luminaire/download/fast_parallel_download.py" \
-            -o fast_parallel_download.py
+          cp "$GITHUB_WORKSPACE/luminaire/download/fast_parallel_download.py" .
           python3 fast_parallel_download.py
 
       - name: "Get kernel version"
