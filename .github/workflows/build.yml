@@ -1,5 +1,5 @@
 name: "✨ Luminaire Protocol"
-run-name: "${{ inputs.kernel_version }} | ${{ inputs.build_system }}${{ inputs.warming_mode && ' (Warming)' || ' (Build)' }}"
+run-name: "${{ inputs.kernel_version }} | ${{ inputs.build_system }} (${{ inputs.warming_mode == 'true' && 'Warming' || 'Build' }})"
 on:
   workflow_dispatch:
     inputs:
