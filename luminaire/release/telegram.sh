@@ -131,9 +131,9 @@ LTO          : ${LTO_ESC}
 Date         : ${DATE_ESC}
 \`\`\`"
 
-BLOCK_ROOT="\`\`\`Root
-Solution : ${ROOT_SOLUTION_ESC}
-SuSFS    : ${SUSFS_VER_ESC}
+BLOCK_ROOT="\`\`\`RootSolution
+KSU   : ${ROOT_SOLUTION_ESC}
+SuSFS : ${SUSFS_VER_ESC}
 \`\`\`"
 
 BLOCK_ADDONS="\`\`\`Add-ons
