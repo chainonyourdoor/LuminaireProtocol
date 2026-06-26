@@ -12,7 +12,20 @@ if [ "${USE_CLANG_CACHE}" = "true" ] && [ -d "${CLANG_CACHE_DIR}/bin" ]; then
     log "Restoring Clang from cache (${CLANG_VARIANT})..."
     mkdir -p "$TOOL_CLANG_DIR"
     cp -a "${CLANG_CACHE_DIR}/." "${TOOL_CLANG_DIR}/"
-    log "Clang restored ✅"
+    if ! "${TOOL_CLANG_DIR}/bin/clang" --version > /dev/null 2>&1; then
+        warn "Clang binary not executable after cache restore — re-downloading..."
+        rm -rf "$TOOL_CLANG_DIR" "$CLANG_CACHE_DIR"
+        mkdir -p "$TOOL_CLANG_DIR"
+        CLANG_VARIANT_SCRIPT="${LUMINAIRE_PATCH_DIR}/setup/clang/${CLANG_VARIANT}.sh"
+        [ -f "$CLANG_VARIANT_SCRIPT" ] || error "Clang variant script not found: ${CLANG_VARIANT}"
+        source "$CLANG_VARIANT_SCRIPT"
+        [ -d "${TOOL_CLANG_DIR}/bin" ] || error "Clang binary missing after re-download!"
+        mkdir -p "$CLANG_CACHE_DIR"
+        cp -a "${TOOL_CLANG_DIR}/." "${CLANG_CACHE_DIR}/"
+        log "Clang re-downloaded and cached ✅"
+    else
+        log "Clang restored ✅"
+    fi
 else
     mkdir -p "$TOOL_CLANG_DIR"
     CLANG_VARIANT_SCRIPT="${LUMINAIRE_PATCH_DIR}/setup/clang/${CLANG_VARIANT}.sh"
