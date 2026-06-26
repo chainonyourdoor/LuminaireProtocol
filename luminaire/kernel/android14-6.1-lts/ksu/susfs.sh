@@ -21,6 +21,7 @@ KSU_DIR="${KSU_DIR:-${KERNEL_SRC}/KernelSU}"
 SUSFS_BRANCH="gki-android14-6.1"
 SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
 SUSFS_DIR="/tmp/susfs4ksu"
+PATCHER_DIR="${LUMINAIRE_PATCH_DIR}/kernel/android14-6.1-lts/ksu"
 
 log "Cloning SuSFS (${SUSFS_BRANCH})..."
 [ -d "$SUSFS_DIR" ] && rm -rf "$SUSFS_DIR"
@@ -45,48 +46,8 @@ else
 fi
 
 log "Fixing namespace.c susfs declarations..."
-python3 - "${KERNEL_SRC}/fs/namespace.c" << 'PYEOF'
-import sys
-
-with open(sys.argv[1]) as f:
-    content = f.read()
-
-if "susfs_is_current_ksu_domain" in content and "susfs_def.h" in content:
-    print("namespace.c already patched, skipping.")
-    sys.exit(0)
-
-include_target = "#include <linux/mnt_idmapping.h>"
-include_inject = ("#include <linux/mnt_idmapping.h>\n"
-                  "#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\n"
-                  "#include <linux/susfs_def.h>\n"
-                  "#endif")
-
-internal_target = '#include "internal.h"'
-internal_inject = ('#include "internal.h"\n'
-                   "\n"
-                   "#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\n"
-                   "extern bool susfs_is_current_ksu_domain(void);\n"
-                   "extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;\n"
-                   "\n"
-                   "#define CL_COPY_MNT_NS BIT(25) /* used by copy_mnt_ns() */\n"
-                   "#endif")
-
-if include_target not in content:
-    print("ERROR: mnt_idmapping.h include not found!", file=sys.stderr)
-    sys.exit(1)
-
-if internal_target not in content:
-    print("ERROR: internal.h include not found!", file=sys.stderr)
-    sys.exit(1)
-
-content = content.replace(include_target, include_inject, 1)
-content = content.replace(internal_target, internal_inject, 1)
-
-with open(sys.argv[1], 'w') as f:
-    f.write(content)
-
-print("namespace.c patched successfully.")
-PYEOF
+python3 "${PATCHER_DIR}/susfs_fix_namespace.py" "${KERNEL_SRC}/fs/namespace.c" \
+    || error "SuSFS: namespace.c fix failed!"
 log "namespace.c fixed ✅"
 
 rm -rf "$SUSFS_DIR"
@@ -96,98 +57,8 @@ KSU_KCONFIG="${KSU_DIR}/kernel/Kconfig"
 if [ -f "$KSU_KCONFIG" ] && grep -q "^config KSU_SUSFS$" "$KSU_KCONFIG"; then
     log "KSU_SUSFS already declared by this fork, skipping injection."
 else
-    python3 - "$KSU_KCONFIG" << 'PYEOF'
-import sys
-
-with open(sys.argv[1]) as f:
-    content = f.read()
-
-if "config KSU_SUSFS" in content:
-    print("KSU_SUSFS Kconfig already present, skipping.")
-    sys.exit(0)
-
-block = '''menu "KernelSU - SUSFS"
-config KSU_SUSFS
-\tbool "KernelSU addon - SUSFS"
-\tdepends on KSU
-\tdepends on THREAD_INFO_IN_TASK
-\tdefault y
-\thelp
-\t  Patch and Enable SUSFS to kernel with KernelSU.
-
-config KSU_SUSFS_SUS_PATH
-\tbool "Enable to hide suspicious path"
-\tdepends on KSU_SUSFS
-\tdefault y
-\thelp
-\t  Allow hiding the user-defined path and all its sub-paths from various system calls.
-
-config KSU_SUSFS_SUS_MOUNT
-\tbool "Enable to hide suspicious mounts"
-\tdepends on KSU_SUSFS
-\tdefault y
-\thelp
-\t  Allow hiding all sus mounts from /proc/self/[mounts|mountinfo|mountstat] for non-su processes.
-
-config KSU_SUSFS_SUS_KSTAT
-\tbool "Enable to spoof suspicious kstat"
-\tdepends on KSU_SUSFS
-\tdefault y
-\thelp
-\t  Allow spoofing the kstat of user-defined file/directory.
-
-config KSU_SUSFS_SPOOF_UNAME
-\tbool "Enable to spoof uname"
-\tdepends on KSU_SUSFS
-\tdefault y
-\thelp
-\t  Allow spoofing the string returned by uname syscall.
-
-config KSU_SUSFS_ENABLE_LOG
-\tbool "Enable logging susfs log to kernel"
-\tdepends on KSU_SUSFS
-\tdefault y
-\thelp
-\t  Allow logging susfs log to kernel.
-
-config KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
-\tbool "Enable to automatically hide ksu and susfs symbols from /proc/kallsyms"
-\tdepends on KSU_SUSFS
-\tdefault y
-\thelp
-\t  Automatically hide ksu and susfs symbols from /proc/kallsyms.
-
-config KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-\tbool "Enable to spoof /proc/bootconfig or /proc/cmdline"
-\tdepends on KSU_SUSFS
-\tdefault y
-\thelp
-\t  Spoof the output of /proc/bootconfig (gki) or /proc/cmdline (non-gki).
-
-config KSU_SUSFS_OPEN_REDIRECT
-\tbool "Enable to redirect a path to be opened with another path"
-\tdepends on KSU_SUSFS
-\tdefault y
-\thelp
-\t  Allow redirecting a target path to be opened with another user-defined path.
-
-config KSU_SUSFS_SUS_MAP
-\tbool "Enable to hide some mmapped real file from different proc maps interfaces"
-\tdepends on KSU_SUSFS
-\tdefault y
-\thelp
-\t  Allow hiding mmapped real file from /proc/<pid>/[maps|smaps|smaps_rollup|map_files|mem|pagemap].
-
-endmenu'''
-
-stripped = content.rstrip()
-new_content = stripped + "\n\n" + block + "\n"
-
-with open(sys.argv[1], 'w') as f:
-    f.write(new_content)
-
-print("KSU_SUSFS Kconfig block appended.")
-PYEOF
+    python3 "${PATCHER_DIR}/susfs_kconfig_inject.py" "$KSU_KCONFIG" \
+        || error "SuSFS: Kconfig inject failed!"
     log "KSU_SUSFS Kconfig injected ✅"
 fi
 
