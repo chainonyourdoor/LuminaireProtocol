@@ -13,6 +13,7 @@ Idempotent: checks for marker before injecting.
 
 import sys
 import os
+import re
 
 KERNEL_SRC = sys.argv[1] if len(sys.argv) > 1 else "."
 
@@ -47,86 +48,86 @@ static int netlink_unit = NETLINK_REKERNEL_MIN;
 
 static inline bool line_is_frozen(struct task_struct *task)
 {
-	return frozen(task->group_leader) || freezing(task->group_leader);
+\treturn frozen(task->group_leader) || freezing(task->group_leader);
 }
 
 static int send_netlink_message(char *msg, uint16_t len)
 {
-	struct sk_buff *skbuffer;
-	struct nlmsghdr *nlhdr;
+\tstruct sk_buff *skbuffer;
+\tstruct nlmsghdr *nlhdr;
 
-	skbuffer = nlmsg_new(len, GFP_ATOMIC);
-	if (!skbuffer) {
-		printk("rekernel: nlmsg_new failed\\n");
-		return -1;
-	}
-	nlhdr = nlmsg_put(skbuffer, 0, 0, netlink_unit, len, 0);
-	if (!nlhdr) {
-		printk("rekernel: nlmsg_put failed\\n");
-		nlmsg_free(skbuffer);
-		return -1;
-	}
-	memcpy(nlmsg_data(nlhdr), msg, len);
-	return netlink_unicast(rekernel_netlink, skbuffer, USER_PORT,
-			       MSG_DONTWAIT);
+\tskbuffer = nlmsg_new(len, GFP_ATOMIC);
+\tif (!skbuffer) {
+\t\tprintk("rekernel: nlmsg_new failed\\n");
+\t\treturn -1;
+\t}
+\tnlhdr = nlmsg_put(skbuffer, 0, 0, netlink_unit, len, 0);
+\tif (!nlhdr) {
+\t\tprintk("rekernel: nlmsg_put failed\\n");
+\t\tnlmsg_free(skbuffer);
+\t\treturn -1;
+\t}
+\tmemcpy(nlmsg_data(nlhdr), msg, len);
+\treturn netlink_unicast(rekernel_netlink, skbuffer, USER_PORT,
+\t\t\t       MSG_DONTWAIT);
 }
 
 static void netlink_rcv_msg(struct sk_buff *skbuffer) {}
 
 static struct netlink_kernel_cfg rekernel_cfg = {
-	.input = netlink_rcv_msg,
+\t.input = netlink_rcv_msg,
 };
 
 static int rekernel_unit_show(struct seq_file *m, void *v)
 {
-	seq_printf(m, "%d\\n", netlink_unit);
-	return 0;
+\tseq_printf(m, "%d\\n", netlink_unit);
+\treturn 0;
 }
 
 static int rekernel_unit_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, rekernel_unit_show, NULL);
+\treturn single_open(file, rekernel_unit_show, NULL);
 }
 
 static const struct file_operations rekernel_unit_fops = {
-	.open    = rekernel_unit_open,
-	.read    = seq_read,
-	.llseek  = seq_lseek,
-	.release = single_release,
-	.owner   = THIS_MODULE,
+\t.open    = rekernel_unit_open,
+\t.read    = seq_read,
+\t.llseek  = seq_lseek,
+\t.release = single_release,
+\t.owner   = THIS_MODULE,
 };
 
 static struct proc_dir_entry *rekernel_dir, *rekernel_unit_entry;
 
 static int start_rekernel_server(void)
 {
-	if (rekernel_netlink != NULL)
-		return 0;
-	for (netlink_unit = NETLINK_REKERNEL_MIN;
-	     netlink_unit < NETLINK_REKERNEL_MAX; netlink_unit++) {
-		rekernel_netlink = (struct sock *)netlink_kernel_create(
-			&init_net, netlink_unit, &rekernel_cfg);
-		if (rekernel_netlink != NULL)
-			break;
-	}
-	if (rekernel_netlink == NULL) {
-		printk("rekernel: failed to create netlink server!\\n");
-		return -1;
-	}
-	printk("rekernel: netlink server created, unit=%d\\n", netlink_unit);
-	rekernel_dir = proc_mkdir("rekernel", NULL);
-	if (!rekernel_dir) {
-		printk("rekernel: create /proc/rekernel failed\\n");
-	} else {
-		char buff[32];
+\tif (rekernel_netlink != NULL)
+\t\treturn 0;
+\tfor (netlink_unit = NETLINK_REKERNEL_MIN;
+\t     netlink_unit < NETLINK_REKERNEL_MAX; netlink_unit++) {
+\t\trekernel_netlink = (struct sock *)netlink_kernel_create(
+\t\t\t&init_net, netlink_unit, &rekernel_cfg);
+\t\tif (rekernel_netlink != NULL)
+\t\t\tbreak;
+\t}
+\tif (rekernel_netlink == NULL) {
+\t\tprintk("rekernel: failed to create netlink server!\\n");
+\t\treturn -1;
+\t}
+\tprintk("rekernel: netlink server created, unit=%d\\n", netlink_unit);
+\trekernel_dir = proc_mkdir("rekernel", NULL);
+\tif (!rekernel_dir) {
+\t\tprintk("rekernel: create /proc/rekernel failed\\n");
+\t} else {
+\t\tchar buff[32];
 
-		sprintf(buff, "%d", netlink_unit);
-		rekernel_unit_entry = proc_create(buff, 0644, rekernel_dir,
-						  &rekernel_unit_fops);
-		if (!rekernel_unit_entry)
-			printk("rekernel: create unit procfs entry failed\\n");
-	}
-	return 0;
+\t\tsprintf(buff, "%d", netlink_unit);
+\t\trekernel_unit_entry = proc_create(buff, 0644, rekernel_dir,
+\t\t\t\t\t\t  &rekernel_unit_fops);
+\t\tif (!rekernel_unit_entry)
+\t\t\tprintk("rekernel: create unit procfs entry failed\\n");
+\t}
+\treturn 0;
 }
 
 #endif /* _REKERNEL_H */
@@ -251,11 +252,52 @@ def already_patched(content):
 
 
 def inject_after(content, anchor, injection, label):
+    """Inject after a single anchor. Returns (content, ok)."""
     if anchor not in content:
-        print(f"  [WARN] anchor not found for {label}, skipping")
         return content, False
     idx = content.index(anchor) + len(anchor)
     return content[:idx] + "\n" + injection + content[idx:], True
+
+
+def inject_after_any(content, anchors, injection, label):
+    """Try multiple anchors in order; return on first match."""
+    for anchor in anchors:
+        if anchor in content:
+            idx = content.index(anchor) + len(anchor)
+            new = content[:idx] + "\n" + injection + content[idx:]
+            return new, True
+    print(f"  [WARN] no anchor matched for {label}")
+    return content, False
+
+
+def inject_include_fallback(content, include_line):
+    """
+    Fallback: insert include_line after the last #include directive
+    found within the first 120 lines of the file.
+    """
+    lines = content.split("\n")
+    last_idx = -1
+    for i, line in enumerate(lines[:120]):
+        if re.match(r"^#include\s+[<\"]", line):
+            last_idx = i
+    if last_idx == -1:
+        return content, False
+    lines.insert(last_idx + 1, include_line)
+    return "\n".join(lines), True
+
+
+def inject_include(content, local_includes, include_line, label):
+    """
+    Inject include_line after the first matching local include anchor.
+    Falls back to last-#include-in-header-section method.
+    """
+    content, ok = inject_after_any(content, local_includes, include_line, label)
+    if not ok:
+        print(f"  [INFO] {label}: trying last-include fallback")
+        content, ok = inject_include_fallback(content, include_line)
+        if ok:
+            print(f"  [INFO] {label}: include injected via fallback ✅")
+    return content, ok
 
 
 def patch_binder_c(src):
@@ -266,33 +308,50 @@ def patch_binder_c(src):
         print("  binder.c: already patched, skipping")
         return
 
-    include_anchor = '#include "binder_alloc.h"'
-    content, ok1 = inject_after(
-        content,
-        include_anchor,
-        '#include "rekernel.h"\n',
-        "binder.c include"
+    # ── Step 1: inject include (CRITICAL — abort hooks if this fails) ──
+    include_anchors = [
+        '#include "binder_alloc.h"',
+        '#include "binder_trace.h"',
+        '#include "binder_internal.h"',
+    ]
+    content, ok_include = inject_include(
+        content, include_anchors, '#include "rekernel.h"', "binder.c include"
     )
 
-    reply_anchor = (
-        "\t\ttarget_proc = target_thread->proc;\n"
-        "\t\ttarget_proc->tmp_ref++;\n"
-        "\t\tbinder_inner_proc_unlock(target_thread->proc);\n"
-    )
-    content, ok2 = inject_after(
-        content, reply_anchor, BINDER_REPLY_HOOK, "binder reply hook"
+    if not ok_include:
+        print("  [ERROR] binder.c: cannot inject include — aborting patch!")
+        sys.exit(1)
+
+    # ── Step 2: reply hook ──
+    reply_anchors = [
+        (
+            "\t\ttarget_proc = target_thread->proc;\n"
+            "\t\ttarget_proc->tmp_ref++;\n"
+            "\t\tbinder_inner_proc_unlock(target_thread->proc);\n"
+        ),
+        "\t\tbinder_inner_proc_unlock(target_thread->proc);\n",
+    ]
+    content, ok_reply = inject_after_any(
+        content, reply_anchors, BINDER_REPLY_HOOK, "binder reply hook"
     )
 
-    txn_anchor = "\t\te->to_node = target_node->debug_id;\n"
-    content, ok3 = inject_after(
-        content, txn_anchor, BINDER_TXN_HOOK, "binder txn hook"
+    # ── Step 3: transaction hook ──
+    txn_anchors = [
+        "\t\te->to_node = target_node->debug_id;\n",
+        "\t\tt->to_proc = target_proc;\n",
+    ]
+    content, ok_txn = inject_after_any(
+        content, txn_anchors, BINDER_TXN_HOOK, "binder txn hook"
     )
 
-    if ok1 or ok2 or ok3:
-        write(path, content)
-        print("  binder.c: patched ✅")
-    else:
-        print("  binder.c: no anchors matched, skipping")
+    write(path, content)
+    hooks = []
+    if ok_reply:
+        hooks.append("reply")
+    if ok_txn:
+        hooks.append("txn")
+    hook_str = "+".join(hooks) if hooks else "no hooks matched"
+    print(f"  binder.c: patched ✅ (include + {hook_str})")
 
 
 def patch_binder_alloc_c(src):
@@ -303,29 +362,37 @@ def patch_binder_alloc_c(src):
         print("  binder_alloc.c: already patched, skipping")
         return
 
-    include_anchor = "#include <linux/shrinker.h>"
-    if include_anchor not in content:
-        include_anchor = "#include <linux/slab.h>"
-    content, _ = inject_after(
-        content,
-        include_anchor,
-        '#include "rekernel.h"\n',
-        "binder_alloc.c include"
+    # Include
+    include_anchors = [
+        "#include <linux/shrinker.h>",
+        "#include <linux/slab.h>",
+        "#include <linux/mm.h>",
+    ]
+    content, ok_include = inject_include(
+        content, include_anchors, '#include "rekernel.h"', "binder_alloc.c include"
+    )
+    if not ok_include:
+        print("  [ERROR] binder_alloc.c: cannot inject include — aborting patch!")
+        sys.exit(1)
+
+    # Hook
+    alloc_anchors = [
+        (
+            "\tif (is_async &&\n"
+            "\t    alloc->free_async_space < size + sizeof(struct binder_buffer)) {\n"
+        ),
+        (
+            "\tif (is_async &&\n"
+            "\t\talloc->free_async_space < size + sizeof(struct binder_buffer)) {\n"
+        ),
+        "alloc->free_async_space < size + sizeof(struct binder_buffer)",
+    ]
+    content, ok_hook = inject_after_any(
+        content, alloc_anchors, BINDER_ALLOC_HOOK, "binder_alloc hook"
     )
 
-    alloc_anchor = (
-        "\tif (is_async &&\n"
-        "\t    alloc->free_async_space < size + sizeof(struct binder_buffer)) {\n"
-    )
-    content, ok = inject_after(
-        content, alloc_anchor, BINDER_ALLOC_HOOK, "binder_alloc hook"
-    )
-
-    if ok:
-        write(path, content)
-        print("  binder_alloc.c: patched ✅")
-    else:
-        print("  binder_alloc.c: anchor not found, skipping")
+    write(path, content)
+    print(f"  binder_alloc.c: patched ✅ (include{', hook' if ok_hook else ', hook not matched'})")
 
 
 def patch_signal_c(src):
@@ -336,31 +403,43 @@ def patch_signal_c(src):
         print("  signal.c: already patched, skipping")
         return
 
-    include_anchor = "#include <linux/freezer.h>"
-    if include_anchor not in content:
-        include_anchor = "#include <linux/posix-timers.h>"
-    content, _ = inject_after(
-        content,
-        include_anchor,
-        '#include "../drivers/android/rekernel.h"\n',
+    # Include
+    include_anchors = [
+        "#include <linux/freezer.h>",
+        "#include <linux/posix-timers.h>",
+        "#include <linux/sched/signal.h>",
+    ]
+    content, ok_include = inject_include(
+        content, include_anchors,
+        '#include "../drivers/android/rekernel.h"',
         "signal.c include"
     )
+    if not ok_include:
+        print("  [ERROR] signal.c: cannot inject include — aborting patch!")
+        sys.exit(1)
 
-    signal_anchor = (
-        "\tif (lock_task_sighand(p, &flags)) {\n"
-        "\t\tret = send_signal(sig, info, p, group);\n"
-        "\t\tunlock_task_sighand(p, &flags);\n"
-        "\t}\n"
-    )
-    content, ok = inject_after(
-        content, signal_anchor, SIGNAL_HOOK, "signal hook"
+    # Hook
+    signal_anchors = [
+        (
+            "\tif (lock_task_sighand(p, &flags)) {\n"
+            "\t\tret = send_signal(sig, info, p, group);\n"
+            "\t\tunlock_task_sighand(p, &flags);\n"
+            "\t}\n"
+        ),
+        (
+            "\tif (lock_task_sighand(p, &flags)) {\n"
+            "\t\tret = send_signal_locked(sig, info, p, group);\n"
+            "\t\tunlock_task_sighand(p, &flags);\n"
+            "\t}\n"
+        ),
+        "unlock_task_sighand(p, &flags);\n\t}\n",
+    ]
+    content, ok_hook = inject_after_any(
+        content, signal_anchors, SIGNAL_HOOK, "signal hook"
     )
 
-    if ok:
-        write(path, content)
-        print("  signal.c: patched ✅")
-    else:
-        print("  signal.c: anchor not found, skipping")
+    write(path, content)
+    print(f"  signal.c: patched ✅ (include{', hook' if ok_hook else ', hook not matched'})")
 
 
 def write_header(src):
