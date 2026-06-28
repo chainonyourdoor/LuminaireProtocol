@@ -18,7 +18,7 @@ SUKISU_SETUP=$(curl -LSs --fail --retry 3 \
     || error "SukiSU-Ultra: failed to download setup.sh!"
 [ -n "$SUKISU_SETUP" ] || error "SukiSU-Ultra: setup.sh is empty!"
 echo "$SUKISU_SETUP" | grep -q "^#!" || error "SukiSU-Ultra: setup.sh looks invalid (no shebang)!"
-echo "$SUKISU_SETUP" | bash -s main || error "SukiSU-Ultra: setup.sh failed!"
+echo "$SUKISU_SETUP" | bash || error "SukiSU-Ultra: setup.sh failed!"
 [ -d "${KERNEL_SRC}/KernelSU" ] || error "SukiSU-Ultra: KernelSU dir not found after setup!"
 cd "$ROOT_DIR"
 log "SukiSU-Ultra integrated ✅"

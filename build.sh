@@ -98,6 +98,7 @@ restore_kernel_source() {
 run_branding() {
     echo "::group::🏷️ Branding"
     SUBLEVEL="$(grep '^SUBLEVEL = ' "${KERNEL_SRC}/Makefile" | awk '{print $3}')"
+    [ -n "$SUBLEVEL" ] || error "SUBLEVEL not found in kernel Makefile — kernel source may be missing or corrupted!"
     KMI_GENERATION="$(grep '^KMI_GENERATION=' \
         "${KERNEL_SRC}/build.config.common" \
         "${KERNEL_SRC}/build.config.constants" 2>/dev/null | head -1 | cut -d= -f2)"

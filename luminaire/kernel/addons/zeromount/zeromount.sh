@@ -43,6 +43,15 @@ fi
 
 rm -f "$ZEROMOUNT_PATCH"
 
+# Guard: verify zeromount was actually injected before running fix scripts.
+# If the patch failed entirely, zeromount markers won't be present — skip
+# fixes and warn rather than silently reporting success.
+if ! grep -qF "zeromount" "${KERNEL_SRC}/fs/namei.c"; then
+    warn "ZeroMount: no zeromount markers found in namei.c — patch may have failed entirely, skipping fix scripts"
+    warn "ZeroMount integration incomplete — kernel will build without ZeroMount"
+    return 0
+fi
+
 log "Fixing namei.c scope issues (zeromount blocks in wrong positions)..."
 python3 "${PATCHER_DIR}/fix_namei.py" "${KERNEL_SRC}/fs/namei.c" \
     || error "ZeroMount: namei.c fix failed!"

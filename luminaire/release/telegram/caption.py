@@ -25,12 +25,24 @@ def mdv2_code_escape(s):
     return s
 
 
+def utf16_len(s):
+    return sum(2 if ord(c) > 0xFFFF else 1 for c in s)
+
+
 def truncate(caption, limit):
-    if len(caption) <= limit:
+    if utf16_len(caption) <= limit:
         return caption
     suffix = "\n\u2026\n```"
-    keep = limit - len(suffix)
-    return caption[:keep] + suffix
+    suffix_len = utf16_len(suffix)
+    result = []
+    current_len = 0
+    for ch in caption:
+        ch_len = 2 if ord(ch) > 0xFFFF else 1
+        if current_len + ch_len + suffix_len > limit:
+            break
+        result.append(ch)
+        current_len += ch_len
+    return "".join(result) + suffix
 
 
 def build_blocks(env):

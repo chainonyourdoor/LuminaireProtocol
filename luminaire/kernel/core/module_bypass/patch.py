@@ -15,8 +15,8 @@ def main():
             break
 
     if anchor_idx is None:
-        print(f"[warn] module_bypass: anchor '{anchor}' not found in {path} — upstream may have refactored version.c; skipping")
-        sys.exit(0)
+        print(f"[error] module_bypass: anchor '{anchor}' not found in {path} — upstream may have refactored version.c!", file=sys.stderr)
+        sys.exit(1)
 
     for i in range(anchor_idx + 1, len(lines)):
         stripped = lines[i].strip()
@@ -30,8 +30,8 @@ def main():
             print(f"[info] module_bypass: patched return value at line {i + 1} ✅")
             sys.exit(0)
 
-    print(f"[warn] module_bypass: 'return 0;' not found after '{anchor}' in {path} — skipping")
-    sys.exit(0)
+    print(f"[error] module_bypass: 'return 0;' not found after '{anchor}' in {path} — upstream may have refactored version.c!", file=sys.stderr)
+    sys.exit(1)
 
 
 if __name__ == "__main__":

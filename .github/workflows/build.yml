@@ -91,7 +91,7 @@ on:
         default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.kernel_version }}
   cancel-in-progress: true
 
 env:
@@ -314,11 +314,4 @@ jobs:
           ccache-prefix: ccache-data-${{ matrix.root_solution }}${{ matrix.susfs && '-susfs' || '' }}-${{ inputs.kernel_version }}-${{ inputs.enable_lto != 'NONE' && format('lto-{0}-', inputs.enable_lto) || '' }}${{ steps.setup-build-env.outputs.clang-variant }}-${{ github.ref_name }}-
           gh-token: ${{ secrets.PERSONAL_TOKEN }}
 
-      - name: "Upload Build Info"
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: build-info-${{ matrix.root_solution }}${{ matrix.susfs && '-susfs' || '' }}
-          path: /tmp/build-info.txt
-          retention-days: 1
-          if-no-files-found: ignore
+

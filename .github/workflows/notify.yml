@@ -28,11 +28,19 @@ jobs:
           TITLE=$(printf '%s' "$MESSAGE" | head -1)
           BODY=$(printf '%s' "$MESSAGE" | tail -n +3)
 
+          html_escape() {
+            printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
+          }
+
+          TITLE_ESC=$(html_escape "$TITLE")
+          BODY_ESC=$(html_escape "$BODY")
+          AUTHOR_ESC=$(html_escape "$AUTHOR")
+
           TEXT=$(printf '📌 New Commit : <a href="%s">%s</a>\nBranch : <code>%s</code>\nAuthor : %s\n\nTitle:\n<i>%s</i>' \
-            "$URL" "$SHORT_COMMIT" "$BRANCH" "$AUTHOR" "$TITLE")
+            "$URL" "$SHORT_COMMIT" "$BRANCH" "$AUTHOR_ESC" "$TITLE_ESC")
 
           if [ -n "$BODY" ]; then
-            TEXT=$(printf '%s\n\nMessage:\n<pre>%s</pre>' "$TEXT" "$BODY")
+            TEXT=$(printf '%s\n\nMessage:\n<pre>%s</pre>' "$TEXT" "$BODY_ESC")
           fi
 
           RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
