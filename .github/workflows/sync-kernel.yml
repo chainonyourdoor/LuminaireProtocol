@@ -91,7 +91,24 @@ jobs:
           mkdir -p kernel
           cd kernel
           MANIFEST_URL="https://android.googlesource.com/kernel/manifest/+/refs/heads/${{ matrix.manifest }}/default.xml?format=TEXT"
-          curl -fsSL "$MANIFEST_URL" | base64 -d > manifest.xml
+          for attempt in 1 2 3; do
+            echo "Fetching manifest (attempt ${attempt}/3)..."
+            CONTENT=$(curl -fsSL "$MANIFEST_URL" 2>/dev/null || true)
+            if [ -n "$CONTENT" ]; then
+              echo "$CONTENT" | base64 -d > manifest.xml
+              if [ -s manifest.xml ]; then
+                echo "Manifest fetched successfully ✅"
+                break
+              fi
+            fi
+            if [ $attempt -lt 3 ]; then
+              echo "Manifest fetch failed or empty, retrying in 15 seconds..."
+              sleep 15
+            else
+              echo "ERROR: failed to fetch manifest after 3 attempts"
+              exit 1
+            fi
+          done
 
       - name: "Download kernel source"
         run: |

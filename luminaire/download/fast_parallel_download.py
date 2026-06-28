@@ -16,16 +16,18 @@ import time
 import sys
 
 
-def try_download(url, name):
+def try_download(url, name, retries=3, backoff=(10, 30, 60)):
     aria_cmd = f"aria2c -x16 -s16 -k1M -j5 --file-allocation=none -o {name}.tar.gz '{url}'"
-    print(f"  Trying download: {url}")
-    result = subprocess.run(aria_cmd, shell=True)
-    if result.returncode == 0:
-        return True
-    print(f"  Download failed, retrying in 10 seconds...")
-    time.sleep(10)
-    result = subprocess.run(aria_cmd, shell=True)
-    return result.returncode == 0
+    for attempt in range(1, retries + 1):
+        print(f"  Trying download (attempt {attempt}/{retries}): {url}")
+        result = subprocess.run(aria_cmd, shell=True)
+        if result.returncode == 0:
+            return True
+        if attempt < retries:
+            wait = backoff[attempt - 1] if attempt - 1 < len(backoff) else backoff[-1]
+            print(f"  Download failed, retrying in {wait} seconds...")
+            time.sleep(wait)
+    return False
 
 
 def sync_project(task):
@@ -93,7 +95,18 @@ def main(manifest_path='manifest.xml'):
 
     with open(manifest_path, 'r') as f:
         manifest_content = f.read()
-    root = ET.fromstring(manifest_content)
+
+    if not manifest_content.strip():
+        print(f"ERROR: manifest file is empty — AOSP server may have returned an empty response: {manifest_path}")
+        return 2
+
+    try:
+        root = ET.fromstring(manifest_content)
+    except ET.ParseError as e:
+        print(f"ERROR: failed to parse manifest XML: {e}")
+        print(f"  This usually means the AOSP server returned an incomplete or empty response.")
+        print(f"  Manifest content (first 200 chars): {manifest_content[:200]!r}")
+        return 2
 
     remotes = {}
     for r in root.findall('remote'):
