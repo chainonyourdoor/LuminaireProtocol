@@ -11,12 +11,11 @@ fi
 KLEAF_ARGS=(
     --config=fast
     --lto="${ENABLE_LTO,,}"
-    --dist_dir="${KLEAF_OUT_DIR}"
     "${BRANDING_KLEAF_ARGS[@]}"
 )
 
-# Ensure RAM disk output dirs exist
-mkdir -p "$KLEAF_OUT_DIR" "$LTO_CACHE_DIR"
+# Ensure LTO cache dir exists on RAM disk
+mkdir -p "$LTO_CACHE_DIR"
 
 log "Applying Luminaire configs (fragment)..."
 DEFCONFIG="${KERNEL_SRC}/arch/arm64/configs/gki_defconfig"
@@ -42,7 +41,7 @@ log "Running config pass to canonicalize gki_defconfig..."
 cd "$KERNEL_DIR"
 tools/bazel build "${KLEAF_ARGS[@]}" //common:kernel_aarch64_config
 
-CANONICAL=$(find "${KLEAF_OUT_DIR}" -name "defconfig" 2>/dev/null | head -1)
+CANONICAL=$(find "${KERNEL_DIR}/out" -path "*/common/defconfig" 2>/dev/null | head -1)
 if [ -n "$CANONICAL" ]; then
     cp "$CANONICAL" "$DEFCONFIG"
     log "gki_defconfig canonicalized ✅ (from $(basename $(dirname $CANONICAL))/defconfig)"

@@ -276,7 +276,7 @@ jobs:
             /tmp/_trash_jvm /tmp/_trash_swift /tmp/_trash_pwsh \
             /var/lib/docker /var/cache/snapd /home/linuxbrew \
           ) &
-          mkdir -p /dev/shm/kout /dev/shm/kleaf-out /dev/shm/ldcache
+          mkdir -p /dev/shm/ldcache
 
       - name: "Setup Swap Space"
         uses: thejerrybao/setup-swap-space@v1

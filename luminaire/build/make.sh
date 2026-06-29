@@ -21,11 +21,11 @@ MAKE_ARGS=(
     -j"$(nproc --all)"
 )
 
-# Ensure RAM disk output dirs exist
-mkdir -p "$OUT_DIR" "$LTO_CACHE_DIR"
+# Ensure LTO cache dir exists on RAM disk
+mkdir -p "$LTO_CACHE_DIR"
 
 # ThinLTO: wrap ld.lld to redirect cache to RAM disk
-if [ "${ENABLE_LTO:-NONE}" = "THIN" ]; then
+if [ "${ENABLE_LTO}" = "THIN" ]; then
     LD_WRAPPER="${KERNEL_SRC}/ld-wrapper"
     cat > "$LD_WRAPPER" << 'WRAPPER_EOF'
 #!/usr/bin/env bash
