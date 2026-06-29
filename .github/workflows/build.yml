@@ -304,10 +304,10 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: /dev/shm/ldcache
-          key: lto-cache-${{ inputs.kernel_version }}-${{ steps.setup-build-env.outputs.clang-variant }}-${{ github.ref_name }}-${{ github.run_id }}
+          key: lto-cache-${{ inputs.kernel_version }}-${{ steps.setup-build-env.outputs.clang-variant }}-${{ matrix.root_solution }}-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
-            lto-cache-${{ inputs.kernel_version }}-${{ steps.setup-build-env.outputs.clang-variant }}-${{ github.ref_name }}-
-            lto-cache-${{ inputs.kernel_version }}-${{ steps.setup-build-env.outputs.clang-variant }}-
+            lto-cache-${{ inputs.kernel_version }}-${{ steps.setup-build-env.outputs.clang-variant }}-${{ matrix.root_solution }}-${{ github.ref_name }}-
+            lto-cache-${{ inputs.kernel_version }}-${{ steps.setup-build-env.outputs.clang-variant }}-${{ matrix.root_solution }}-
 
       - name: "Build"
         run: bash build.sh
@@ -321,7 +321,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: /dev/shm/ldcache
-          key: lto-cache-${{ inputs.kernel_version }}-${{ steps.setup-build-env.outputs.clang-variant }}-${{ github.ref_name }}-${{ github.run_id }}
+          key: lto-cache-${{ inputs.kernel_version }}-${{ steps.setup-build-env.outputs.clang-variant }}-${{ matrix.root_solution }}-${{ github.ref_name }}-${{ github.run_id }}
 
       - name: "Save ccache"
         if: always() && startsWith(inputs.build_system, 'Make')
