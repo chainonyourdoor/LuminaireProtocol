@@ -12,6 +12,8 @@ if [ "${USE_CLANG_CACHE}" = "true" ] && [ -d "${CLANG_CACHE_DIR}/bin" ]; then
     log "Restoring Clang from cache (${CLANG_VARIANT})..."
     mkdir -p "$TOOL_CLANG_DIR"
     cp -a "${CLANG_CACHE_DIR}/." "${TOOL_CLANG_DIR}/"
+    # actions/cache does not always preserve file permissions — fix after restore
+    chmod +x "${TOOL_CLANG_DIR}/bin/"* 2>/dev/null || true
     if ! "${TOOL_CLANG_DIR}/bin/clang" --version > /dev/null 2>&1; then
         warn "Clang binary not executable after cache restore — re-downloading..."
         rm -rf "$TOOL_CLANG_DIR" "$CLANG_CACHE_DIR"
