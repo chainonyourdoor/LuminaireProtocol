@@ -8,6 +8,7 @@ TELEGRAM_API_TIMEOUT="${TELEGRAM_API_TIMEOUT:-60}"
 TELEGRAM_MAX_RETRIES="${TELEGRAM_MAX_RETRIES:-3}"
 TELEGRAM_MAX_FILE_BYTES=$((50 * 1024 * 1024))
 CAPTION_BUILDER="${LUMINAIRE_PATCH_DIR}/release/telegram/caption.py"
+BANNER_DIR="${LUMINAIRE_PATCH_DIR}/release/telegram"
 
 # ------------------------------------------------------
 # Guard clauses
@@ -89,7 +90,7 @@ case ",${ADDONS}," in *,bbg,*)         BBG_DISPLAY="Enable" ;; esac
 case ",${ADDONS}," in *,droidspaces,*) DROIDSPACES_DISPLAY="Enable" ;; esac
 
 # ------------------------------------------------------
-# Build captions (1 Python call, outputs 2 temp files)
+# Build group caption (no VARIANT_LINKS_JSON yet)
 # ------------------------------------------------------
 CAPTION_GROUP_FILE="/tmp/telegram_caption_group.txt"
 CAPTION_CHANNEL_FILE="/tmp/telegram_caption_channel.txt"
@@ -113,100 +114,156 @@ python3 "$CAPTION_BUILDER" "$CAPTION_GROUP_FILE" "$CAPTION_CHANNEL_FILE" \
     || error "Telegram: caption builder failed!"
 
 CAPTION="$(cat "$CAPTION_GROUP_FILE")"
-CAPTION_CHANNEL="$(cat "$CAPTION_CHANNEL_FILE")"
 rm -f "$CAPTION_GROUP_FILE" "$CAPTION_CHANNEL_FILE"
 
 # ------------------------------------------------------
-# Send helper
+# Send to group topic — capture message_id
 # ------------------------------------------------------
-send_document() {
-    local chat_id="$1"
-    local thread_id="$2"
-    local caption="$3"
-    local label="$4"
-    local attempt=1
-    local send_ok=0
+log "📤 Sending ${ZIP_NAME} to Telegram group topic..."
 
-    while [ "$attempt" -le "$TELEGRAM_MAX_RETRIES" ]; do
-        log "📤 Sending ${ZIP_NAME} to ${label} (attempt ${attempt}/${TELEGRAM_MAX_RETRIES})..."
+GROUP_MESSAGE_ID=""
+attempt=1
+while [ "$attempt" -le "$TELEGRAM_MAX_RETRIES" ]; do
+    http_code=$(curl -s -o /tmp/telegram_response.json -w "%{http_code}" \
+        --max-time "$TELEGRAM_API_TIMEOUT" \
+        --retry 0 \
+        -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+        -F "chat_id=${TELEGRAM_CHAT_ID}" \
+        -F "message_thread_id=${TELEGRAM_THREAD_ID_ARTIFACT}" \
+        -F "parse_mode=MarkdownV2" \
+        -F "document=@${ZIP_PATH};filename=${ZIP_NAME}" \
+        -F "caption=${CAPTION}" 2>/tmp/telegram_curl_err.log) || http_code="000"
 
-        local http_code
-        if [ -n "$thread_id" ]; then
-            http_code=$(curl -s -o /tmp/telegram_response.json -w "%{http_code}" \
-                --max-time "$TELEGRAM_API_TIMEOUT" \
-                --retry 0 \
-                -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
-                -F "chat_id=${chat_id}" \
-                -F "message_thread_id=${thread_id}" \
-                -F "parse_mode=MarkdownV2" \
-                -F "document=@${ZIP_PATH};filename=${ZIP_NAME}" \
-                -F "caption=${caption}" 2>/tmp/telegram_curl_err.log) || http_code="000"
-        else
-            http_code=$(curl -s -o /tmp/telegram_response.json -w "%{http_code}" \
-                --max-time "$TELEGRAM_API_TIMEOUT" \
-                --retry 0 \
-                -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
-                -F "chat_id=${chat_id}" \
-                -F "parse_mode=MarkdownV2" \
-                -F "document=@${ZIP_PATH};filename=${ZIP_NAME}" \
-                -F "caption=${caption}" 2>/tmp/telegram_curl_err.log) || http_code="000"
-        fi
+    response=$(cat /tmp/telegram_response.json 2>/dev/null || echo "")
 
-        local response curl_err
-        response=$(cat /tmp/telegram_response.json 2>/dev/null || echo "")
-        curl_err=$(cat /tmp/telegram_curl_err.log 2>/dev/null || echo "")
-
-        if [ "$http_code" = "200" ] && echo "$response" | grep -q '"ok":true'; then
-            log "${label} sent ✅"
-            send_ok=1
-            break
-        fi
-
-        case "$http_code" in
-            000)
-                warn "Telegram send failed: connection/timeout error (${curl_err:-no details}) — will retry"
-                ;;
-            429|500|502|503|504)
-                warn "Telegram send failed: HTTP ${http_code} (transient) — will retry. Response: ${response}"
-                ;;
-            *)
-                warn "Telegram send FAILED: HTTP ${http_code} (non-retryable). Response: ${response}"
-                break
-                ;;
-        esac
-
-        if [ "$attempt" -lt "$TELEGRAM_MAX_RETRIES" ]; then
-            local sleep_secs=$(( 2 ** attempt ))
-            log "⏳ Retrying in ${sleep_secs}s..."
-            sleep "$sleep_secs"
-        fi
-
-        attempt=$(( attempt + 1 ))
-    done
-
-    if [ "$send_ok" -ne 1 ]; then
-        log "❌ Telegram delivery to ${label} failed after ${TELEGRAM_MAX_RETRIES} attempt(s)."
+    if [ "$http_code" = "200" ] && echo "$response" | grep -q '"ok":true'; then
+        GROUP_MESSAGE_ID=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin)['result']['message_id'])" 2>/dev/null || echo "")
+        log "Group topic sent ✅ (message_id=${GROUP_MESSAGE_ID})"
+        break
     fi
-}
+
+    curl_err=$(cat /tmp/telegram_curl_err.log 2>/dev/null || echo "")
+    case "$http_code" in
+        000|429|500|502|503|504)
+            warn "Telegram group send failed: HTTP ${http_code} — will retry. ${curl_err}"
+            ;;
+        *)
+            warn "Telegram group send FAILED: HTTP ${http_code} (non-retryable). Response: ${response}"
+            break
+            ;;
+    esac
+
+    if [ "$attempt" -lt "$TELEGRAM_MAX_RETRIES" ]; then
+        sleep_secs=$(( 2 ** attempt ))
+        log "⏳ Retrying in ${sleep_secs}s..."
+        sleep "$sleep_secs"
+    fi
+    attempt=$(( attempt + 1 ))
+done
 
 # ------------------------------------------------------
-# Send to group topic
-# ------------------------------------------------------
-send_document \
-    "$TELEGRAM_CHAT_ID" \
-    "$TELEGRAM_THREAD_ID_ARTIFACT" \
-    "$CAPTION" \
-    "Telegram group topic"
-
-# ------------------------------------------------------
-# Send to release channel (if enabled)
+# Send to release channel (if enabled) — sendPhoto + download links
 # ------------------------------------------------------
 if [ "${RELEASE_CHANNEL:-false}" = "true" ] && [ -n "${TELEGRAM_CHANNEL_ID:-}" ]; then
-    send_document \
-        "$TELEGRAM_CHANNEL_ID" \
-        "" \
-        "$CAPTION_CHANNEL" \
-        "Telegram release channel"
+
+    # Find banner image (jpg or png, first match wins)
+    BANNER_PATH=""
+    for ext in jpg jpeg png; do
+        candidate="${BANNER_DIR}/banner.${ext}"
+        if [ -f "$candidate" ]; then
+            BANNER_PATH="$candidate"
+            break
+        fi
+    done
+
+    if [ -z "$BANNER_PATH" ]; then
+        warn "Telegram channel: no banner image found in ${BANNER_DIR} (banner.jpg/jpeg/png) — skipping channel post"
+    elif [ -z "$GROUP_MESSAGE_ID" ]; then
+        warn "Telegram channel: could not get group message_id — skipping channel post"
+    else
+        # Build t.me link to the group message
+        # TELEGRAM_CHAT_ID format: -100XXXXXXXXXX → strip -100 prefix for t.me/c/ link
+        RAW_CHANNEL_ID="${TELEGRAM_CHAT_ID/#-100/}"
+
+        # Determine variant key (VANILLA / RESUKISU_SUSFS / etc.)
+        VARIANT_KEY="${ROOT_SOLUTION}"
+        if [ "${SUSFS_ENABLED:-false}" = "true" ] && [ "$ROOT_SOLUTION" != "VANILLA" ]; then
+            VARIANT_KEY="${ROOT_SOLUTION}_SUSFS"
+        fi
+
+        GROUP_MSG_LINK="https://t.me/c/${RAW_CHANNEL_ID}/${GROUP_MESSAGE_ID}"
+
+        # Build VARIANT_LINKS_JSON — single entry for this job's variant
+        # (multi-variant aggregation would need a separate step; for now one entry per job)
+        VARIANT_LINKS_JSON="{\"${VARIANT_KEY}\": \"${GROUP_MSG_LINK}\"}"
+
+        # Rebuild caption with variant links
+        CAPTION_CHANNEL_FILE="/tmp/telegram_caption_channel2.txt"
+        CAPTION_GROUP_DUMMY="/tmp/telegram_caption_group_dummy.txt"
+
+        LINUX_VER="$LINUX_VER" \
+        KERNEL_VERSION="${KERNEL_VERSION:-}" \
+        BUILD_SYSTEM_DISPLAY="$BUILD_SYSTEM_DISPLAY" \
+        COMPILER_STRING="${COMPILER_STRING:-N/A}" \
+        ENABLE_LTO="${ENABLE_LTO:-NONE}" \
+        ROOT_SOLUTION="${ROOT_SOLUTION:-}" \
+        ROOT_SOLUTION_DISPLAY="$ROOT_SOLUTION_DISPLAY" \
+        SUSFS_VER="$SUSFS_VER" \
+        MOUNTLESS_DISPLAY="$MOUNTLESS_DISPLAY" \
+        REKERNEL_DISPLAY="$REKERNEL_DISPLAY" \
+        BBG_DISPLAY="$BBG_DISPLAY" \
+        DROIDSPACES_DISPLAY="$DROIDSPACES_DISPLAY" \
+        GITHUB_SHA="${GITHUB_SHA:-}" \
+        GITHUB_SERVER_URL="${GITHUB_SERVER_URL:-https://github.com}" \
+        GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-}" \
+        GITHUB_RUN_ID="${GITHUB_RUN_ID:-}" \
+        VARIANT_LINKS_JSON="$VARIANT_LINKS_JSON" \
+        python3 "$CAPTION_BUILDER" "$CAPTION_GROUP_DUMMY" "$CAPTION_CHANNEL_FILE" \
+            || error "Telegram: channel caption builder failed!"
+
+        CAPTION_CHANNEL="$(cat "$CAPTION_CHANNEL_FILE")"
+        rm -f "$CAPTION_CHANNEL_FILE" "$CAPTION_GROUP_DUMMY"
+
+        # Send photo to channel
+        attempt=1
+        while [ "$attempt" -le "$TELEGRAM_MAX_RETRIES" ]; do
+            log "📸 Sending channel post (attempt ${attempt}/${TELEGRAM_MAX_RETRIES})..."
+
+            http_code=$(curl -s -o /tmp/telegram_response.json -w "%{http_code}" \
+                --max-time "$TELEGRAM_API_TIMEOUT" \
+                --retry 0 \
+                -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto" \
+                -F "chat_id=${TELEGRAM_CHANNEL_ID}" \
+                -F "parse_mode=MarkdownV2" \
+                -F "photo=@${BANNER_PATH}" \
+                -F "caption=${CAPTION_CHANNEL}" 2>/tmp/telegram_curl_err.log) || http_code="000"
+
+            response=$(cat /tmp/telegram_response.json 2>/dev/null || echo "")
+
+            if [ "$http_code" = "200" ] && echo "$response" | grep -q '"ok":true'; then
+                log "Channel post sent ✅"
+                break
+            fi
+
+            curl_err=$(cat /tmp/telegram_curl_err.log 2>/dev/null || echo "")
+            case "$http_code" in
+                000|429|500|502|503|504)
+                    warn "Telegram channel send failed: HTTP ${http_code} — will retry. ${curl_err}"
+                    ;;
+                *)
+                    warn "Telegram channel send FAILED: HTTP ${http_code} (non-retryable). Response: ${response}"
+                    break
+                    ;;
+            esac
+
+            if [ "$attempt" -lt "$TELEGRAM_MAX_RETRIES" ]; then
+                sleep_secs=$(( 2 ** attempt ))
+                log "⏳ Retrying in ${sleep_secs}s..."
+                sleep "$sleep_secs"
+            fi
+            attempt=$(( attempt + 1 ))
+        done
+    fi
 fi
 
 rm -f /tmp/telegram_response.json /tmp/telegram_curl_err.log

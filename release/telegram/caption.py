@@ -1,9 +1,26 @@
 import os
 import sys
+import json
 from datetime import datetime
 
 
 CAPTION_LIMIT = 1024
+
+KERNEL_VERSION_TO_ANDROID = {
+    "5.10": "12",
+    "5.15": "13",
+    "6.1":  "14",
+    "6.6":  "15",
+    "6.12": "16",
+}
+
+VARIANT_DISPLAY = {
+    "VANILLA":        "Vanilla",
+    "RESUKISU":       "ReSukiSU",
+    "RESUKISU_SUSFS": "ReSukiSU \\+SUSFS",
+    "SUKISU":         "SukiSU\\-Ultra",
+    "SUKISU_SUSFS":   "SukiSU\\-Ultra \\+SUSFS",
+}
 
 
 def mdv2_escape(s):
@@ -106,6 +123,33 @@ def build_blocks(env):
     return block_luminaire, block_root, block_addons, footer
 
 
+def build_channel_caption(env, variant_links):
+    """
+    variant_links: dict { "VANILLA": "https://t.me/c/...", "RESUKISU_SUSFS": "...", ... }
+    Only variants present in the dict will be listed.
+    """
+    kernel_ver  = env.get("KERNEL_VERSION", "")
+    linux_ver   = env.get("LINUX_VER", "N/A")
+    android_ver = KERNEL_VERSION_TO_ANDROID.get(kernel_ver, "?")
+
+    header = (
+        f"*Luminaire \\| Protocol \\| {mdv2_escape(linux_ver)}*\n"
+        f"*GKI Kernel \\| Android {mdv2_escape(android_ver)} \\| Linux {mdv2_escape(linux_ver)}*"
+    )
+
+    download_lines = ["", "*Download*"]
+    for variant_key, link in variant_links.items():
+        display = VARIANT_DISPLAY.get(variant_key, mdv2_escape(variant_key))
+        safe_link = mdv2_escape_url(link)
+        download_lines.append(f"• [{display}]({safe_link})")
+
+    donate_url   = mdv2_escape_url("https://sociabuzz.com/chainonyourdoor")
+    support_line = f"\n[Support]({donate_url})"
+
+    caption = "\n".join([header] + download_lines) + support_line
+    return truncate(caption, CAPTION_LIMIT)
+
+
 def main():
     out_group   = sys.argv[1]
     out_channel = sys.argv[2]
@@ -117,18 +161,27 @@ def main():
     caption_group = "\n".join([block_luminaire, block_root, block_addons, footer])
     caption_group = truncate(caption_group, CAPTION_LIMIT)
 
-    donate_url  = mdv2_escape_url("https://sociabuzz.com/chainonyourdoor")
-    donate_line = (
-        "*My dev partner insists on being paid in Whiskas\\. "
-        "If this kernel's been useful, maybe help me keep the little engineer fed?* \U0001f431"
-    )
-    donate_link = f"[Buy the cat some Whiskas]({donate_url})"
-
-    caption_channel = "\n".join([
-        block_luminaire, block_root, block_addons, footer,
-        "", donate_line, donate_link,
-    ])
-    caption_channel = truncate(caption_channel, CAPTION_LIMIT)
+    # Channel caption: new-style if VARIANT_LINKS_JSON is provided by telegram.sh
+    variant_links_json = env.get("VARIANT_LINKS_JSON", "")
+    if variant_links_json:
+        try:
+            variant_links = json.loads(variant_links_json)
+        except Exception:
+            variant_links = {}
+        caption_channel = build_channel_caption(env, variant_links)
+    else:
+        # Fallback: old-style (should not happen in normal flow)
+        donate_url  = mdv2_escape_url("https://sociabuzz.com/chainonyourdoor")
+        donate_line = (
+            "*My dev partner insists on being paid in Whiskas\\. "
+            "If this kernel's been useful, maybe help me keep the little engineer fed?* \U0001f431"
+        )
+        donate_link = f"[Buy the cat some Whiskas]({donate_url})"
+        caption_channel = "\n".join([
+            block_luminaire, block_root, block_addons, footer,
+            "", donate_line, donate_link,
+        ])
+        caption_channel = truncate(caption_channel, CAPTION_LIMIT)
 
     with open(out_group, "w") as f:
         f.write(caption_group)
