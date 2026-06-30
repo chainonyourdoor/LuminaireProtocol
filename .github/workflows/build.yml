@@ -280,7 +280,7 @@ jobs:
         run: df -h && du -sh ~/kernel-cache/ 2>/dev/null || true
 
       - name: "Restore LTO Cache"
-        if: startsWith(inputs.build_system, 'Make') && inputs.enable_lto == 'THIN'
+        if: startsWith(inputs.build_system, 'Make') && inputs.enable_lto == 'THIN' && inputs.update_arsenal != 'yes'
         uses: actions/cache/restore@v6
         with:
           path: /dev/shm/ldcache
