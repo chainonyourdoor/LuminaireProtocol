@@ -33,7 +33,7 @@ runs:
         SIZE_MB=$((SIZE / 1024 / 1024))
         if [ "$SIZE_MB" -gt 2000 ]; then
           echo "❌ LTO cache too large (${SIZE_MB}MB > 2000MB limit) — skipping save"
-          rm -f "/tmp/${ASSET_NAME}"
+          sudo rm -f "/tmp/${ASSET_NAME}"
           exit 1
         fi
         echo "✅ LTO cache size: ${SIZE_MB}MB"
@@ -45,7 +45,7 @@ runs:
             --notes "Automated cache storage for Luminaire build tools" \
             --prerelease || {
           echo "❌ Failed to create cache release"
-          rm -f "/tmp/${ASSET_NAME}"
+          sudo rm -f "/tmp/${ASSET_NAME}"
           exit 1
         }
 
@@ -54,9 +54,9 @@ runs:
           --repo "${{ github.repository }}" \
           --clobber || {
           echo "❌ Failed to upload LTO cache"
-          rm -f "/tmp/${ASSET_NAME}"
+          sudo rm -f "/tmp/${ASSET_NAME}"
           exit 1
         }
 
-        rm -f "/tmp/${ASSET_NAME}"
+        sudo rm -f "/tmp/${ASSET_NAME}"
         echo "LTO cache saved ✅"
