@@ -1,5 +1,5 @@
 name: "✨ Luminaire Protocol"
-run-name: "${{ inputs.kernel_version }} | ${{ inputs.build_system }} (${{ inputs.warming_mode && 'Warming' || 'Build' }})"
+run-name: "${{ inputs.kernel_version }} | ${{ inputs.enable_lto != 'NONE' && format('{0} LTO x ', inputs.enable_lto) || '' }}${{ split(inputs.build_system, ' - ')[1] }} (${{ inputs.warming_mode && 'Warming' || 'Build' }})"
 
 on:
   workflow_dispatch:
