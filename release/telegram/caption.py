@@ -164,27 +164,13 @@ def main():
     caption_group = "\n".join([block_luminaire, block_root, block_addons, footer])
     caption_group = truncate(caption_group, CAPTION_LIMIT)
 
-    # Channel caption: new-style if VARIANT_LINKS_JSON is provided by telegram.sh
+    # Channel caption — built from VARIANT_LINKS_JSON (provided by channel_post.sh)
     variant_links_json = env.get("VARIANT_LINKS_JSON", "")
-    if variant_links_json:
-        try:
-            variant_links = json.loads(variant_links_json)
-        except Exception:
-            variant_links = {}
-        caption_channel = build_channel_caption(env, variant_links)
-    else:
-        # Fallback: old-style (should not happen in normal flow)
-        donate_url  = mdv2_escape_url("https://sociabuzz.com/chainonyourdoor")
-        donate_line = (
-            "*My dev partner insists on being paid in Whiskas\\. "
-            "If this kernel's been useful, maybe help me keep the little engineer fed?* \U0001f431"
-        )
-        donate_link = f"[Buy the cat some Whiskas]({donate_url})"
-        caption_channel = "\n".join([
-            block_luminaire, block_root, block_addons, footer,
-            "", donate_line, donate_link,
-        ])
-        caption_channel = truncate(caption_channel, CAPTION_LIMIT)
+    try:
+        variant_links = json.loads(variant_links_json) if variant_links_json else {}
+    except Exception:
+        variant_links = {}
+    caption_channel = build_channel_caption(env, variant_links)
 
     with open(out_group, "w") as f:
         f.write(caption_group)
