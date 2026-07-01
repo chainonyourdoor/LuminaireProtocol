@@ -56,6 +56,7 @@ This repo does **not** contain kernel source — it contains all the scripts and
 ## ⚡ Addons
 
 - **BBG** — Baseband Guard LSM security module
+- **BBRv3** — TCP BBRv3 congestion control backport
 - **ZeroMount** — VFS path redirection engine (best paired with SuSFS)
 - **NoMount** — VFS path injection framework
 - **Re:Kernel** — Netlink event hook for binder/signal (frozen process detection)
@@ -71,6 +72,7 @@ This repo does **not** contain kernel source — it contains all the scripts and
 - [susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu) — simonpunk
 - [AnyKernel3](https://github.com/osm0sis/AnyKernel3) — osm0sis
 - [Baseband Guard](https://github.com/vc-teahouse/Baseband-guard) — vc-teahouse
+- [BBRv3 backport](https://github.com/WildKernels/kernel_patches/tree/main/common/bbrv3) — fatalcoder524
 - [ZeroMount](https://github.com/Enginex0/zeromount) — Enginex0
 - [NoMount](https://github.com/maxsteeel/nomount) — maxsteeel
 - [Re:Kernel](https://github.com/Sakion-Team/Re-Kernel) — Sakion-Team
