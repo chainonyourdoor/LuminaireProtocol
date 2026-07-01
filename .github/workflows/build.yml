@@ -51,6 +51,10 @@ on:
           - "none"
           - "nomount"
           - "zeromount"
+      bbrv3:
+        description: "BBRv3"
+        type: boolean
+        default: true
       bbg:
         description: "BBG"
         type: boolean
@@ -178,7 +182,7 @@ jobs:
       WARMING_MODE:                ${{ inputs.warming_mode }}
       RELEASE_CHANNEL:             ${{ inputs.release_channel }}
       BUILD_SYSTEM:                ${{ inputs.build_system }}
-      ADDONS:                      "${{ inputs.bbg && 'bbg,' || '' }}${{ inputs.rekernel && 'rekernel,' || '' }}${{ inputs.droidspaces && 'droidspaces,' || '' }}${{ inputs.mountless_engine != 'none' && format('{0},', inputs.mountless_engine) || '' }}"
+      ADDONS:                      "${{ inputs.bbrv3 && 'bbrv3,' || '' }}${{ inputs.bbg && 'bbg,' || '' }}${{ inputs.rekernel && 'rekernel,' || '' }}${{ inputs.droidspaces && 'droidspaces,' || '' }}${{ inputs.mountless_engine != 'none' && format('{0},', inputs.mountless_engine) || '' }}"
       CCACHE_DIR:                  ${{ startsWith(inputs.build_system, 'Make') && format('{0}/.ccache', github.workspace) || '' }}
       CCACHE_MAXSIZE:              ${{ startsWith(inputs.build_system, 'Make') && '1500M' || '' }}
 

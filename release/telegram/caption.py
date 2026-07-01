@@ -72,6 +72,7 @@ def build_blocks(env):
     susfs_ver       = mdv2_code_escape(env.get("SUSFS_VER", "N/A"))
     mountless       = mdv2_code_escape(env.get("MOUNTLESS_DISPLAY", "N/A"))
     rekernel        = mdv2_code_escape(env.get("REKERNEL_DISPLAY", "Disable"))
+    bbrv3           = mdv2_code_escape(env.get("BBRV3_DISPLAY", "Disable"))
     bbg             = mdv2_code_escape(env.get("BBG_DISPLAY", "Disable"))
     droidspaces     = mdv2_code_escape(env.get("DROIDSPACES_DISPLAY", "Disable"))
     date_str        = mdv2_code_escape(datetime.now().strftime("%d %b %Y"))
@@ -109,6 +110,7 @@ def build_blocks(env):
         "```Add-ons\n"
         f"Mountless Engine : {mountless}\n"
         f"Re:Kernel        : {rekernel}\n"
+        f"BBRv3            : {bbrv3}\n"
         f"BBG              : {bbg}\n"
         f"Droidspaces      : {droidspaces}\n"
         "```"
