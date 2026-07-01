@@ -38,25 +38,8 @@ PATCH_CONTENT=$(curl -LSs --fail --retry 3 --connect-timeout 30 "${PATCH_URL}") 
 echo "$PATCH_CONTENT" | patch -p1 --forward --no-backup-if-mismatch \
     || error "BBRv3: patch apply failed!"
 
-# Set BBRv3 as default TCP congestion control in defconfig
-DEFCONFIG_FILE="${KERNEL_SRC}/arch/arm64/configs/gki_defconfig"
-
-log "Configuring BBRv3 as default TCP congestion control..."
-
-for config in \
-    "CONFIG_TCP_CONG_BBR=y" \
-    "CONFIG_DEFAULT_TCP_CONG=\"bbr\"" \
-    "CONFIG_NET_SCH_FQ=y"; do
-    key="${config%%=*}"
-    if grep -q "^${key}=" "${DEFCONFIG_FILE}" 2>/dev/null; then
-        sed -i "s|^${key}=.*|${config}|" "${DEFCONFIG_FILE}"
-    else
-        echo "${config}" >> "${DEFCONFIG_FILE}"
-    fi
-done
-
 cd "${ROOT_DIR}"
 
 export BBRV3_ENABLED=true
 
-log "BBRv3 setup complete ✅"
+log "BBRv3 patch applied ✅ (configs will be set in defconfig step)"
