@@ -44,6 +44,7 @@ log "Luminaire defconfig applied ✅"
 if [ "${BBRV3_ENABLED:-false}" = "true" ]; then
     config --enable CONFIG_TCP_CONG_ADVANCED
     config --enable CONFIG_TCP_CONG_BBR3
+    config --set-str CONFIG_DEFAULT_TCP_CONG "bbr3"
     log "BBRv3: configs enabled ✅"
 fi
 
