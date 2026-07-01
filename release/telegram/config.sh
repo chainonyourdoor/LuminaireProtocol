@@ -5,6 +5,7 @@
 # ======================================================
 
 TELEGRAM_CHAT_ID="-1004391786664"
+TELEGRAM_GROUP_USERNAME="LuminaireCI"
 # CI Artifact
 TELEGRAM_THREAD_ID_ARTIFACT="3"
 

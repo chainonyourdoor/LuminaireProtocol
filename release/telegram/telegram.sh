@@ -173,14 +173,12 @@ if [ "${RELEASE_CHANNEL:-false}" = "true" ] && [ -n "${TELEGRAM_CHANNEL_ID:-}" ]
     if [ -z "$GROUP_MESSAGE_ID" ]; then
         warn "Telegram: could not get group message_id — skipping variant link save"
     else
-        RAW_CHANNEL_ID="${TELEGRAM_CHAT_ID/#-100/}"
-
         VARIANT_KEY="${ROOT_SOLUTION}"
         if [ "${SUSFS_ENABLED:-false}" = "true" ] && [ "$ROOT_SOLUTION" != "VANILLA" ]; then
             VARIANT_KEY="${ROOT_SOLUTION}_SUSFS"
         fi
 
-        GROUP_MSG_LINK="https://t.me/c/${RAW_CHANNEL_ID}/${GROUP_MESSAGE_ID}"
+        GROUP_MSG_LINK="https://t.me/${TELEGRAM_GROUP_USERNAME}/${GROUP_MESSAGE_ID}"
 
         LINKS_DIR="${GITHUB_WORKSPACE}/variant-links"
         mkdir -p "$LINKS_DIR"
