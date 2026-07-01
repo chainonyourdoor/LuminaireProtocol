@@ -66,61 +66,17 @@ if [ "${KERNEL_VERSION}" = "5.10" ]; then
     fi
 fi
 
-# Some vendor init scripts (common on MediaTek-based ROMs, among others)
-# write directly to /proc/sys/net/ipv4/tcp_congestion_control during late
-# boot, silently overriding our compiled CONFIG_DEFAULT_BBR3 well after
-# tcp_congestion_default() already ran. That happens entirely in
+# Some vendor init scripts (confirmed on MediaTek devices: an
+# `on early-init` write in /vendor/etc/init/*.rc) overwrite
+# /proc/sys/net/ipv4/tcp_congestion_control shortly after boot, silently
+# overriding our compiled CONFIG_DEFAULT_BBR3. That happens entirely in
 # userspace, after the kernel has already booted, so no defconfig/Kconfig
 # fix can prevent it — this must be enforced by the kernel itself,
 # repeatedly, so it wins regardless of what userspace does afterward.
 # Doing it kernel-side (rather than a root-manager service.d script) means
 # it also works on VANILLA builds with no root solution installed at all.
-TCP_CONG_FILE="${KERNEL_SRC}/net/ipv4/tcp_cong.c"
-if ! grep -q "luminaire_bbr3_enforce_init" "$TCP_CONG_FILE"; then
-    cat >> "$TCP_CONG_FILE" << 'EOF'
-
-/* ======================================================
- * Luminaire: BBRv3 default-congestion enforcer
- *
- * Re-asserts bbr3 as net.ipv4.tcp_congestion_control a handful of times
- * during early boot so a vendor init script writing over it doesn't
- * stick. Stops after LUMINAIRE_BBR3_ENFORCE_TRIES — this only needs to
- * win the boot-time race, not fight the user's own later choice (e.g.
- * manually switching algorithm via a kernel manager app).
- * ====================================================== */
-#ifdef CONFIG_TCP_CONG_BBR3
-#include <linux/workqueue.h>
-
-#define LUMINAIRE_BBR3_ENFORCE_TRIES 5
-
-static struct delayed_work luminaire_bbr3_enforce_work;
-static int luminaire_bbr3_enforce_count;
-
-static void luminaire_bbr3_enforce_fn(struct work_struct *work)
-{
-	tcp_set_default_congestion_control(&init_net, "bbr3");
-	if (++luminaire_bbr3_enforce_count < LUMINAIRE_BBR3_ENFORCE_TRIES)
-		schedule_delayed_work(&luminaire_bbr3_enforce_work, 20 * HZ);
-}
-
-static int __init luminaire_bbr3_enforce_init(void)
-{
-	INIT_DELAYED_WORK(&luminaire_bbr3_enforce_work, luminaire_bbr3_enforce_fn);
-	/* First shot after 20s — late enough that it lands after typical
-	 * vendor "on boot"/"on property:sys.boot_completed=1" triggers.
-	 * Repeats every 20s up to LUMINAIRE_BBR3_ENFORCE_TRIES, covering the
-	 * first ~100s of boot, then stops for good — so it never fights a
-	 * choice the user makes later on. */
-	schedule_delayed_work(&luminaire_bbr3_enforce_work, 20 * HZ);
-	return 0;
-}
-late_initcall(luminaire_bbr3_enforce_init);
-#endif /* CONFIG_TCP_CONG_BBR3 */
-EOF
-    grep -q "luminaire_bbr3_enforce_init" "$TCP_CONG_FILE" \
-        || error "BBRv3: enforcer injection into tcp_cong.c did not take!"
-    log "BBRv3: default-congestion enforcer injected into tcp_cong.c ✅"
-fi
+python3 "${LUMINAIRE_PATCH_DIR}/kernel/addons/bbrv3/enforcer.py" "${KERNEL_SRC}/net/ipv4/tcp_cong.c" \
+    || error "BBRv3: enforcer injection into tcp_cong.c failed!"
 
 cd "${ROOT_DIR}"
 
