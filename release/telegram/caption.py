@@ -180,9 +180,10 @@ def build_push_caption(env):
     Caption for the plain push-event notify (.github/workflows/notify.yml),
     distinct from build_blocks()/build_channel_caption() above (those are
     for release/test build posts, still MarkdownV2 — only the push notify
-    uses HTML). Author is linked to https://t.me/<name> — this repo is a
-    solo project, so the git author name and the Telegram handle are the
-    same person; no separate mapping needed.
+    uses HTML). Layout follows the redesign from commits b69f6bf/8a860ed
+    (header line, Branch in inline code, Author linked, Title/Message as
+    boxed blocks, Commit link as the closing line) — only the markup
+    language changed from MarkdownV2 to HTML, the structure itself didn't.
 
     Uses HTML parse_mode instead of MarkdownV2: HTML only needs & < >
     escaped in text nodes, so a stray unescaped character can't silently
@@ -198,28 +199,29 @@ def build_push_caption(env):
     title = env.get("TITLE", "")
     body  = env.get("BODY", "")
 
-    header = "\n".join([
-        f'\U0001F4CC New Commit : <a href="{commit_url}">{html_escape(commit_short)}</a>',
+    head = "\n".join([
+        "New Commit \U0001F4CC",
+        "",
         f"Branch : <code>{html_escape(branch_raw)}</code>",
         f'Author : <a href="{author_url}">{html_escape(author)}</a>',
-        "",
         "Title:",
-        f"<i>{html_escape(title)}</i>",
+        f"<pre>{html_escape(title)}</pre>",
     ])
+    footer = f'\nCommit : <a href="{commit_url}">{html_escape(commit_short)}</a>'
 
     if not body.strip():
-        return truncate(header, PUSH_TEXT_LIMIT)
+        return truncate(head + footer, PUSH_TEXT_LIMIT)
 
-    # Budget the body block against what's left after the header + the
+    # Budget the body block against what's left after head + footer + the
     # fixed wrapper text/tags, so truncate() never has to cut inside a
     # <pre> tag itself — only the escaped body content gets shortened.
     wrapper = "\n\nMessage:\n<pre></pre>"
-    body_budget = PUSH_TEXT_LIMIT - utf16_len(header) - utf16_len(wrapper)
+    body_budget = PUSH_TEXT_LIMIT - utf16_len(head) - utf16_len(footer) - utf16_len(wrapper)
     body_esc = html_escape(body)
     if utf16_len(body_esc) > body_budget:
         body_esc = truncate(body_esc, max(body_budget, 0), suffix="\n\u2026")
 
-    return header + f"\n\nMessage:\n<pre>{body_esc}</pre>"
+    return head + f"\n\nMessage:\n<pre>{body_esc}</pre>" + footer
 
 
 def build_channel_caption(env, variant_links, variant_versions=None):
