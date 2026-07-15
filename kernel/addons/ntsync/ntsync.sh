@@ -2,7 +2,7 @@
 
 # ======================================================
 # 🪟 ADDON — NTSync
-# NT synchronization primitive driver backport by Elizabeth Figura (CodeWeavers)
+# Driver by Elizabeth Figura (CodeWeavers), GKI backport by luigimak & fatalcoder524
 # Patch source: https://github.com/WildKernels/kernel_patches
 # ======================================================
 # Backports drivers/misc/ntsync.c (mainlined upstream, not yet present on
