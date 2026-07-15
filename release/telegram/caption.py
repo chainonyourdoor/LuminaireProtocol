@@ -204,24 +204,30 @@ def build_push_caption(env):
         "",
         f"Branch : <code>{html_escape(branch_raw)}</code>",
         f'Author : <a href="{author_url}">{html_escape(author)}</a>',
-        "Title:",
-        f"<pre>{html_escape(title)}</pre>",
     ])
+    # <pre><code class="language-X"> is how Telegram HTML gets the small
+    # "language" label in the corner of the box — the same visual Telegram
+    # gives a MarkdownV2 fenced block tagged ```X ... ``` (what b69f6bf
+    # originally used). A plain <pre> alone doesn't carry that label.
+    title_block = f'<pre><code class="language-Title">{html_escape(title)}</code></pre>'
+    head_full = head + "\n" + title_block
     footer = f'\nCommit : <a href="{commit_url}">{html_escape(commit_short)}</a>'
 
     if not body.strip():
-        return truncate(head + footer, PUSH_TEXT_LIMIT)
+        return truncate(head_full + footer, PUSH_TEXT_LIMIT)
 
-    # Budget the body block against what's left after head + footer + the
-    # fixed wrapper text/tags, so truncate() never has to cut inside a
-    # <pre> tag itself — only the escaped body content gets shortened.
-    wrapper = "\n\nMessage:\n<pre></pre>"
-    body_budget = PUSH_TEXT_LIMIT - utf16_len(head) - utf16_len(footer) - utf16_len(wrapper)
+    # Budget the body block against what's left after head_full + footer +
+    # the fixed wrapper tags, so truncate() never has to cut inside a
+    # <pre>/<code> tag itself — only the escaped body shortens.
+    wrapper = '\n<pre><code class="language-Message"></code></pre>'
+    fixed_len = utf16_len(head_full) + utf16_len(footer) + utf16_len(wrapper)
+    body_budget = PUSH_TEXT_LIMIT - fixed_len
     body_esc = html_escape(body)
     if utf16_len(body_esc) > body_budget:
         body_esc = truncate(body_esc, max(body_budget, 0), suffix="\n\u2026")
 
-    return head + f"\n\nMessage:\n<pre>{body_esc}</pre>" + footer
+    message_block = f'<pre><code class="language-Message">{body_esc}</code></pre>'
+    return head_full + "\n" + message_block + footer
 
 
 def build_channel_caption(env, variant_links, variant_versions=None):
