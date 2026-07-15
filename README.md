@@ -53,3 +53,9 @@ This repo does **not** contain kernel source — it contains all the scripts and
 - [ZyC Clang](https://github.com/ZyCromerZ/Clang) — ZyCromerZ
 
 ---
+
+## License
+
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
+
+Feel free to fork and modify — a credit/link back is appreciated
