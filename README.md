@@ -47,6 +47,7 @@ This repo does **not** contain kernel source — it contains all the scripts and
 - [Droidspaces](https://github.com/ravindu644/Droidspaces-OSS) — ravindu644
 - [BORE Scheduler](https://github.com/firelzrd/bore-scheduler) — firelzrd
 - [ADIOS](https://github.com/firelzrd/adios) — firelzrd
+- [NTSync](https://github.com/WildKernels/kernel_patches/tree/main/common/ntsync) — Elizabeth Figura (CodeWeavers)
 - [Greenforce Clang](https://github.com/greenforce-project/greenforce_clang) — greenforce-project
 - [Neutron Clang](https://github.com/Neutron-Toolchains/clang-build-catalogue) — Neutron-Toolchains
 - [WeebX Clang](https://github.com/XSans0/WeebX-Clang) — XSans0
