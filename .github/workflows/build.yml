@@ -87,10 +87,6 @@ on:
         description: "NTSync (Wine/Winlator compatibility)"
         type: boolean
         default: false
-      ipset:
-        description: "IPSet (firewall/ad-block apps)"
-        type: boolean
-        default: false
       lto_mode:
         description: "LTO"
         type: choice
@@ -199,7 +195,7 @@ jobs:
           # Single source of truth for the ADDONS list — reused by Start-Build
           # and notify-channel via this job's output, instead of each job
           # rebuilding the same string from inputs independently.
-          ADDONS="${{ inputs.bbrv3 && 'bbrv3,' || '' }}${{ inputs.bbg && 'bbg,' || '' }}${{ inputs.rekernel && 'rekernel,' || '' }}${{ inputs.droidspaces && 'droidspaces,' || '' }}${{ inputs.bore && 'bore,' || '' }}${{ inputs.adios && 'adios,' || '' }}${{ inputs.kasumi && 'kasumi,' || '' }}${{ inputs.ntsync && 'ntsync,' || '' }}${{ inputs.ipset && 'ipset,' || '' }}${{ inputs.mountless_engine != 'none' && format('{0},', inputs.mountless_engine) || '' }}"
+          ADDONS="${{ inputs.bbrv3 && 'bbrv3,' || '' }}${{ inputs.bbg && 'bbg,' || '' }}${{ inputs.rekernel && 'rekernel,' || '' }}${{ inputs.droidspaces && 'droidspaces,' || '' }}${{ inputs.bore && 'bore,' || '' }}${{ inputs.adios && 'adios,' || '' }}${{ inputs.kasumi && 'kasumi,' || '' }}${{ inputs.ntsync && 'ntsync,' || '' }}${{ inputs.mountless_engine != 'none' && format('{0},', inputs.mountless_engine) || '' }}"
           echo "addons=${ADDONS}" >> $GITHUB_OUTPUT
 
           # "/" -> "-" so this is safe to use as a filesystem path component
