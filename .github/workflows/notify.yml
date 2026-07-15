@@ -11,6 +11,12 @@ jobs:
   on-push:
     name: "Push"
     runs-on: ubuntu-latest
+    # Skip at job level instead of filtering the trigger itself — a bare
+    # `on: push:` (no branches/tags filters) is the config with a long
+    # track record of reliably firing on this repo. Tag pushes (e.g. the
+    # ccache release tag) still queue the job, but it exits immediately
+    # without posting anything, so no message goes out for them.
+    if: github.ref_type == 'branch'
 
     steps:
       - name: "Checkout"
@@ -44,7 +50,7 @@ jobs:
           if telegram_api_call "sendMessage" /tmp/tg_push_response.json "Push notify" \
                   -d "chat_id=${TELEGRAM_CHAT_ID}" \
                   -d "message_thread_id=${TELEGRAM_THREAD_ID}" \
-                  -d "parse_mode=MarkdownV2" \
+                  -d "parse_mode=HTML" \
                   -d "disable_web_page_preview=true" \
                   --data-urlencode "text=${TEXT}"; then
               log "Notify sent ✅"
