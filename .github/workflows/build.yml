@@ -79,12 +79,12 @@ on:
         description: "ADIOS (I/O scheduler)"
         type: boolean
         default: true
-      kasumi:
-        description: "Kasumi (Experimental)"
+      ntsync:
+        description: "NTSync (Wine/Winlator compat)"
         type: boolean
         default: false
-      ntsync:
-        description: "NTSync (Wine/Winlator compatibility)"
+      kasumi:
+        description: "Kasumi (Experimental)"
         type: boolean
         default: false
       lto_mode:
