@@ -36,8 +36,7 @@ def eprint(msg):
 
 def build_title(env):
     linux_ver = env.get("LINUX_VER", "N/A")
-    date_str = time.strftime("%d %b %Y")
-    return f"LuminaireProtocol {linux_ver} \u2014 {date_str}"
+    return f"LuminaireProtocol {linux_ver}"
 
 
 def create_page(token, title, content):

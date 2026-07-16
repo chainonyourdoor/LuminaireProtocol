@@ -60,19 +60,56 @@ TOGGLE_ADDON_ORDER = ["rekernel", "bbrv3", "bbg", "droidspaces", "bore", "adios"
 # build_telegraph_content() below. Keep this in sync manually whenever
 # luminaire.fragment's sections change — there's no automated link between
 # the two, so a stale entry here won't be caught by anything.
-FRAGMENT_FEATURES = [
-    "Mountify / OverlayFS",
-    "Kallsyms (full symbol table)",
-    "Ondemand CPU governor (available, not necessarily default)",
-    "ZRAM (LZ4 compression, writeback, memory tracking)",
-    "I/O Scheduler: MQ-Deadline",
-    "F2FS extended attributes + POSIX ACL",
-    "TCP BBR (congestion control selection)",
-    "Network schedulers: FQ, FQ_CoDel, CAKE, PIE, FQ-PIE",
-    "IP Set",
-    "IPv6 NAT",
-    "Debug overhead disabled (UBSAN, Page Owner, RCU Trace off)",
-]
+# Human-readable summary of kernel/config/luminaire.fragment — the always-on
+# feature set baked into every build, regardless of which addons are
+# toggled. This is hand-curated (the fragment itself is raw Kconfig, not
+# something to surface verbatim to readers) and used only by
+# build_telegraph_content() below. Keep this in sync manually whenever
+# luminaire.fragment's sections change — there's no automated link between
+# the two, so a stale entry here won't be caught by anything.
+# Grouped to mirror the fragment's own section comments (Mountify/OverlayFS,
+# ZRAM, Performance, I/O Scheduler, F2FS, TCP BBR, IP Set, IPv6 NAT, debug
+# overhead), not a flat list — easier to scan on the Telegraph page.
+FRAGMENT_FEATURES = {
+    "Filesystem": [
+        "Mountify / OverlayFS",
+        "F2FS Extended Attributes",
+        "POSIX ACL",
+    ],
+    "Memory": [
+        "ZRAM (LZ4 compression)",
+        "Memory Tracking",
+        "Writeback Support",
+    ],
+    "CPU & Scheduler": [
+        "Ondemand Governor (included)",
+        "MQ-Deadline I/O Scheduler",
+    ],
+    "Network": [
+        "TCP BBR",
+        "IP Set",
+        "IPv6 NAT",
+        "FQ",
+        "FQ_CoDel",
+        "CAKE",
+        "PIE",
+        "FQ-PIE",
+    ],
+    "Debug": [
+        "Full Kallsyms",
+        "UBSAN Disabled",
+        "Page Owner Disabled",
+        "RCU Trace Disabled",
+    ],
+}
+
+# LTO_MODE raw values ("NONE"/"THIN"/"FULL", from the workflow's LTO
+# choice input) to their display form on the Telegraph Overview block.
+LTO_DISPLAY = {
+    "NONE": "None",
+    "THIN": "ThinLTO",
+    "FULL": "FullLTO",
+}
 
 
 def mdv2_escape(s):
@@ -133,7 +170,7 @@ def build_blocks(env):
     lto             = mdv2_code_escape(env.get("LTO_MODE", "NONE"))
     kernel_variant  = mdv2_code_escape(env.get("KERNEL_VARIANT_DISPLAY", "N/A"))
     susfs_ver       = mdv2_code_escape(env.get("SUSFS_VER", "N/A"))
-    date_str        = mdv2_code_escape(datetime.now().strftime("%d %b %Y"))
+    date_str        = mdv2_code_escape(datetime.now().strftime("%-d %b %Y"))
 
     addon_tokens = [t for t in env.get("ADDONS", "").split(",") if t]
     mountless = "N/A"
@@ -198,11 +235,22 @@ def build_telegraph_content(env):
     """
     Builds the Node-array content for a per-release Telegraph page (see
     Telegraph's Content Format: https://telegra.ph/api#Content-format).
-    Two sections, both listed in full — no active/inactive filtering:
-      - "Features": FRAGMENT_FEATURES, always-on regardless of build.
-      - "Addon": every TOGGLE_ADDON_ORDER entry with its Enable/Disable
-        status for *this* build, same status logic as build_blocks()'s
-        Add-ons block, just not scoped to only-active entries.
+    Three sections:
+      - "Overview": release-wide build facts (Kernel/Platform/Compiler/
+        Build System/LTO). These come from telegram.sh's per-variant JSON
+        (compiler_string/build_system_display/lto_mode — see
+        channel_post.sh's "first non-empty wins" parsing) rather than a
+        per-variant source, because they're all backed by single global
+        workflow inputs (BUILD_SYSTEM, LTO_MODE) or a value derived from
+        one (COMPILER_STRING from the one CLANG_VARIANT used release-wide)
+        — verified against build.yml before relying on that, not assumed.
+      - "Core Features": FRAGMENT_FEATURES, grouped exactly like the
+        dict's categories, always-on regardless of build.
+      - "Release Configuration": every TOGGLE_ADDON_ORDER entry, split
+        into an enabled group (\u2713) and disabled group (\u2717) for *this*
+        build — same status logic as build_blocks()'s Add-ons block, just
+        not scoped to only-active entries and shown with checkmarks
+        instead of Enable/Disable text.
     Returns a plain Python list (json.dumps'd by the caller), not a JSON
     string itself.
     """
@@ -212,30 +260,61 @@ def build_telegraph_content(env):
     linux_ver   = env.get("LINUX_VER", "N/A")
     android_ver = KERNEL_VERSION_TO_ANDROID.get(kernel_ver, "?")
 
+    compiler_string = env.get("COMPILER_STRING", "") or "N/A"
+    build_system    = env.get("BUILD_SYSTEM_DISPLAY", "") or "N/A"
+    lto_raw         = env.get("LTO_MODE", "")
+    lto_display     = LTO_DISPLAY.get(lto_raw, lto_raw or "N/A")
+
     intro = (
-        f"LuminaireProtocol \u2014 GKI kernel build for Android {android_ver} "
-        f"(Linux {linux_ver}). This page lists every feature and addon "
-        f"available as of this release; addon status reflects this "
-        f"specific build."
+        f"LuminaireProtocol \u2014 an Android GKI kernel build. This page "
+        f"lists every feature and addon available as of this release; "
+        f"addon status reflects this specific build."
     )
 
-    feature_items = [{"tag": "li", "children": [name]} for name in FRAGMENT_FEATURES]
+    overview_lines = [
+        f"Kernel       : Linux {linux_ver}",
+        f"Platform     : Android {android_ver} GKI",
+        f"Compiler     : {compiler_string}",
+        f"Build System : {build_system}",
+        f"LTO          : {lto_display}",
+    ]
+    overview_block = {
+        "tag": "pre",
+        "children": [{"tag": "code", "children": ["\n".join(overview_lines)]}],
+    }
 
-    addon_items = []
+    content = [
+        {"tag": "p", "children": [intro]},
+        {"tag": "h3", "children": ["Overview"]},
+        overview_block,
+        {"tag": "h3", "children": ["Core Features"]},
+        {"tag": "p", "children": ["Always available on every Luminaire build."]},
+    ]
+
+    for category, items in FRAGMENT_FEATURES.items():
+        content.append({"tag": "h4", "children": [category]})
+        content.append({
+            "tag": "ul",
+            "children": [{"tag": "li", "children": [item]} for item in items],
+        })
+
+    enabled_items = []
+    disabled_items = []
     for token in TOGGLE_ADDON_ORDER:
         name = ADDON_DISPLAY_NAMES.get(token, token)
-        status = "Enable" if token in addon_tokens else "Disable"
-        addon_items.append({"tag": "li", "children": [f"{name} \u2014 {status}"]})
+        if token in addon_tokens:
+            enabled_items.append({"tag": "li", "children": [f"\u2713 {name}"]})
+        else:
+            disabled_items.append({"tag": "li", "children": [f"\u2717 {name}"]})
 
-    return [
-        {"tag": "p", "children": [intro]},
-        {"tag": "h3", "children": ["Features"]},
-        {"tag": "p", "children": ["Always enabled, every build:"]},
-        {"tag": "ul", "children": feature_items},
-        {"tag": "h3", "children": ["Addon"]},
-        {"tag": "p", "children": ["Toggled per release \u2014 status below is for this build:"]},
-        {"tag": "ul", "children": addon_items},
-    ]
+    content.append({"tag": "h3", "children": ["Release Configuration"]})
+    content.append({"tag": "p", "children": ["Enabled for this release."]})
+    if enabled_items:
+        content.append({"tag": "ul", "children": enabled_items})
+    if disabled_items:
+        content.append({"tag": "ul", "children": disabled_items})
+
+    return content
 
 
 CHANGELOG_MAX_LEN = 300
