@@ -197,6 +197,15 @@ def build_blocks(env):
         f"LTO          : {lto}\n"
         f"Date         : {date_str}```"
     )
+    # Release-mode group posts skip this block: the same release also gets
+    # a channel post whose Telegraph "Features" page has an Overview
+    # section with this exact info (Kernel/Platform/Compiler/Build
+    # System/LTO — see build_telegraph_content()). Test-mode posts never
+    # get a Telegraph page (notify-channel only runs for Release — see
+    # build.yml), so they keep this block; it's their only source for
+    # this info.
+    if env.get("RUN_MODE", "").upper() == "RELEASE":
+        block_luminaire = None
     is_vanilla = env.get("KERNEL_VARIANT", "").upper() == "VANILLA"
     ksu_display = "N/A" if is_vanilla else kernel_variant
     ksu_version = mdv2_code_escape(env.get("KERNEL_VARIANT_VERSION", ""))
@@ -484,7 +493,9 @@ def main():
 
     block_luminaire, block_root, block_addons, footer = build_blocks(env)
 
-    caption_group = "\n".join([block_luminaire, block_root, block_addons, footer])
+    caption_group = "\n".join(
+        b for b in [block_luminaire, block_root, block_addons, footer] if b is not None
+    )
     caption_group = truncate(caption_group, CAPTION_LIMIT)
 
     # Channel caption — built from VARIANT_LINKS_JSON (provided by channel_post.sh)
