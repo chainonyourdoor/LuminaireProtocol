@@ -63,7 +63,7 @@ TOGGLE_ADDON_ORDER = ["rekernel", "bbrv3", "bbg", "droidspaces", "bore", "adios"
 FRAGMENT_FEATURES = [
     "Mountify / OverlayFS",
     "Kallsyms (full symbol table)",
-    "CPU governor: Ondemand",
+    "Ondemand CPU governor (available, not necessarily default)",
     "ZRAM (LZ4 compression, writeback, memory tracking)",
     "I/O Scheduler: MQ-Deadline",
     "F2FS extended attributes + POSIX ACL",
