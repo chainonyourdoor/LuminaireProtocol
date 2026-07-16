@@ -6,8 +6,6 @@ inputs:
     required: true
   gh-token:
     required: true
-  kernel-version:
-    required: true
 
 runs:
   using: composite

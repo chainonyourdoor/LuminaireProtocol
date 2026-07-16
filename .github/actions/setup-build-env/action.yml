@@ -63,7 +63,6 @@ runs:
         # (same field order, same susfs/mode handling) or restore silently
         # misses the asset the save step actually wrote.
         ccache-filename: ccache-data-${{ inputs.kernel-version }}-${{ inputs.kernel-variant }}${{ inputs.susfs == 'true' && '+SUSFS' || '' }}-${{ steps.clang-key.outputs.clang_variant_upper }}${{ inputs.lto-mode != 'NONE' && format('-{0}', inputs.lto-mode) || '' }}-${{ inputs.ref-name }}.tar.zst
-        kernel-version: ${{ inputs.kernel-version }}
         gh-token: ${{ inputs.gh-token }}
 
     - name: "Restore LTO Cache"
