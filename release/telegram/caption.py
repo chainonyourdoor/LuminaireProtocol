@@ -208,25 +208,11 @@ def build_blocks(env):
         f"Toolchain : {compiler}\n"
         f"LTO       : {lto}```"
     )
-    # Release-mode group posts skip this block: the same release also gets
-    # a channel post whose Telegraph "Features" page has an Overview
-    # section with this exact info (Kernel/Source/Toolchain/LTO — see
-    # build_telegraph_content()). Test-mode posts never
-    # get a Telegraph page (notify-channel only runs for Release — see
-    # build.yml), so they keep this block; it's their only source for
-    # this info.
-    if env.get("RUN_MODE", "").upper() == "RELEASE":
-        block_luminaire = None
-    # Root-solution block: the codeblock's language tag (the fenced-off
-    # title Telegram renders in the box header) is the variant name itself
-    # rather than a fixed "Root-solution" label, so each release's caption
-    # visually identifies which fork it is at a glance. Vanilla has no KSU
-    # fork or SuSFS to report, so both fields are hardcoded "N/A (Vanilla)"
-    # rather than left blank.
+    
     is_vanilla = env.get("KERNEL_VARIANT", "").upper() == "VANILLA"
     if is_vanilla:
         root_lines = [
-            "Version : N/A (Vanilla)",
+            "Version : Vanilla",
             "SuSFS   : N/A (Vanilla)",
         ]
     else:
