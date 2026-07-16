@@ -37,19 +37,16 @@ fi
 
 # Kasumi resolves non-exported kernel symbols (kallsyms_lookup_name and
 # friends) at runtime — needs the full kallsyms table, not just exported
-# ones. Inject directly into gki_defconfig (before `make defconfig` runs),
-# same reasoning/pattern as bbrv3.sh: scripts/config post-processing in
-# defconfig.sh runs too late for constraints like this that other Kconfig
-# options key off of.
-GKI_DEFCONFIG="${KERNEL_SRC}/arch/arm64/configs/gki_defconfig"
-if ! grep -q "CONFIG_KALLSYMS_ALL" "$GKI_DEFCONFIG"; then
-    cat >> "$GKI_DEFCONFIG" << 'EOF'
-# Kasumi requires full kallsyms (Luminaire)
-CONFIG_KALLSYMS=y
-CONFIG_KALLSYMS_ALL=y
-EOF
-    log "Kasumi: CONFIG_KALLSYMS_ALL injected into gki_defconfig ✅"
-fi
+# ones (CONFIG_KALLSYMS_ALL). No injection needed here though: unlike
+# BBRv3's TCP_CONG_ADVANCED gate, KALLSYMS_ALL (depends on DEBUG_KERNEL &&
+# KALLSYMS) is already the resolved default in stock gki_defconfig
+# (EXPERT selects DEBUG_KERNEL, and nothing in this repo ever disables
+# EXPERT/DEBUG_KERNEL), and kernel/config/luminaire.fragment sets it
+# explicitly on every build regardless — verified against real Kconfig
+# source + a built `conf` tool, not assumed. A prior version of this
+# script duplicated that injection early into gki_defconfig on the
+# (incorrect) assumption it needed BBRv3-style early placement — don't
+# re-add it without re-checking the dependency chain first.
 
 # Consumed later by kernel/addons/kasumi/postbuild.sh (run_postbuild() in
 # build.sh, after run_build() finishes) and release/anykernel.sh
