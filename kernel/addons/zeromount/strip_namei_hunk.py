@@ -7,19 +7,21 @@
 # patched baseline — its first hunk's unchanged context includes
 # `#ifdef CONFIG_KSU_SUSFS_UNICODE_FILTER` / `extern bool
 # susfs_check_unicode_bypass(...)`, which only exists once SuSFS has
-# already been patched in. Applying it to a VANILLA (or any non-SuSFS)
-# tree means that context can't match, and --fuzz=3 will still force a
-# match rather than fail outright — landing the later hunks (the
-# generic_permission()/inode_permission() permission-check injections)
-# outside the actual function bodies, producing "undeclared identifier
-# 'inode'/'mask'" compile errors. Confirmed via a VANILLA build failure
-# (fs/namei.c:833) while the same patch applied cleanly on all three
-# SuSFS-patched variants in the same run.
+# already been patched in. Applying it to a non-SuSFS tree means that
+# context can't match, and --fuzz=3 will still force a match rather than
+# fail outright — landing the later hunks (the generic_permission()/
+# inode_permission() permission-check injections) outside the actual
+# function bodies, producing "undeclared identifier 'inode'/'mask'"
+# compile errors. Confirmed via a VANILLA build failure (fs/namei.c:833)
+# while the same patch applied cleanly on all three SuSFS-patched
+# variants in the same run — VANILLA (and any non-SuSFS variant) is no
+# longer a supported combo for this addon at all (see zeromount.sh), but
+# the failure mode that led here is still the reason this strip exists.
 #
-# inject_namei.py handles fs/namei.c for all variants via anchor-based
-# injection (anchors are baseline-agnostic real function bodies), so
-# the patch hunks are not needed. This mirrors strip_readdir_hunk.py,
-# which strips the same-root-cause-affected fs/readdir.c hunk.
+# inject_namei.py handles fs/namei.c via anchor-based injection instead
+# (anchors are baseline-agnostic real function bodies), so the patch
+# hunks are not needed. This mirrors strip_readdir_hunk.py, which strips
+# the same-root-cause-affected fs/readdir.c hunk.
 #
 # This script strips the namei.c diff section from the patch file
 # in-place before it is applied, guaranteeing zero hunk failures and

@@ -3,18 +3,22 @@
 #
 # inject_namei.py — inject ZeroMount hooks into fs/namei.c
 #
-# Handles namei.c injection for all variants (VANILLA, RESUKISU, SUKISU,
-# KSUNEXT), replacing the namei.c hunks from the ZeroMount patch, which
-# are diffed against a SuSFS-patched baseline and mis-apply on VANILLA
-# (see strip_namei_hunk.py for the full explanation). The ZeroMount
-# patch is pre-stripped of its namei.c hunks before being applied, so
-# this worker is always the sole authority for namei.c injection.
+# Handles namei.c injection for every ZeroMount build (RESUKISU, SUKISU,
+# KSUNEXT — ZeroMount requires SuSFS, so VANILLA is never a valid combo,
+# see zeromount.sh), replacing the namei.c hunks from the ZeroMount patch,
+# which are diffed against a SuSFS-patched baseline and mis-apply on a
+# non-SuSFS tree (see strip_namei_hunk.py for the full explanation). The
+# ZeroMount patch is pre-stripped of its namei.c hunks before being
+# applied, so this worker is always the sole authority for namei.c
+# injection.
 #
 # All anchors below are matched against real, unpatched upstream
 # fs/namei.c (chainonyourdoor/LuminaireKernel-6.1,
 # android14-6.1-lts) — they don't depend on SuSFS or any KSU fork
 # having touched the file first, so this applies identically and
-# correctly regardless of variant or patch order.
+# correctly regardless of variant or patch order (baseline-agnostic by
+# design, even though SuSFS is required at the addon level — see
+# zeromount.sh).
 
 import sys
 

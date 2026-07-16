@@ -4,9 +4,11 @@
 # strip_readdir_hunk.py — strip the fs/readdir.c hunk from ZeroMount patch
 #
 # The ZeroMount patch contains a readdir.c hunk that anchors on
-# CONFIG_KSU_SUSFS_SUS_PATH context, causing it to fail on VANILLA and
-# non-SuSFS builds. inject_readdir.py handles readdir.c for all variants
-# via anchor-based injection, so the patch hunk is not needed.
+# CONFIG_KSU_SUSFS_SUS_PATH context, causing it to fail on a non-SuSFS
+# tree (VANILLA, or any variant with SuSFS disabled — neither is a
+# supported combo for this addon, see zeromount.sh). inject_readdir.py
+# handles readdir.c via anchor-based injection instead, so the patch
+# hunk is not needed regardless.
 #
 # This script strips the readdir.c diff section from the patch file
 # in-place before it is applied, guaranteeing zero hunk failures.

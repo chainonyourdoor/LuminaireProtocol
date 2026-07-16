@@ -1,5 +1,12 @@
 import sys
 
+# ZeroMount now requires SuSFS unconditionally (build.sh's addon conflict
+# matrix errors out before this ever runs on a non-SuSFS tree — see
+# run_addons()), so this only has to handle the with-SuSFS scope bug.
+# There used to be a second "broken_vanilla" case here for non-SuSFS trees
+# (zeromount_spoof_mmap_metadata() landing inside the if(!mm){} block
+# instead of if(file){}); it's gone along with non-SuSFS support.
+
 
 def main():
     path = sys.argv[1]
@@ -7,9 +14,9 @@ def main():
     with open(path) as f:
         content = f.read()
 
-    # Case A: with SuSFS — zeromount call landed after SUS_KSTAT block
-    # but still inside if(file){} scope
-    broken_susfs = (
+    # zeromount call landed after SUS_KSTAT block but still inside
+    # if(file){} scope
+    broken = (
         '#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT\n'
         '\t\tsusfs_sus_kstat_spoof_show_map_vma(inode, &dev, &ino);\n'
         '#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT\n'
@@ -22,7 +29,7 @@ def main():
         'orig_flow:\n'
         '#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT'
     )
-    fixed_susfs = (
+    fixed = (
         '#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT\n'
         '\t\tsusfs_sus_kstat_spoof_show_map_vma(inode, &dev, &ino);\n'
         '#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT\n'
@@ -36,44 +43,25 @@ def main():
         '#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT'
     )
 
-    # Case B: without SuSFS — zeromount call landed in wrong scope entirely
-    # (inside if(!mm) block instead of if(file) block)
-    broken_vanilla = (
-        '\t\tif (!mm) {\n'
-        '\t\t\tname = "[vdso]";\n'
-        '\t\t\tgoto done;\n'
-        '\t\t}\n'
-        '\n'
-        '#ifdef CONFIG_ZEROMOUNT\n'
-        '\t\tzeromount_spoof_mmap_metadata(inode, &dev, &ino);\n'
-        '#endif\n'
-        '\t\tif (vma->vm_start <= mm->brk &&'
-    )
-    fixed_vanilla = (
-        '\t\tif (!mm) {\n'
-        '\t\t\tname = "[vdso]";\n'
-        '\t\t\tgoto done;\n'
-        '\t\t}\n'
-        '\n'
-        '\t\tif (vma->vm_start <= mm->brk &&'
-    )
+    if broken in content:
+        content = content.replace(broken, fixed)
+        with open(path, 'w') as f:
+            f.write(content)
+        print("task_mmu.c scope fix applied.")
+        sys.exit(0)
 
-    if broken_susfs in content:
-        content = content.replace(broken_susfs, fixed_susfs)
-        print("task_mmu.c scope fix applied (with-SuSFS case).")
-    elif broken_vanilla in content:
-        # For vanilla: just remove the misplaced call entirely from wrong scope.
-        # zeromount's show_map_vma hook in the patch already handles this
-        # correctly via the other hook points (d_path.c, stat.c).
-        content = content.replace(broken_vanilla, fixed_vanilla)
-        print("task_mmu.c scope fix applied (vanilla/no-SuSFS case).")
-    elif "zeromount_spoof_mmap_metadata" not in content:
-        print("zeromount call not found, skipping.")
-    else:
-        print("Pattern already fixed or different, skipping.")
+    if "zeromount_spoof_mmap_metadata" not in content:
+        print("ERROR: zeromount call not found in task_mmu.c — ZeroMount patch/injection "
+              "may not have run yet, or upstream task_mmu.c structure changed!", file=sys.stderr)
+        sys.exit(1)
 
-    with open(path, 'w') as f:
-        f.write(content)
+    # zeromount_spoof_mmap_metadata is present but doesn't match the known
+    # broken pattern — either already fixed by a previous run (idempotent,
+    # not an error) or the surrounding SuSFS code shifted upstream (a real
+    # problem, but indistinguishable from "already fixed" by string match
+    # alone). Exits 0 either way; if this masks a real upstream drift, the
+    # actual compile error downstream will surface it.
+    print("Pattern already fixed or different, skipping.")
 
 
 if __name__ == "__main__":

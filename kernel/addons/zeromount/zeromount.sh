@@ -7,10 +7,18 @@
 # Patch source: https://github.com/Enginex0/Super-Builders
 # Note: self-contained patch (creates fs/zeromount.c,
 #       include/linux/zeromount.h, Kconfig + Makefile wiring).
-#       readdir.c and namei.c hunks are stripped before apply —
-#       both are diffed against a SuSFS-patched baseline (mis-apply
-#       on VANILLA/non-SuSFS trees) and are handled exclusively by
-#       inject_readdir.py / inject_namei.py for all variants instead.
+#       readdir.c and namei.c hunks are stripped before apply — both are
+#       diffed against a SuSFS-patched baseline and are handled exclusively
+#       by inject_readdir.py / inject_namei.py instead.
+#
+# Requires SuSFS — build.sh's addon conflict matrix (run_addons()) rejects
+# this addon outright when SUSFS_ENABLED isn't true, on any variant
+# including VANILLA (which can never have SuSFS). Design decision, not a
+# hard limitation of every script here: inject_namei.py/inject_readdir.py
+# are baseline-agnostic and would work on a non-SuSFS tree too, but
+# fix_taskmmu.py's scope fix only handles the SuSFS-patched pattern (its
+# non-SuSFS case was removed once this addon stopped supporting non-SuSFS
+# trees), so this is a hard requirement in practice regardless.
 
 ZEROMOUNT_PATCH_URL="https://raw.githubusercontent.com/Enginex0/Super-Builders/main/android14-6.1/ReSukiSU/patches/60_zeromount-android14-6.1.patch"
 ZEROMOUNT_PATCH="/tmp/60_zeromount-android14-6.1.patch"
