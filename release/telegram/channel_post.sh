@@ -7,6 +7,7 @@
 # Called from the notify-channel job after all builds have finished.
 
 CAPTION_BUILDER="${LUMINAIRE_PATCH_DIR}/release/telegram/caption.py"
+TELEGRAPH_BUILDER="${LUMINAIRE_PATCH_DIR}/release/telegram/telegraph_page.py"
 BANNER_DIR="${LUMINAIRE_PATCH_DIR}/release/telegram"
 
 # Run standalone (bash release/telegram/channel_post.sh) from notify-channel,
@@ -142,6 +143,27 @@ if [ "$MISSING_VARIANTS_JSON" != "[]" ]; then
 fi
 
 # ------------------------------------------------------
+# Create per-release Telegraph Features page
+# Never fails the job: telegraph_page.py always exits 0 and prints an
+# empty line on failure (missing token, API down, retries exhausted) —
+# caption.py's build_channel_caption() falls back to plain text pointing
+# at the zip caption's Add-ons block when FEATURES_URL is empty.
+# ------------------------------------------------------
+FEATURES_URL=$(
+    LINUX_VER="${LINUX_VER:-N/A}" \
+    KERNEL_VERSION="${KERNEL_VERSION:-}" \
+    ADDONS="${ADDONS:-}" \
+    TELEGRAPH_TOKEN="${TELEGRAPH_TOKEN:-}" \
+    python3 "$TELEGRAPH_BUILDER"
+)
+
+if [ -n "$FEATURES_URL" ]; then
+    log "Features page: $FEATURES_URL"
+else
+    warn "No Features page this run — channel caption will fall back to the zip's Add-ons block"
+fi
+
+# ------------------------------------------------------
 # Build channel caption
 # ------------------------------------------------------
 CAPTION_GROUP_DUMMY="/tmp/channel_post_group_dummy.txt"
@@ -158,6 +180,7 @@ GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-}" \
 GITHUB_RUN_ID="${GITHUB_RUN_ID:-}" \
 VARIANT_LINKS_JSON="$VARIANT_LINKS_JSON" \
 VARIANT_VERSIONS_JSON="$VARIANT_VERSIONS_JSON" \
+FEATURES_URL="$FEATURES_URL" \
 python3 "$CAPTION_BUILDER" "$CAPTION_GROUP_DUMMY" "$CAPTION_CHANNEL_FILE" \
     || error "Caption builder failed"
 

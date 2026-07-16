@@ -53,6 +53,27 @@ MOUNTLESS_ADDON_TOKENS = ("nomount", "zeromount")
 # caption, in display order.
 TOGGLE_ADDON_ORDER = ["rekernel", "bbrv3", "bbg", "droidspaces", "bore", "adios", "kasumi", "ntsync"]
 
+# Human-readable summary of kernel/config/luminaire.fragment — the always-on
+# feature set baked into every build, regardless of which addons are
+# toggled. This is hand-curated (the fragment itself is raw Kconfig, not
+# something to surface verbatim to readers) and used only by
+# build_telegraph_content() below. Keep this in sync manually whenever
+# luminaire.fragment's sections change — there's no automated link between
+# the two, so a stale entry here won't be caught by anything.
+FRAGMENT_FEATURES = [
+    "Mountify / OverlayFS",
+    "Kallsyms (full symbol table)",
+    "CPU governor: Ondemand",
+    "ZRAM (LZ4 compression, writeback, memory tracking)",
+    "I/O Scheduler: MQ-Deadline",
+    "F2FS extended attributes + POSIX ACL",
+    "TCP BBR (congestion control selection)",
+    "Network schedulers: FQ, FQ_CoDel, CAKE, PIE, FQ-PIE",
+    "IP Set",
+    "IPv6 NAT",
+    "Debug overhead disabled (UBSAN, Page Owner, RCU Trace off)",
+]
+
 
 def mdv2_escape(s):
     special = r"\_*[]()~`>#+-=|{}.!"
@@ -173,6 +194,50 @@ def build_blocks(env):
     return block_luminaire, block_root, block_addons, footer
 
 
+def build_telegraph_content(env):
+    """
+    Builds the Node-array content for a per-release Telegraph page (see
+    Telegraph's Content Format: https://telegra.ph/api#Content-format).
+    Two sections, both listed in full — no active/inactive filtering:
+      - "Features": FRAGMENT_FEATURES, always-on regardless of build.
+      - "Addon": every TOGGLE_ADDON_ORDER entry with its Enable/Disable
+        status for *this* build, same status logic as build_blocks()'s
+        Add-ons block, just not scoped to only-active entries.
+    Returns a plain Python list (json.dumps'd by the caller), not a JSON
+    string itself.
+    """
+    addon_tokens = [t for t in env.get("ADDONS", "").split(",") if t]
+
+    kernel_ver  = env.get("KERNEL_VERSION", "")
+    linux_ver   = env.get("LINUX_VER", "N/A")
+    android_ver = KERNEL_VERSION_TO_ANDROID.get(kernel_ver, "?")
+
+    intro = (
+        f"LuminaireProtocol \u2014 GKI kernel build for Android {android_ver} "
+        f"(Linux {linux_ver}). This page lists every feature and addon "
+        f"available as of this release; addon status reflects this "
+        f"specific build."
+    )
+
+    feature_items = [{"tag": "li", "children": [name]} for name in FRAGMENT_FEATURES]
+
+    addon_items = []
+    for token in TOGGLE_ADDON_ORDER:
+        name = ADDON_DISPLAY_NAMES.get(token, token)
+        status = "Enable" if token in addon_tokens else "Disable"
+        addon_items.append({"tag": "li", "children": [f"{name} \u2014 {status}"]})
+
+    return [
+        {"tag": "p", "children": [intro]},
+        {"tag": "h3", "children": ["Features"]},
+        {"tag": "p", "children": ["Always enabled, every build:"]},
+        {"tag": "ul", "children": feature_items},
+        {"tag": "h3", "children": ["Addon"]},
+        {"tag": "p", "children": ["Toggled per release \u2014 status below is for this build:"]},
+        {"tag": "ul", "children": addon_items},
+    ]
+
+
 CHANGELOG_MAX_LEN = 300
 
 
@@ -255,14 +320,20 @@ def build_channel_caption(env, variant_links, variant_versions=None):
         f"*GKI Kernel \\| Android {mdv2_escape(android_ver)} \\| Linux {mdv2_escape(major_minor)}*"
     ]
 
-    # Add-ons — only the ones actually enabled for this run
-    addon_tokens = [t for t in env.get("ADDONS", "").split(",") if t]
-    if addon_tokens:
-        addon_lines = ["*Add\\-ons*"]
-        for token in addon_tokens:
-            name = ADDON_DISPLAY_NAMES.get(token, token)
-            addon_lines.append(f"\\- {mdv2_escape(name)}")
-        sections.append("\n".join(addon_lines))
+    # Features — links out to a per-release Telegraph page (built fresh per
+    # release, never reused — see build_telegraph_content()) listing every
+    # always-on fragment feature plus every addon's Enable/Disable status
+    # for this build. FEATURES_URL is populated by channel_post.sh after
+    # calling telegraph_page.py; left empty if that call failed (Telegraph
+    # API down, etc), in which case this falls back to plain text pointing
+    # at the Add-ons block already present in the zip's own caption —
+    # chosen over pointing into the zip's contents directly, since the
+    # archive itself carries no bundled feature manifest.
+    features_url = env.get("FEATURES_URL", "").strip()
+    if features_url:
+        sections.append(f"[Features]({mdv2_escape_url(features_url)})")
+    else:
+        sections.append("Features: see Add\\-ons block in the zip's caption")
 
     # Download links
     download_lines = ["*Download*"]

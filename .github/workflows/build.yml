@@ -412,6 +412,7 @@ jobs:
       - name: "Send Channel Post"
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAPH_TOKEN:    ${{ secrets.TELEGRAPH_TOKEN }}
           LUMINAIRE_PATCH_DIR: ${{ github.workspace }}
           LINKS_DIR:           /tmp/variant-links
           KERNEL_VERSION:      ${{ inputs.kernel_version }}
