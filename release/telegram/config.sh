@@ -7,7 +7,6 @@
 TELEGRAM_CHAT_ID="-1004391786664"
 TELEGRAM_CI_GROUP="LuminaireCI"       # bot notifications (Test/Release/Event topics)
 TELEGRAM_GROUP="LuminaireLab"         # community discussion group
-TELEGRAM_CHANNEL="LuminaireProtocol"       # public channel username (for t.me links)
 
 # Repository Event
 TELEGRAM_THREAD_ID_EVENT="4"
