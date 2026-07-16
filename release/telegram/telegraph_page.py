@@ -27,7 +27,6 @@ import caption  # noqa: E402  (path insert must happen first)
 
 TELEGRAPH_API_TIMEOUT = int(os.environ.get("TELEGRAPH_API_TIMEOUT", "30"))
 TELEGRAPH_MAX_RETRIES = int(os.environ.get("TELEGRAPH_MAX_RETRIES", "3"))
-TELEGRAPH_AUTHOR_NAME = "LuminaireProtocol"
 
 
 def eprint(msg):
@@ -40,10 +39,12 @@ def build_title(env):
 
 
 def create_page(token, title, content):
+    # No explicit author_name here — omitting it makes Telegraph fall back
+    # to the account's own default author_name (set once at createAccount
+    # time), instead of overriding it per-page with a hardcoded value.
     payload = json.dumps({
         "access_token": token,
         "title": title,
-        "author_name": TELEGRAPH_AUTHOR_NAME,
         "content": json.dumps(content),
         "return_content": False,
     }).encode("utf-8")
