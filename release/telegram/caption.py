@@ -204,16 +204,26 @@ def build_blocks(env):
     # this info.
     if env.get("RUN_MODE", "").upper() == "RELEASE":
         block_luminaire = None
+    # Root-solution block: the codeblock's language tag (the fenced-off
+    # title Telegram renders in the box header) is the variant name itself
+    # rather than a fixed "Root-solution" label, so each release's caption
+    # visually identifies which fork it is at a glance. Vanilla has no KSU
+    # fork or SuSFS to report, so both fields are hardcoded "N/A (Vanilla)"
+    # rather than left blank.
     is_vanilla = env.get("KERNEL_VARIANT", "").upper() == "VANILLA"
-    ksu_display = "N/A" if is_vanilla else kernel_variant
-    ksu_version = mdv2_code_escape(env.get("KERNEL_VARIANT_VERSION", ""))
-    root_lines = [f"KSU     : {ksu_display}"]
-    if not is_vanilla and ksu_version:
-        root_lines.append(f"Version : {ksu_version}")
-    root_lines.append(f"SuSFS   : {susfs_ver}")
     if is_vanilla:
-        root_lines.append("Vanilla Build")
-    block_root = "```Root-solution\n" + "\n".join(root_lines) + "```"
+        root_lines = [
+            "Version : N/A (Vanilla)",
+            "SuSFS   : N/A (Vanilla)",
+        ]
+    else:
+        ksu_version = mdv2_code_escape(env.get("KERNEL_VARIANT_VERSION", "")) or "N/A"
+        root_lines = [
+            f"Version : {ksu_version}",
+            f"SuSFS   : {susfs_ver}",
+        ]
+    variant_label = "Vanilla" if is_vanilla else kernel_variant
+    block_root = f"```{variant_label}\n" + "\n".join(root_lines) + "```"
     block_addons = (
         "```Add-ons\n"
         f"Mountless Engine : {mountless}\n"
