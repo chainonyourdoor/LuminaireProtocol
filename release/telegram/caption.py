@@ -1,7 +1,6 @@
 import os
 import sys
 import json
-from datetime import datetime
 
 
 CAPTION_LIMIT = 1024
@@ -399,36 +398,46 @@ def build_channel_caption(env, variant_links, variant_versions=None):
         f"*GKI Kernel \\| Android {mdv2_escape(android_ver)} \\| Linux {mdv2_escape(major_minor)}*"
     ]
 
-    # Features — links out to a per-release Telegraph page (built fresh per
-    # release, never reused — see build_telegraph_content()) listing every
-    # always-on fragment feature plus every addon's Enable/Disable status
-    # for this build. FEATURES_URL is populated by channel_post.sh after
-    # calling telegraph_page.py; left empty if that call failed (Telegraph
-    # API down, etc), in which case this falls back to plain text pointing
-    # at the Add-ons block already present in the zip's own caption —
-    # chosen over pointing into the zip's contents directly, since the
-    # archive itself carries no bundled feature manifest.
+    # What's Inside? — links out to a per-release Telegraph page (built
+    # fresh per release, never reused — see build_telegraph_content())
+    # listing every always-on fragment feature plus every addon's
+    # Enable/Disable status for this build. FEATURES_URL is populated by
+    # channel_post.sh after calling telegraph_page.py; left empty if that
+    # call failed (Telegraph API down, etc), in which case this falls back
+    # to plain text pointing at the Add-ons block already present in the
+    # zip's own caption — chosen over pointing into the zip's contents
+    # directly, since the archive itself carries no bundled feature
+    # manifest.
     features_url = env.get("FEATURES_URL", "").strip()
     if features_url:
-        sections.append(f"[Features]({mdv2_escape_url(features_url)})")
+        sections.append(f"[What's Inside?]({mdv2_escape_url(features_url)})")
     else:
-        sections.append("Features: see Add\\-ons block in the zip's caption")
+        sections.append("What's Inside?: see Add\\-ons block in the zip's caption")
 
-    # Download links
+    # Download links — variant lines rendered as a blockquote (each line
+    # prefixed with ">" per Telegram MarkdownV2's blockquote syntax); the
+    # "Download" heading itself stays outside the quote. A bare ">" blank
+    # line is inserted between entries — still part of the same quote (the
+    # left bar stays unbroken), but gives each link more vertical breathing
+    # room so adjacent links aren't a mis-tap risk on small screens.
     download_lines = ["*Download*"]
-    for variant_key, link in variant_links.items():
+    variant_items = list(variant_links.items())
+    for i, (variant_key, link) in enumerate(variant_items):
         display = VARIANT_DISPLAY.get(variant_key, mdv2_escape(variant_key))
         version = variant_versions.get(variant_key, "")
         if version:
             display = f"{display} \\- {mdv2_escape(version)}"
         safe_link = mdv2_escape_url(link)
-        download_lines.append(f"• [{display}]({safe_link})")
+        download_lines.append(f">• [{display}]({safe_link})")
+        if i < len(variant_items) - 1:
+            download_lines.append(">")
     sections.append("\n".join(download_lines))
 
     # Changelog — manual input, optional, capped so it can't crowd out the
     # rest of the caption if someone pastes something huge. Rendered as a
     # code block, same style as the group caption's Root-solution/Add-ons
     # blocks, instead of plain bold text.
+    changelog_added = False
     changelog_raw = env.get("CHANGELOG", "").strip()
     if changelog_raw:
         entries = [e.strip() for e in changelog_raw.split(";") if e.strip()]
@@ -436,8 +445,12 @@ def build_channel_caption(env, variant_links, variant_versions=None):
         changelog_block = "```Changelog\n" + changelog_body + "```"
         changelog_block = truncate(changelog_block, CHANGELOG_MAX_LEN)
         sections.append(changelog_block)
+        changelog_added = True
 
-    # Traceability — commit + workflow run that produced this post
+    # Traceability — commit + workflow run that produced this post. Kept
+    # tight against the changelog block (single newline, no blank-line
+    # gap) when a changelog is present, since both are "fine print" —
+    # everything else still gets the normal blank-line spacing.
     commit_short = env.get("GITHUB_SHA", "")[:7]
     commit_url = "{}/{}/commit/{}".format(
         env.get("GITHUB_SERVER_URL", ""),
@@ -452,17 +465,21 @@ def build_channel_caption(env, variant_links, variant_versions=None):
         env.get("GITHUB_RUN_ID", ""))
     trace_line = "[Commits]({}) \\| [Workflows]({})".format(
         mdv2_escape_url(commits_url), mdv2_escape_url(run_url))
-    sections.append(trace_line)
+    if changelog_added:
+        sections[-1] = sections[-1] + "\n" + trace_line
+    else:
+        sections.append(trace_line)
 
-    # Bug reports point to the community discussion group, not the CI group
+    # Support + bug-report footer
+    donate_url = mdv2_escape_url("https://sociabuzz.com/chainonyourdoor")
+    sections.append(f"[Support]({donate_url})")
+
     group_url = mdv2_escape_url("https://t.me/{}".format(env.get("TELEGRAM_GROUP", "")))
     sections.append(
-        f"Found a bug? Let's discuss it in [Luminaire Lab]({group_url})"
+        "If you encounter any issues or unexpected behavior, please "
+        f"report them through the [Luminaire Lab]({group_url}) "
+        "discussion group\\."
     )
-
-    date_str = mdv2_escape(datetime.now().strftime("%-d %b %Y"))
-    donate_url = mdv2_escape_url("https://sociabuzz.com/chainonyourdoor")
-    sections.append(f"{date_str} \u00b7 [Support]({donate_url})")
 
     sections.append("\\#GKI \\#Kernel \\#Luminaire")
 
