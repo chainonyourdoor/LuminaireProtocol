@@ -154,10 +154,23 @@ def truncate(caption, limit, suffix="\n\u2026\n```"):
     return "".join(result) + suffix
 
 
+def kernel_source_repo(kernel_ver):
+    # Single source of truth (within caption.py) for the kernel source
+    # repo naming convention — LuminaireKernel-{version}, e.g.
+    # "LuminaireKernel-6.1". Matches download/make.sh, download/kleaf.sh,
+    # and .github/workflows/kernel-source.yml, which each define this
+    # pattern independently on the shell side (different domain, build-time
+    # vs caption-time, not worth threading through env just to unify).
+    # Used by both build_blocks() (zip caption) and
+    # build_telegraph_content() (Telegraph Overview) so the two never
+    # drift apart from each other at least.
+    return f"LuminaireKernel-{kernel_ver}" if kernel_ver else "N/A"
+
+
 def build_blocks(env):
     linux_ver       = mdv2_code_escape(env.get("LINUX_VER", "N/A"))
     kernel_ver      = env.get("KERNEL_VERSION", "")
-    source_str      = mdv2_code_escape(f"LuminaireKernel-{kernel_ver}" if kernel_ver else "N/A")
+    source_str      = mdv2_code_escape(kernel_source_repo(kernel_ver))
     compiler        = mdv2_code_escape(env.get("COMPILER_STRING", "N/A"))
     lto             = mdv2_code_escape(env.get("LTO_MODE", "NONE"))
     kernel_variant  = mdv2_code_escape(env.get("KERNEL_VARIANT_DISPLAY", "N/A"))
@@ -270,7 +283,7 @@ def build_telegraph_content(env):
 
     kernel_ver  = env.get("KERNEL_VERSION", "")
     linux_ver   = env.get("LINUX_VER", "N/A")
-    source_str  = f"LuminaireKernel-{kernel_ver}" if kernel_ver else "N/A"
+    source_str  = kernel_source_repo(kernel_ver)
 
     compiler_string = env.get("COMPILER_STRING", "") or "N/A"
     lto_raw         = env.get("LTO_MODE", "")
