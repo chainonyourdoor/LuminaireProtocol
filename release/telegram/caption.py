@@ -247,11 +247,12 @@ def build_telegraph_content(env):
         before relying on that, not assumed.
       - "Core Features": FRAGMENT_FEATURES, grouped exactly like the
         dict's categories, always-on regardless of build.
-      - "Release Configuration": every TOGGLE_ADDON_ORDER entry, split
-        into an enabled group (\u2713) and disabled group (\u2717) for *this*
-        build — same status logic as build_blocks()'s Add-ons block, just
-        not scoped to only-active entries and shown with checkmarks
-        instead of Enable/Disable text.
+      - "Optional Add-ons": every TOGGLE_ADDON_ORDER entry as a single
+        monospace Feature/Status table (\u2705/\u274c) reflecting *this*
+        build. A real HTML <table> isn't an option — Telegraph's allowed
+        tag set (https://telegra.ph/api#Content-format) has no table/tr/td,
+        so this is a <pre><code> block with manually column-aligned text
+        instead, replacing the old enabled/disabled two-list split.
     Returns a plain Python list (json.dumps'd by the caller), not a JSON
     string itself.
     """
@@ -297,21 +298,20 @@ def build_telegraph_content(env):
             "children": [{"tag": "li", "children": [item]} for item in items],
         })
 
-    enabled_items = []
-    disabled_items = []
-    for token in TOGGLE_ADDON_ORDER:
-        name = ADDON_DISPLAY_NAMES.get(token, token)
-        if token in addon_tokens:
-            enabled_items.append({"tag": "li", "children": [f"\u2713 {name}"]})
-        else:
-            disabled_items.append({"tag": "li", "children": [f"\u2717 {name}"]})
+    addon_rows = [
+        (ADDON_DISPLAY_NAMES.get(token, token), "\u2705" if token in addon_tokens else "\u274c")
+        for token in TOGGLE_ADDON_ORDER
+    ]
+    name_width = max(len(name) for name, _ in addon_rows) + 2
+    addon_table_lines = [f"{'Feature'.ljust(name_width)}Status"]
+    addon_table_lines += [f"{name.ljust(name_width)}{status}" for name, status in addon_rows]
+    addons_block = {
+        "tag": "pre",
+        "children": [{"tag": "code", "children": ["\n".join(addon_table_lines)]}],
+    }
 
-    content.append({"tag": "h3", "children": ["Release Configuration"]})
-    content.append({"tag": "p", "children": ["Enabled for this release."]})
-    if enabled_items:
-        content.append({"tag": "ul", "children": enabled_items})
-    if disabled_items:
-        content.append({"tag": "ul", "children": disabled_items})
+    content.append({"tag": "h3", "children": ["Optional Add-ons"]})
+    content.append(addons_block)
 
     return content
 
