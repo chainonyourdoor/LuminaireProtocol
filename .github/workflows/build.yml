@@ -82,7 +82,7 @@ on:
       ntsync:
         description: "NTSync (Wine/Winlator compat)"
         type: boolean
-        default: false
+        default: true
       kasumi:
         description: "Kasumi (Experimental)"
         type: boolean
