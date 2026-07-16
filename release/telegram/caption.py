@@ -60,16 +60,10 @@ TOGGLE_ADDON_ORDER = ["rekernel", "bbrv3", "bbg", "droidspaces", "bore", "adios"
 # build_telegraph_content() below. Keep this in sync manually whenever
 # luminaire.fragment's sections change — there's no automated link between
 # the two, so a stale entry here won't be caught by anything.
-# Human-readable summary of kernel/config/luminaire.fragment — the always-on
-# feature set baked into every build, regardless of which addons are
-# toggled. This is hand-curated (the fragment itself is raw Kconfig, not
-# something to surface verbatim to readers) and used only by
-# build_telegraph_content() below. Keep this in sync manually whenever
-# luminaire.fragment's sections change — there's no automated link between
-# the two, so a stale entry here won't be caught by anything.
 # Grouped to mirror the fragment's own section comments (Mountify/OverlayFS,
-# ZRAM, Performance, I/O Scheduler, F2FS, TCP BBR, IP Set, IPv6 NAT, debug
-# overhead), not a flat list — easier to scan on the Telegraph page.
+# Kallsyms, Performance, ZRAM, I/O Scheduler, F2FS, TCP BBR, IP Set, IPv6
+# NAT, Networking extras, debug overhead), not a flat list — easier to scan
+# on the Telegraph page.
 FRAGMENT_FEATURES = {
     "Filesystem": [
         "Mountify / OverlayFS",
@@ -83,17 +77,15 @@ FRAGMENT_FEATURES = {
     ],
     "CPU & Scheduler": [
         "Ondemand Governor (included)",
+        "Frame Warning Disabled",
         "MQ-Deadline I/O Scheduler",
     ],
     "Network": [
-        "TCP BBR",
+        "TCP Congestion Control (BBR, BIC, CUBIC, Westwood, HTCP)",
+        "Network Schedulers (FQ, FQ_CoDel, CAKE, PIE, FQ-PIE)",
         "IP Set",
         "IPv6 NAT",
-        "FQ",
-        "FQ_CoDel",
-        "CAKE",
-        "PIE",
-        "FQ-PIE",
+        "TTL Target (Netfilter)",
     ],
     "Debug": [
         "Full Kallsyms",
