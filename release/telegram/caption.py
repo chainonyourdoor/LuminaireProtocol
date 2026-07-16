@@ -157,12 +157,12 @@ def truncate(caption, limit, suffix="\n\u2026\n```"):
 
 def build_blocks(env):
     linux_ver       = mdv2_code_escape(env.get("LINUX_VER", "N/A"))
-    build_system    = mdv2_code_escape(env.get("BUILD_SYSTEM_DISPLAY", "N/A"))
+    kernel_ver      = env.get("KERNEL_VERSION", "")
+    source_str      = mdv2_code_escape(f"LuminaireKernel-{kernel_ver}" if kernel_ver else "N/A")
     compiler        = mdv2_code_escape(env.get("COMPILER_STRING", "N/A"))
     lto             = mdv2_code_escape(env.get("LTO_MODE", "NONE"))
     kernel_variant  = mdv2_code_escape(env.get("KERNEL_VARIANT_DISPLAY", "N/A"))
     susfs_ver       = mdv2_code_escape(env.get("SUSFS_VER", "N/A"))
-    date_str        = mdv2_code_escape(datetime.now().strftime("%-d %b %Y"))
 
     addon_tokens = [t for t in env.get("ADDONS", "").split(",") if t]
     mountless = "N/A"
@@ -191,16 +191,15 @@ def build_blocks(env):
 
     block_luminaire = (
         "```Luminaire\n"
-        f"Linux        : {linux_ver}\n"
-        f"Build System : {build_system}\n"
-        f"Compiler     : {compiler}\n"
-        f"LTO          : {lto}\n"
-        f"Date         : {date_str}```"
+        f"Kernel    : Linux {linux_ver}\n"
+        f"Source    : {source_str}\n"
+        f"Toolchain : {compiler}\n"
+        f"LTO       : {lto}```"
     )
     # Release-mode group posts skip this block: the same release also gets
     # a channel post whose Telegraph "Features" page has an Overview
-    # section with this exact info (Kernel/Platform/Compiler/Build
-    # System/LTO — see build_telegraph_content()). Test-mode posts never
+    # section with this exact info (Kernel/Source/Toolchain/LTO — see
+    # build_telegraph_content()). Test-mode posts never
     # get a Telegraph page (notify-channel only runs for Release — see
     # build.yml), so they keep this block; it's their only source for
     # this info.
@@ -237,14 +236,16 @@ def build_telegraph_content(env):
     Builds the Node-array content for a per-release Telegraph page (see
     Telegraph's Content Format: https://telegra.ph/api#Content-format).
     Three sections:
-      - "Overview": release-wide build facts (Kernel/Platform/Compiler/
-        Build System/LTO). These come from telegram.sh's per-variant JSON
-        (compiler_string/build_system_display/lto_mode — see
-        channel_post.sh's "first non-empty wins" parsing) rather than a
-        per-variant source, because they're all backed by single global
-        workflow inputs (BUILD_SYSTEM, LTO_MODE) or a value derived from
-        one (COMPILER_STRING from the one CLANG_VARIANT used release-wide)
-        — verified against build.yml before relying on that, not assumed.
+      - "Overview": release-wide build facts (Kernel/Source/Toolchain/
+        LTO). Source is derived from KERNEL_VERSION (repo is always
+        LuminaireKernel-{version} — see download/make.sh /
+        kleaf.sh). Toolchain/LTO come from telegram.sh's per-variant JSON
+        (compiler_string/lto_mode — see channel_post.sh's "first
+        non-empty wins" parsing) rather than a per-variant source, because
+        they're both backed by single global workflow inputs (LTO_MODE) or
+        a value derived from one (COMPILER_STRING from the one
+        CLANG_VARIANT used release-wide) — verified against build.yml
+        before relying on that, not assumed.
       - "Core Features": FRAGMENT_FEATURES, grouped exactly like the
         dict's categories, always-on regardless of build.
       - "Release Configuration": every TOGGLE_ADDON_ORDER entry, split
@@ -259,10 +260,9 @@ def build_telegraph_content(env):
 
     kernel_ver  = env.get("KERNEL_VERSION", "")
     linux_ver   = env.get("LINUX_VER", "N/A")
-    android_ver = KERNEL_VERSION_TO_ANDROID.get(kernel_ver, "?")
+    source_str  = f"LuminaireKernel-{kernel_ver}" if kernel_ver else "N/A"
 
     compiler_string = env.get("COMPILER_STRING", "") or "N/A"
-    build_system    = env.get("BUILD_SYSTEM_DISPLAY", "") or "N/A"
     lto_raw         = env.get("LTO_MODE", "")
     lto_display     = LTO_DISPLAY.get(lto_raw, lto_raw or "N/A")
 
@@ -273,11 +273,10 @@ def build_telegraph_content(env):
     )
 
     overview_lines = [
-        f"Kernel       : Linux {linux_ver}",
-        f"Platform     : Android {android_ver} GKI",
-        f"Compiler     : {compiler_string}",
-        f"Build System : {build_system}",
-        f"LTO          : {lto_display}",
+        f"Kernel    : Linux {linux_ver}",
+        f"Source    : {source_str}",
+        f"Toolchain : {compiler_string}",
+        f"LTO       : {lto_display}",
     ]
     overview_block = {
         "tag": "pre",

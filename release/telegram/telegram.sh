@@ -69,12 +69,6 @@ fi
 # ------------------------------------------------------
 LINUX_VER="${KERNEL_VERSION}.${SUBLEVEL}"
 
-BUILD_SYSTEM_DISPLAY="${BUILD_SYSTEM,,}"
-BUILD_SYSTEM_DISPLAY="${BUILD_SYSTEM_DISPLAY^}"
-if [ "${BUILD_SYSTEM}" = "MAKE" ] && [ -n "${CLANG_VARIANT:-}" ]; then
-    BUILD_SYSTEM_DISPLAY="Make - ${CLANG_VARIANT^}"
-fi
-
 case "${KERNEL_VARIANT}" in
     VANILLA)  KERNEL_VARIANT_DISPLAY="Vanilla" ;;
     RESUKISU) KERNEL_VARIANT_DISPLAY="ReSukiSU" ;;
@@ -114,7 +108,6 @@ CAPTION_GROUP_FILE="/tmp/telegram_caption_group.txt"
 CAPTION_CHANNEL_FILE="/tmp/telegram_caption_channel.txt"
 
 LINUX_VER="$LINUX_VER" \
-BUILD_SYSTEM_DISPLAY="$BUILD_SYSTEM_DISPLAY" \
 COMPILER_STRING="${COMPILER_STRING:-N/A}" \
 LTO_MODE="${LTO_MODE:-NONE}" \
 RUN_MODE="${RUN_MODE:-}" \
@@ -167,7 +160,7 @@ if [ "$RUN_MODE_UPPER" = "RELEASE" ] && [ -n "${TELEGRAM_CHANNEL_ID:-}" ]; then
         LINKS_DIR="${GITHUB_WORKSPACE}/variant-links"
         mkdir -p "$LINKS_DIR"
         LINK_FILE="${LINKS_DIR}/${VARIANT_KEY}.json"
-        echo "{\"variant\":\"${VARIANT_KEY}\",\"link\":\"${GROUP_MSG_LINK}\",\"linux_ver\":\"${LINUX_VER}\",\"kernel_version\":\"${KERNEL_VERSION}\",\"ksu_version\":\"${KERNEL_VARIANT_VERSION}\",\"compiler_string\":\"${COMPILER_STRING:-}\",\"build_system_display\":\"${BUILD_SYSTEM_DISPLAY:-}\",\"lto_mode\":\"${LTO_MODE:-}\"}" > "${LINK_FILE}"
+        echo "{\"variant\":\"${VARIANT_KEY}\",\"link\":\"${GROUP_MSG_LINK}\",\"linux_ver\":\"${LINUX_VER}\",\"kernel_version\":\"${KERNEL_VERSION}\",\"ksu_version\":\"${KERNEL_VARIANT_VERSION}\",\"compiler_string\":\"${COMPILER_STRING:-}\",\"lto_mode\":\"${LTO_MODE:-}\"}" > "${LINK_FILE}"
         log "Variant link saved → ${LINK_FILE} ✅"
     fi
 fi

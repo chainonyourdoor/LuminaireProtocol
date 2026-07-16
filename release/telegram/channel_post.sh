@@ -66,11 +66,10 @@ if [ ! -d "$LINKS_DIR" ]; then
 fi
 
 # Parse all variant JSON files — extract links, linux_ver, kernel_version,
-# and (where present) ksu_version per variant. compiler_string,
-# build_system_display, and lto_mode are release-wide constants (single
-# global workflow inputs, not per-variant — see telegram.sh where they're
-# written), so the first non-empty value wins, same as linux_ver/
-# kernel_version below.
+# and (where present) ksu_version per variant. compiler_string and
+# lto_mode are release-wide constants (single global workflow inputs, not
+# per-variant — see telegram.sh where they're written), so the first
+# non-empty value wins, same as linux_ver/kernel_version below.
 LINKS_PARSED=$(python3 -c "
 import json, glob, sys
 links_dir = '${LINKS_DIR}'
@@ -79,7 +78,6 @@ versions = {}
 linux_ver = ''
 kernel_version = ''
 compiler_string = ''
-build_system_display = ''
 lto_mode = ''
 for f in sorted(glob.glob(links_dir + '/*.json')):
     try:
@@ -93,11 +91,10 @@ for f in sorted(glob.glob(links_dir + '/*.json')):
         if not linux_ver: linux_ver = data.get('linux_ver','')
         if not kernel_version: kernel_version = data.get('kernel_version','')
         if not compiler_string: compiler_string = data.get('compiler_string','')
-        if not build_system_display: build_system_display = data.get('build_system_display','')
         if not lto_mode: lto_mode = data.get('lto_mode','')
     except Exception as e:
         print('[warn] ' + str(e), file=sys.stderr)
-print(json.dumps({'links':result,'versions':versions,'linux_ver':linux_ver,'kernel_version':kernel_version,'compiler_string':compiler_string,'build_system_display':build_system_display,'lto_mode':lto_mode}))
+print(json.dumps({'links':result,'versions':versions,'linux_ver':linux_ver,'kernel_version':kernel_version,'compiler_string':compiler_string,'lto_mode':lto_mode}))
 ")
 
 VARIANT_LINKS_JSON=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['links']))")
@@ -105,9 +102,8 @@ VARIANT_VERSIONS_JSON=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; prin
 LINUX_VER=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.load(sys.stdin)['linux_ver'])")
 KERNEL_VERSION=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.load(sys.stdin)['kernel_version'])")
 COMPILER_STRING=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.load(sys.stdin)['compiler_string'])")
-BUILD_SYSTEM_DISPLAY=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.load(sys.stdin)['build_system_display'])")
 LTO_MODE=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.load(sys.stdin)['lto_mode'])")
-export LINUX_VER KERNEL_VERSION COMPILER_STRING BUILD_SYSTEM_DISPLAY LTO_MODE
+export LINUX_VER KERNEL_VERSION COMPILER_STRING LTO_MODE
 
 if [ "$VARIANT_LINKS_JSON" = "{}" ] || [ -z "$VARIANT_LINKS_JSON" ]; then
     warn "Skipping channel post: no valid variant links found"
@@ -167,7 +163,6 @@ FEATURES_URL=$(
     KERNEL_VERSION="${KERNEL_VERSION:-}" \
     ADDONS="${ADDONS:-}" \
     COMPILER_STRING="${COMPILER_STRING:-}" \
-    BUILD_SYSTEM_DISPLAY="${BUILD_SYSTEM_DISPLAY:-}" \
     LTO_MODE="${LTO_MODE:-}" \
     TELEGRAPH_TOKEN="${TELEGRAPH_TOKEN:-}" \
     python3 "$TELEGRAPH_BUILDER"
