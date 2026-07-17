@@ -24,13 +24,13 @@ This repo does **not** contain kernel source — it contains all the scripts and
 
 ---
 
-## ⚙️ Build System
+## Build System
 
 - **MAKE** — Clang (Cirrus / Neutron / WeebX / ZyC) + ccache-ECS
 
 ---
 
-## 🙏 Credits
+## Credits
 
 - [ccache-ECS](https://github.com/cctv18/ccache-ECS) — cctv18
 - [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) — ReSukiSU Team
