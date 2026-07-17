@@ -68,11 +68,7 @@ main() {
 
 run_download() {
     echo "::group::📥 Arsenal Download"
-    if [ "$BUILD_SYSTEM" = "KLEAF" ]; then
-        source "${LUMINAIRE_PATCH_DIR}/download/kleaf.sh"
-    else
-        source "${LUMINAIRE_PATCH_DIR}/download/make.sh"
-    fi
+    source "${LUMINAIRE_PATCH_DIR}/download/make.sh"
     log "Arsenal downloaded ✅"
     echo "::endgroup::"
 }

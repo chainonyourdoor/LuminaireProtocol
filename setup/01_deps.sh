@@ -4,17 +4,9 @@
 # 📦 SETUP — APT DEPENDENCIES
 # ======================================================
 
-# Common — needed for both Make and Kleaf
-PKGS_COMMON=(git curl wget zip patch rsync python3 ca-certificates aria2 pigz cpio g++ libzstd-dev)
-
-# Make-only — Kleaf uses prebuilt toolchain, these are handled internally
-PKGS_MAKE=(bc bison flex libssl-dev libelf-dev dwarves cmake ninja-build gcc-arm-linux-gnueabi)
-
-if [ "$BUILD_SYSTEM" = "KLEAF" ]; then
-    PKGS=("${PKGS_COMMON[@]}")
-else
-    PKGS=("${PKGS_COMMON[@]}" "${PKGS_MAKE[@]}")
-fi
+# Packages needed for a Make kernel build
+PKGS=(git curl wget zip patch rsync python3 ca-certificates aria2 pigz cpio g++ libzstd-dev \
+      bc bison flex libssl-dev libelf-dev dwarves cmake ninja-build gcc-arm-linux-gnueabi)
 
 MISSING=()
 for pkg in "${PKGS[@]}"; do

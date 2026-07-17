@@ -21,7 +21,7 @@ source "$(cd "$(dirname "$0")" && pwd)/functions.sh"
 
 KERNEL_VERSION="${KERNEL_VERSION:?KERNEL_VERSION is not set}"
 
-# DRY_RUN skips the actual compile (see build/make.sh, build/kleaf.sh) so
+# DRY_RUN skips the actual compile (see build/make.sh) so
 # the rest of the pipeline can be exercised quickly after a refactor. It's
 # derived in build.yml from RUN_MODE=="Dry Run", so it can never disagree
 # with RUN_MODE by the time it reaches here.
@@ -97,11 +97,7 @@ main() {
 
 restore_kernel_source() {
     echo "::group::📥 Kernel Source"
-    if [ "$BUILD_SYSTEM" = "KLEAF" ]; then
-        source "${LUMINAIRE_PATCH_DIR}/download/kleaf.sh"
-    else
-        source "${LUMINAIRE_PATCH_DIR}/download/make.sh"
-    fi
+    source "${LUMINAIRE_PATCH_DIR}/download/make.sh"
     log "Kernel source ready ✅"
     echo "::endgroup::"
 }
@@ -210,11 +206,7 @@ run_addons() {
 
 run_build() {
     echo "::group::🏗️ Build Kernel (${BUILD_SYSTEM})"
-    if [ "$BUILD_SYSTEM" = "KLEAF" ]; then
-        source "${LUMINAIRE_PATCH_DIR}/build/kleaf.sh"
-    else
-        source "${LUMINAIRE_PATCH_DIR}/build/make.sh"
-    fi
+    source "${LUMINAIRE_PATCH_DIR}/build/make.sh"
     echo "::endgroup::"
 }
 

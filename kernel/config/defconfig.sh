@@ -4,8 +4,6 @@
 # Applied after gki_defconfig via scripts/config
 # ======================================================
 
-[ "$BUILD_SYSTEM" = "KLEAF" ] && return 0
-
 config() {
     "${KERNEL_SRC}/scripts/config" --file "${OUT_DIR}/.config" "$@"
 }

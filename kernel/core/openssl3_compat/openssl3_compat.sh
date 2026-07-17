@@ -13,8 +13,6 @@
 #
 # See patch.py for the actual fix (defines the missing macro).
 
-[ "$BUILD_SYSTEM" = "KLEAF" ] && return 0
-
 EXTRACT_CERT="${KERNEL_SRC}/certs/extract-cert.c"
 PATCHER="${LUMINAIRE_PATCH_DIR}/kernel/core/openssl3_compat/patch.py"
 

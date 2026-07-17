@@ -30,7 +30,7 @@ fi
 [ -d "$TOOL_AK3_DIR" ] || error "AK3 directory missing after clone/cache restore — aborting packaging"
 
 KERNEL_IMG=""
-BOOT_SEARCH_DIR="$([ "$BUILD_SYSTEM" = "KLEAF" ] && echo "$KLEAF_OUT_DIR" || echo "${OUT_DIR}/arch/${ARCH}/boot")"
+BOOT_SEARCH_DIR="${OUT_DIR}/arch/${ARCH}/boot"
 
 for img in Image Image.gz Image.gz-dtb Image-dtb; do
     BOOT_PATH="${BOOT_SEARCH_DIR}/${img}"

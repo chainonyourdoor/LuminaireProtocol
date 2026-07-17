@@ -4,8 +4,6 @@
 # 🔤 COMPILER STRING — SANITIZE UTS VERSION
 # ======================================================
 
-[ "$BUILD_SYSTEM" = "KLEAF" ] && return 0
-
 MKCOMPILE_H="${KERNEL_SRC}/scripts/mkcompile_h"
 PATCHER="${LUMINAIRE_PATCH_DIR}/kernel/core/compiler_string/patch.py"
 

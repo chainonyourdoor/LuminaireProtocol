@@ -157,7 +157,7 @@ def truncate(caption, limit, suffix="\n\u2026\n```"):
 def kernel_source_repo(kernel_ver):
     # Single source of truth (within caption.py) for the kernel source
     # repo naming convention — LuminaireKernel-{version}, e.g.
-    # "LuminaireKernel-6.1". Matches download/make.sh, download/kleaf.sh,
+    # "LuminaireKernel-6.1". Matches download/make.sh,
     # and .github/workflows/kernel-source.yml, which each define this
     # pattern independently on the shell side (different domain, build-time
     # vs caption-time, not worth threading through env just to unify).
@@ -246,8 +246,8 @@ def build_telegraph_content(env):
     Three sections:
       - "Overview": release-wide build facts (Kernel/Source/Toolchain/
         LTO). Source is derived from KERNEL_VERSION (repo is always
-        LuminaireKernel-{version} — see download/make.sh /
-        kleaf.sh). Toolchain/LTO come from telegram.sh's per-variant JSON
+        LuminaireKernel-{version} — see download/make.sh).
+        Toolchain/LTO come from telegram.sh's per-variant JSON
         (compiler_string/lto_mode — see channel_post.sh's "first
         non-empty wins" parsing) rather than a per-variant source, because
         they're both backed by single global workflow inputs (LTO_MODE) or

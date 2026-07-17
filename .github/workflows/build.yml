@@ -9,7 +9,6 @@ on:
         type: choice
         default: "Make - Neutron"
         options:
-          - "Kleaf - AOSP"
           - "Make - Cirrus"
           - "Make - Neutron"
           - "Make - WeebX"

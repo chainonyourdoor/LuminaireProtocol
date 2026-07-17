@@ -19,15 +19,14 @@ This repo does **not** contain kernel source — it contains all the scripts and
 
 1. Download the kernel source from `chainonyourdoor/LuminaireKernel-*`
 2. Apply patches, integrations, and addons
-3. Build the kernel via **MAKE** or **KLEAF** (Bazel)
+3. Build the kernel via **MAKE**
 4. Package and release via AnyKernel3 + Telegram
 
 ---
 
-## ⚙️ Build Systems
+## ⚙️ Build System
 
 - **MAKE** — Clang (Cirrus / Neutron / WeebX / ZyC) + ccache-ECS
-- **KLEAF** — AOSP Clang prebuilt via Bazel + Bazel internal cache
 
 ---
 

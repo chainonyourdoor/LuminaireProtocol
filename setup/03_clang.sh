@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# 🧰 SETUP — CLANG DISPATCHER (MAKE only)
+# 🧰 SETUP — CLANG DISPATCHER
 # ======================================================
-
-[ "$BUILD_SYSTEM" = "KLEAF" ] && return 0
 
 CLANG_CACHE_DIR="${HOME}/clang-cache"
 

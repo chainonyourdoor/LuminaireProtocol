@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# ⚡ SETUP — CCACHE-ECS (MAKE only)
+# ⚡ SETUP — CCACHE-ECS
 # ======================================================
-# KLEAF uses Bazel internal caching — this script is skipped
-# ======================================================
-
-# Kleaf handles caching internally via Bazel — skip
-[ "$BUILD_SYSTEM" = "KLEAF" ] && return 0
 
 CCACHE_CACHE_DIR="${HOME}/ccache-bin"
 

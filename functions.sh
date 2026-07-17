@@ -63,7 +63,7 @@ mark_stage_ok() {
 # Writes a placeholder file at the path a real kernel Image would occupy,
 # so release/anykernel.sh's packaging step (and everything downstream of
 # it — Telegram notify, checkpoint promotion) can be exercised without
-# actually compiling. Used by build/make.sh and build/kleaf.sh when
+# actually compiling. Used by build/make.sh when
 # DRY_RUN=true, which build.yml only ever sets when RUN_MODE="Dry Run".
 write_dry_run_image() {
     local path="$1"

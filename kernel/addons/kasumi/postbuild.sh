@@ -2,16 +2,6 @@
 
 # Compiles kasumi_lkm.ko as an out-of-tree module against the kernel tree
 # run_build() just finished producing (needs its Module.symvers).
-#
-# MAKE-only for now — Kleaf/Bazel external module builds work differently
-# (no plain Module.symvers + `M=` the same way) and haven't been researched/
-# tested yet. Kleaf users just don't get Kasumi shipped in the zip until
-# that's figured out; nothing else about their build is affected.
-
-if [ "$BUILD_SYSTEM" != "MAKE" ]; then
-    warn "Kasumi: post-build module compile is only implemented for MAKE builds right now (BUILD_SYSTEM=${BUILD_SYSTEM}) — skipping. Ship an Image without Kasumi for this run, or rerun with a Make build system."
-    return 0
-fi
 
 [ -n "${KASUMI_SRC_DIR:-}" ] || error "Kasumi: KASUMI_SRC_DIR not set — kasumi.sh addon may not have run correctly!"
 
