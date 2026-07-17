@@ -73,7 +73,7 @@ main() {
     run_build
     run_postbuild
 
-    if [ "${RUN_MODE^^}" = "WARMING" ]; then
+    if [ "${RUN_MODE^^}" = "WARM RUN" ]; then
         echo "========================================"
         echo "  $(mode_emoji "$RUN_MODE") ${RUN_MODE} Complete! $(mode_emoji "$RUN_MODE")"
         echo "  🏷️ ${KERNEL_VARIANT}$([ "$SUSFS_ENABLED" = "true" ] && [ "$KERNEL_VARIANT" != "VANILLA" ] && echo "+SUSFS")"

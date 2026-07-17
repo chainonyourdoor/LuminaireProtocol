@@ -332,7 +332,7 @@ def build_push_caption(env):
     """
     Caption for the plain push-event notify (.github/workflows/notify.yml),
     distinct from build_blocks()/build_channel_caption() above (those are
-    for release/test build posts, still MarkdownV2 — only the push notify
+    for release/build posts, still MarkdownV2 — only the push notify
     uses HTML). Layout follows the redesign from commits b69f6bf/8a860ed
     (header line, Branch in inline code, Author linked, Title/Message as
     boxed blocks, Commit link as the closing line) — only the markup
@@ -499,7 +499,7 @@ def build_channel_caption(env, variant_links, variant_versions=None):
 
 def main():
     # Push-notify mode: `caption.py push <output_file>` — separate from the
-    # release/test build mode below (2 positional args, no subcommand),
+    # release/build mode below (2 positional args, no subcommand),
     # since it's a different caller (notify.yml) with a different env-var
     # shape (BRANCH/AUTHOR/COMMIT/URL/TITLE/BODY vs. the build-metadata
     # vars build_blocks()/build_channel_caption() expect).

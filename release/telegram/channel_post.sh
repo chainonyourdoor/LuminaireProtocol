@@ -116,10 +116,10 @@ log "Linux version: $LINUX_VER | Kernel: $KERNEL_VERSION"
 # ------------------------------------------------------
 # Diff: variants selected for this run vs. variants that actually
 # produced a download link. Release mode is only ever triggered after a
-# Test run already confirmed every selected variant is fine — so if a
+# Build run already confirmed every selected variant is fine — so if a
 # variant that was selected here doesn't have a link, its matrix job
 # failed unexpectedly for *this* run (e.g. a checkpoint pin expired
-# between Test and Release, or an upstream regression). That's exactly
+# between Build and Release, or an upstream regression). That's exactly
 # the situation a Release-mode failure should stay loud about instead of
 # quietly shipping a partial channel post — so this hard-fails the whole
 # job rather than posting whatever succeeded. Skipping the channel post

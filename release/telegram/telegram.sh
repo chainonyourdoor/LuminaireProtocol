@@ -35,15 +35,15 @@ if [ ! -f "${ZIP_PATH:-}" ]; then
     return 0
 fi
 
-# Pick the destination topic from RUN_MODE. Warming mode never reaches this
+# Pick the destination topic from RUN_MODE. Warm Run mode never reaches this
 # script (build.sh exits before run_release), and Dry Run returns above
-# before this point — so only Test/Release are valid here, anything else
+# before this point — so only Build/Release are valid here, anything else
 # is a misconfiguration, not a silent no-op.
 RUN_MODE_UPPER="${RUN_MODE^^}"
 case "$RUN_MODE_UPPER" in
-    TEST)      TARGET_THREAD_ID="${TELEGRAM_THREAD_ID_TEST:-}" ;;
+    BUILD)     TARGET_THREAD_ID="${TELEGRAM_THREAD_ID_BUILD:-}" ;;
     RELEASE)   TARGET_THREAD_ID="${TELEGRAM_THREAD_ID_RELEASE:-}" ;;
-    *)         error "Telegram: unknown RUN_MODE '${RUN_MODE:-}' — expected Test or Release" ;;
+    *)         error "Telegram: unknown RUN_MODE '${RUN_MODE:-}' — expected Build or Release" ;;
 esac
 if [ -z "$TARGET_THREAD_ID" ]; then
     warn "Skipping Telegram: no thread id configured for RUN_MODE=${RUN_MODE}"

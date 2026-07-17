@@ -1,5 +1,5 @@
 name: "✨ Luminaire Protocol"
-run-name: "${{ inputs.run_mode == 'Dry Run' && '🧪' || inputs.run_mode == 'Warming' && '🔥' || inputs.run_mode == 'Test' && '🔬' || '🚀' }} ${{ inputs.kernel_version }} | ${{ inputs.lto_mode != 'NONE' && format('{0} LTO x ', inputs.lto_mode) || '' }}${{ contains(inputs.build_system, 'AOSP') && 'AOSP' || contains(inputs.build_system, 'Cirrus') && 'Cirrus' || contains(inputs.build_system, 'Neutron') && 'Neutron' || contains(inputs.build_system, 'WeebX') && 'WeebX' || 'Zyc' }} (${{ inputs.run_mode }})"
+run-name: "${{ inputs.run_mode == 'Dry Run' && '🧪' || inputs.run_mode == 'Warm Run' && '🔥' || inputs.run_mode == 'Build' && '🔬' || '🚀' }} ${{ inputs.kernel_version }} | ${{ inputs.lto_mode != 'NONE' && format('{0} LTO x ', inputs.lto_mode) || '' }}${{ contains(inputs.build_system, 'AOSP') && 'AOSP' || contains(inputs.build_system, 'Cirrus') && 'Cirrus' || contains(inputs.build_system, 'Neutron') && 'Neutron' || contains(inputs.build_system, 'WeebX') && 'WeebX' || 'Zyc' }} (${{ inputs.run_mode }})"
 
 on:
   workflow_dispatch:
@@ -98,11 +98,11 @@ on:
       run_mode:
         description: "Run Mode"
         type: choice
-        default: "Warming"
+        default: "Warm Run"
         options:
           - "Dry Run"
-          - "Warming"
-          - "Test"
+          - "Warm Run"
+          - "Build"
           - "Release"
       changelog:
         description: "Changelog on Post"
@@ -304,7 +304,7 @@ jobs:
 
       - name: "Upload Kernel Build Artifact"
         # ZIP_PATH is only exported (via anykernel.sh → $GITHUB_ENV) once
-        # run_release() runs in build.sh — Warming mode exits main() before
+        # run_release() runs in build.sh — Warm Run mode exits main() before
         # that point, so there's nothing to upload there. Uploaded via the
         # built-in Actions token, no PERSONAL_TOKEN/secrets needed at all —
         # this is what lets a fork with zero secrets configured still get

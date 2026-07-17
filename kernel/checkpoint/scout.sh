@@ -7,7 +7,7 @@
 #
 # - RUN_MODE=Release: always use the manifest's known-good pin. Never
 #   queries upstream, never builds an untested candidate.
-# - RUN_MODE=Test/Warming: queries upstream's latest commit. If it
+# - RUN_MODE=Build/Warm Run: queries upstream's latest commit. If it
 #   differs from the pin and isn't already known-bad, that becomes the
 #   candidate for this run — and checkpoint/engine.sh decides after
 #   the build whether to promote it or blacklist it.
@@ -17,7 +17,7 @@
 #   would just make build scripts silently default to cloning upstream's
 #   branch HEAD anyway (the very commit that's blacklisted) without ever
 #   tracking it as a candidate — a permanent deadlock where Release mode
-#   can never pass no matter how many Warming/Test runs succeed. In that
+#   can never pass no matter how many Warm Run/Build runs succeed. In that
 #   specific case only, the blacklisted ref is retried as a last-resort
 #   candidate so a real build outcome can promote or re-blacklist it.
 #
@@ -101,7 +101,7 @@ resolve_component() {
     bad_list=$(jq -c ".${key}.bad // []" "$MANIFEST")
 
     if [ "${RUN_MODE^^}" = "RELEASE" ]; then
-        [ -n "$good" ] || error "scout: RUN_MODE=Release but no known-good ${key} pin exists yet — run a Test build first."
+        [ -n "$good" ] || error "scout: RUN_MODE=Release but no known-good ${key} pin exists yet — run a Build first."
         ref="$good"; candidate="false"
         log "${prefix}: Release mode — pinned to ${ref:0:12} (no upstream check)"
     elif [ -z "$latest" ]; then
@@ -125,7 +125,7 @@ resolve_component() {
                 # but since candidate stays "false" here, engine.sh never
                 # gets a chance to promote it even when that build succeeds.
                 # Net effect: Release mode can never pass for this component,
-                # no matter how many green Warming/Test runs happen against
+                # no matter how many green Warm Run/Build runs happen against
                 # it — confirmed on SUKISU+SUSFS (sukisu_builtin stuck on
                 # b88403d2561b since it was blacklisted in run 28687541974;
                 # upstream's builtin branch hasn't moved since).
