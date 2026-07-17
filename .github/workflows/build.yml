@@ -86,7 +86,15 @@ on:
       wireguard:
         description: "WireGuard (kernel-level VPN)"
         type: boolean
-        default: false
+        default: true
+      lz4zstd:
+        description: "LZ4 1.10.0 + ZSTD 1.5.7 (ZRAM compression bump)"
+        type: boolean
+        default: true
+      lz4kd:
+        description: "LZ4KD (ZRAM compression optimization)"
+        type: boolean
+        default: true
       kasumi:
         description: "Kasumi (Experimental)"
         type: boolean
@@ -199,7 +207,7 @@ jobs:
           # Single source of truth for the ADDONS list — reused by Start-Build
           # and notify-channel via this job's output, instead of each job
           # rebuilding the same string from inputs independently.
-          ADDONS="${{ inputs.bbrv3 && 'bbrv3,' || '' }}${{ inputs.bbg && 'bbg,' || '' }}${{ inputs.rekernel && 'rekernel,' || '' }}${{ inputs.droidspaces && 'droidspaces,' || '' }}${{ inputs.bore && 'bore,' || '' }}${{ inputs.adios && 'adios,' || '' }}${{ inputs.kasumi && 'kasumi,' || '' }}${{ inputs.ntsync && 'ntsync,' || '' }}${{ inputs.wireguard && 'wireguard,' || '' }}${{ inputs.mountless_engine != 'none' && format('{0},', inputs.mountless_engine) || '' }}"
+          ADDONS="${{ inputs.bbrv3 && 'bbrv3,' || '' }}${{ inputs.bbg && 'bbg,' || '' }}${{ inputs.rekernel && 'rekernel,' || '' }}${{ inputs.droidspaces && 'droidspaces,' || '' }}${{ inputs.bore && 'bore,' || '' }}${{ inputs.adios && 'adios,' || '' }}${{ inputs.ntsync && 'ntsync,' || '' }}${{ inputs.wireguard && 'wireguard,' || '' }}${{ inputs.lz4zstd && 'lz4zstd,' || '' }}${{ inputs.lz4kd && 'lz4kd,' || '' }}${{ inputs.mountless_engine != 'none' && format('{0},', inputs.mountless_engine) || '' }}${{ inputs.kasumi && 'kasumi,' || '' }}"
           echo "addons=${ADDONS}" >> $GITHUB_OUTPUT
 
           # "/" -> "-" so this is safe to use as a filesystem path component
