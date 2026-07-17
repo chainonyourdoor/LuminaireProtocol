@@ -47,6 +47,7 @@ This repo does **not** contain kernel source — it contains all the scripts and
 - [BORE Scheduler](https://github.com/firelzrd/bore-scheduler) — firelzrd
 - [ADIOS](https://github.com/firelzrd/adios) — firelzrd
 - [NTSync](https://github.com/WildKernels/kernel_patches/tree/main/common/ntsync) — driver by Elizabeth Figura (CodeWeavers), GKI backport by luigimak & fatalcoder524
+- [WireGuard](https://www.wireguard.com/) — Jason A. Donenfeld
 - [Greenforce Clang](https://github.com/greenforce-project/greenforce_clang) — greenforce-project
 - [Neutron Clang](https://github.com/Neutron-Toolchains/clang-build-catalogue) — Neutron-Toolchains
 - [WeebX Clang](https://github.com/XSans0/WeebX-Clang) — XSans0
