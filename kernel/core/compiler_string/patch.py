@@ -62,14 +62,31 @@ def main():
             continue
 
         if not ld_replaced and re.match(r"\s*LD_VERSION=\$\(", line):
+            # Track paren depth to find where this multi-line LD_VERSION=$(...)
+            # assignment actually closes. Must ignore parens inside single
+            # quotes — the sed pattern 's/(compatible with [^)]*)//' has
+            # literal '(' ')' chars that aren't real shell grouping. Naive
+            # raw counting broke on android12-5.10-lts's mkcompile_h, where
+            # that whole quoted sed clause sits on the SAME line as the
+            # opening "$(": depth hit 0 after just that one line (the quoted
+            # parens happened to balance out), leaving the real closing line
+            # (" | sed '...')" ) unconsumed as an orphan — which starts with
+            # "|", causing a shell syntax error at runtime. android14-6.1-lts's
+            # version has the sed clause on its own separate line, so the same
+            # naive counting happened to land on the right line there by
+            # coincidence, masking the bug until this kernel version.
             depth = 0
+            in_squote = False
             j = i
             while j < len(lines):
                 for ch in lines[j]:
-                    if ch == "(":
-                        depth += 1
-                    elif ch == ")":
-                        depth -= 1
+                    if ch == "'":
+                        in_squote = not in_squote
+                    elif not in_squote:
+                        if ch == "(":
+                            depth += 1
+                        elif ch == ")":
+                            depth -= 1
                 if depth <= 0:
                     break
                 j += 1
