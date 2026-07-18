@@ -56,6 +56,20 @@ if [ -n "${KASUMI_KO:-}" ] && [ -f "${KASUMI_KO}" ]; then
     log "Kasumi: kasumi_lkm.ko included in zip under modules/ (manual insmod required) ✅"
 fi
 
+# zram.ko (LZ4KD support) lives on the read-only, dm-verity-protected
+# system_dlkm partition on-device, not the boot ramdisk — AK3's normal
+# repack flow can't touch it, so there's no in-zip auto-load path here
+# (same constraint as Kasumi, different reason: that's opt-in-by-design,
+# this is a partition AK3 structurally cannot reach). Shipped for manual
+# `insmod`/`ksud insmod` testing (swapoff + rmmod zram first) until a
+# system_dlkm.img rebuild+fastboot-flash path exists, if ever.
+ZRAM_KO="${OUT_DIR}/drivers/block/zram/zram.ko"
+if [ -f "$ZRAM_KO" ]; then
+    mkdir -p "${TOOL_AK3_DIR}/modules"
+    cp "$ZRAM_KO" "${TOOL_AK3_DIR}/modules/"
+    log "LZ4KD: zram.ko included in zip under modules/ (manual insmod required, see release notes) ✅"
+fi
+
 ZIP_PATH="/tmp/${ZIP_NAME}"
 export ZIP_PATH ZIP_NAME
 cd "$TOOL_AK3_DIR"
