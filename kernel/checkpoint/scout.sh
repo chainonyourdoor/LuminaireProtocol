@@ -154,8 +154,9 @@ case "$KERNEL_VARIANT" in
         resolve_component "resukisu" "RESUKISU" "$latest"
 
         if [ "$SUSFS_ENABLED" = "true" ]; then
+            SUSFS_GKI_BRANCH="gki-$(resolve_android_version)-${KERNEL_VERSION}"
             latest=$(latest_sha_or_empty "SuSFS (ReSukiSU pairing)" \
-                "https://gitlab.com/api/v4/projects/simonpunk%2Fsusfs4ksu/repository/commits/gki-android14-6.1" '.id')
+                "https://gitlab.com/api/v4/projects/simonpunk%2Fsusfs4ksu/repository/commits/${SUSFS_GKI_BRANCH}" '.id')
             resolve_component "susfs_resukisu" "SUSFS_RESUKISU" "$latest"
         fi
         ;;
@@ -172,8 +173,9 @@ case "$KERNEL_VARIANT" in
                 "https://api.github.com/repos/SukiSU-Ultra/SukiSU-Ultra/commits/builtin" '.sha')
             resolve_component "sukisu_builtin" "SUKISU_BUILTIN" "$latest"
 
+            SUSFS_GKI_BRANCH="gki-$(resolve_android_version)-${KERNEL_VERSION}"
             latest=$(latest_sha_or_empty "SuSFS (SukiSU pairing)" \
-                "https://gitlab.com/api/v4/projects/simonpunk%2Fsusfs4ksu/repository/commits/gki-android14-6.1" '.id')
+                "https://gitlab.com/api/v4/projects/simonpunk%2Fsusfs4ksu/repository/commits/${SUSFS_GKI_BRANCH}" '.id')
             resolve_component "susfs_sukisu" "SUSFS_SUKISU" "$latest"
         else
             # SukiSU-Ultra's own setup.sh defaults to the latest *tag* (not
