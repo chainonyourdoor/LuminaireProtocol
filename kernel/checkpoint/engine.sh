@@ -80,7 +80,16 @@ apply_and_push() {
         mkdir -p "$(dirname "$MANIFEST")"
         [ -f "$MANIFEST" ] || echo '{}' > "$MANIFEST"
 
-        jq "$jq_patch" "$MANIFEST" > "${MANIFEST}.tmp" && mv "${MANIFEST}.tmp" "$MANIFEST"
+        # A failing jq here used to be silently swallowed: mv never ran, so
+        # manifest.json stayed unchanged, git found "nothing to commit", and
+        # apply_and_push returned 0 as if the update had actually happened —
+        # confirmed for real on the promote path (.bad -= [...] errors when
+        # .bad is null/missing, which every fresh-reset manifest.json hits).
+        # Fail loud instead so a broken jq_patch is never mistaken for a
+        # legitimate no-op.
+        jq "$jq_patch" "$MANIFEST" > "${MANIFEST}.tmp" \
+            || error "checkpoint: jq patch failed against ${MANIFEST_REL} — patch: ${jq_patch}"
+        mv "${MANIFEST}.tmp" "$MANIFEST"
 
         (
             git add "$MANIFEST_REL"
@@ -139,7 +148,7 @@ for key in "${COMPONENTS[@]}"; do
 
     if [ "$BUILD_OUTCOME" = "success" ]; then
         log "checkpoint: promoting ${key} pin to ${ref:0:12} (kernel ${KERNEL_VERSION})"
-        apply_and_push ".${key}.good = \"${ref}\" | .${key}.bad -= [\"${ref}\"]" "chore: bump ${key} pin to ${ref:0:12} for kernel ${KERNEL_VERSION} (verified via run ${GITHUB_RUN_ID})"
+        apply_and_push ".${key}.good = \"${ref}\" | .${key}.bad = ((.${key}.bad // []) - [\"${ref}\"])" "chore: bump ${key} pin to ${ref:0:12} for kernel ${KERNEL_VERSION} (verified via run ${GITHUB_RUN_ID})"
         close_issue_if_open "$key"
         continue
     fi
