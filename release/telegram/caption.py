@@ -290,9 +290,14 @@ def build_telegraph_content(env):
         f"Toolchain : {compiler_string}",
         f"LTO       : {lto_display}",
     ]
+    overview_children = []
+    for i, line in enumerate(overview_lines):
+        if i > 0:
+            overview_children.append({"tag": "br"})
+        overview_children.append(line)
     overview_block = {
         "tag": "pre",
-        "children": [{"tag": "code", "children": ["\n".join(overview_lines)]}],
+        "children": [{"tag": "code", "children": overview_children}],
     }
 
     content = [
@@ -317,9 +322,14 @@ def build_telegraph_content(env):
     name_width = max(len(name) for name, _ in addon_rows) + 2
     addon_table_lines = [f"{'Feature'.ljust(name_width)}Status"]
     addon_table_lines += [f"{name.ljust(name_width)}{status}" for name, status in addon_rows]
+    addon_table_children = []
+    for i, line in enumerate(addon_table_lines):
+        if i > 0:
+            addon_table_children.append({"tag": "br"})
+        addon_table_children.append(line)
     addons_block = {
         "tag": "pre",
-        "children": [{"tag": "code", "children": ["\n".join(addon_table_lines)]}],
+        "children": [{"tag": "code", "children": addon_table_children}],
     }
 
     content.append({"tag": "h3", "children": ["Optional Add-ons"]})
