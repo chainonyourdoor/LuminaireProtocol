@@ -53,6 +53,19 @@ log "Luminaire defconfig applied ✅"
 # scripts/config bypasses Kconfig's `select` resolution entirely, so they
 # need to be forced explicitly too, not just the crypto/Kconfig-level
 # CRYPTO_LZ4K/LZ4KD symbols that normally `select` them.
+#
+# CONFIG_ZRAM=m by default (stock gki_defconfig) — zram then ships as a
+# separate zram.ko, loaded on this device from the read-only,
+# dm-verity-protected system_dlkm partition (confirmed via `cat
+# /proc/mounts`), not the boot ramdisk. AnyKernel3's repack flow only
+# touches boot.img, so a rebuilt zram.ko with LZ4K/LZ4KD support never
+# reaches the running device no matter how correct the compile is — the
+# stock system_dlkm zram.ko keeps loading every boot. Forcing =y here
+# builds zram directly into Image instead (same as WireGuard/lib/zstd),
+# which *does* ship via the normal AK3 flash — same fix other SM8750 GKI
+# kernel builders (e.g. ox1d3x3/Op13_Susfs_kernel) use for this exact
+# reason. Only touch this when LZ4KD is actually enabled — no reason to
+# change zram's module-ness on builds that don't need it.
 if [ "${LZ4KD_ENABLED:-false}" = "true" ]; then
     config --enable CONFIG_CRYPTO_LZ4HC
     config --enable CONFIG_CRYPTO_LZ4K
@@ -61,8 +74,22 @@ if [ "${LZ4KD_ENABLED:-false}" = "true" ]; then
     config --enable CONFIG_LZ4K_DECOMPRESS
     config --enable CONFIG_LZ4KD_COMPRESS
     config --enable CONFIG_LZ4KD_DECOMPRESS
+    config --enable CONFIG_ZRAM
+    # The lz4kd.patch itself already flips the ZRAM_DEF_COMP choice's
+    # default from ZRAM_DEF_COMP_LZORLE to ZRAM_DEF_COMP_LZ4KD (so lz4kd
+    # becomes the kernel's own boot-time default, zero userspace steps
+    # needed) — but luminaire.fragment unconditionally forces
+    # ZRAM_DEF_COMP_LZ4=y earlier in this same script for builds that
+    # don't have LZ4KD, which otherwise silently overrides the patch's
+    # intent here too. Force it back to LZ4KD explicitly so it doesn't
+    # require a manual `echo lz4kd > comp_algorithm` after every boot.
+    config --enable CONFIG_ZRAM_DEF_COMP_LZ4KD
     LZ4KD_STATE=$(config --state CONFIG_CRYPTO_LZ4KD 2>/dev/null || echo "unknown")
+    ZRAM_STATE=$(config --state CONFIG_ZRAM 2>/dev/null || echo "unknown")
+    ZRAM_DEF_STATE=$(config --state CONFIG_ZRAM_DEF_COMP_LZ4KD 2>/dev/null || echo "unknown")
     log "LZ4KD: CONFIG_CRYPTO_LZ4KD state after scripts/config --enable: ${LZ4KD_STATE}"
+    log "LZ4KD: CONFIG_ZRAM state after scripts/config --enable (should be 'y', not 'm'): ${ZRAM_STATE}"
+    log "LZ4KD: CONFIG_ZRAM_DEF_COMP_LZ4KD state after scripts/config --enable: ${ZRAM_DEF_STATE}"
 fi
 
 # BBG requires baseband_guard in CONFIG_LSM — patch here because .config
