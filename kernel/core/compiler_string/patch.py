@@ -8,12 +8,20 @@ def main():
     with open(path, "r") as f:
         content = f.read()
 
-    # mkcompile_h is called by the kernel Makefile as:
-    #   scripts/mkcompile_h "$(UTS_MACHINE)" "$(CONFIG_CC_VERSION_TEXT)" "$(LD)"
+    # mkcompile_h is called by the kernel Makefile — the exact positional
+    # arg number varies by kernel version/convention:
+    #   - GKI 6.1-style (trimmed): scripts/mkcompile_h "$(UTS_MACHINE)"
+    #     "$(CONFIG_CC_VERSION_TEXT)" "$(LD)"  →  CC_VERSION="$2"
+    #   - Older/mainline-style (e.g. 5.10's GKI tree, still close to
+    #     upstream scripts/mkcompile_h): TARGET/ARCH/SMP/PREEMPT/
+    #     PREEMPT_RT/CC_VERSION/LD as $1.."$7  →  CC_VERSION="$6"
+    # The regex below matches CC_VERSION="$N" for any N so this doesn't
+    # need a per-kernel-version special case — confirmed both patterns
+    # exist in the wild (android14-6.1-lts: $2, android12-5.10-lts: $6).
     #
-    # CC_VERSION="$2" receives CONFIG_CC_VERSION_TEXT which is baked at defconfig
-    # time from raw "clang --version" output — KBUILD_COMPILER_STRING is never
-    # used here. We hardcode CC_VERSION to our clean string directly.
+    # CONFIG_CC_VERSION_TEXT is baked at defconfig time from raw
+    # "clang --version" output — KBUILD_COMPILER_STRING is never used
+    # here. We hardcode CC_VERSION to our clean string directly.
     #
     # LD_VERSION reads raw "ld.lld -v" output with full LLVM commit URL.
     # We replace it with a clean extraction that yields "LLD X.Y.Z" only.
@@ -47,7 +55,7 @@ def main():
     while i < len(lines):
         line = lines[i]
 
-        if not cc_replaced and re.match(r'\s*CC_VERSION="\$2"', line):
+        if not cc_replaced and re.match(r'\s*CC_VERSION="\$\d+"', line):
             out.append(f'CC_VERSION="{compiler_string}"')
             i += 1
             cc_replaced = True
