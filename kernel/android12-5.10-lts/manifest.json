@@ -1,1 +1,18 @@
-{}
+{
+  "resukisu": {
+    "good": "930f61a654f35b98577e5da781fb30f9a1bc678b",
+    "bad": []
+  },
+  "susfs_resukisu": {
+    "good": "8c6faae6881c2eb8174842b9b00a9e85b9cfa47f",
+    "bad": []
+  },
+  "sukisu_builtin": {
+    "good": "b1d534bc41941b2c818d7a1a1dac341e4aabfc2d",
+    "bad": []
+  },
+  "susfs_sukisu": {
+    "good": "8c6faae6881c2eb8174842b9b00a9e85b9cfa47f",
+    "bad": []
+  }
+}
