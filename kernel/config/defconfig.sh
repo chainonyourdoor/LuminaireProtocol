@@ -37,6 +37,34 @@ fi
 
 log "Luminaire defconfig applied ✅"
 
+# LZ4KD: same class of bug as CONFIG_SCHED_BORE (see bore.sh/defconfig.sh
+# history) — gki_defconfig text-append alone isn't reliably surviving to
+# the final compiled kernel. On-device verification showed crypto/lz4k.o
+# and crypto/lz4kd.o both compile and register in /proc/crypto (so the
+# Kconfig symbol, Makefile obj-y line, and patch apply are all correct at
+# patch-apply time), yet CONFIG_CRYPTO_LZ4K/LZ4KD are absent from
+# /proc/config.gz on the flashed device and zcomp.c's
+# IS_ENABLED(CONFIG_CRYPTO_LZ4K) backend-list guard evaluates false, so
+# zram never offers "lz4k"/"lz4kd" as a comp_algorithm option. Root cause
+# not pinned down (same as BORE). Enforcing here too, directly on the
+# post-merge .config via scripts/config (same proven mechanism as
+# LTO_MODE/BBG above) as a second, more direct path. The LZ4K_*/LZ4KD_*
+# symbols are plain `tristate` (select-only, no prompt) in lib/Kconfig —
+# scripts/config bypasses Kconfig's `select` resolution entirely, so they
+# need to be forced explicitly too, not just the crypto/Kconfig-level
+# CRYPTO_LZ4K/LZ4KD symbols that normally `select` them.
+if [ "${LZ4KD_ENABLED:-false}" = "true" ]; then
+    config --enable CONFIG_CRYPTO_LZ4HC
+    config --enable CONFIG_CRYPTO_LZ4K
+    config --enable CONFIG_CRYPTO_LZ4KD
+    config --enable CONFIG_LZ4K_COMPRESS
+    config --enable CONFIG_LZ4K_DECOMPRESS
+    config --enable CONFIG_LZ4KD_COMPRESS
+    config --enable CONFIG_LZ4KD_DECOMPRESS
+    LZ4KD_STATE=$(config --state CONFIG_CRYPTO_LZ4KD 2>/dev/null || echo "unknown")
+    log "LZ4KD: CONFIG_CRYPTO_LZ4KD state after scripts/config --enable: ${LZ4KD_STATE}"
+fi
+
 # BBG requires baseband_guard in CONFIG_LSM — patch here because .config
 # is not available when bbg.sh runs (before make defconfig)
 if [ "${BBG_ENABLED:-false}" = "true" ]; then

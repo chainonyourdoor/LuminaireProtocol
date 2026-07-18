@@ -66,6 +66,7 @@ CONFIG_CRYPTO_LZ4KD=y
 CONFIGS
     log "LZ4KD: configs enabled ✅"
 fi
+export LZ4KD_ENABLED=true
 
 cd "${ROOT_DIR}"
 log "LZ4KD ZRAM optimization integrated ✅"
