@@ -14,22 +14,35 @@
 # that dir, so all 3 renames fail no matter what — confirmed by diffing
 # lib/lz4/lz4_compress.c etc. against the patch's own assumed pre-image
 # (byte-identical match), which rules out a source-mismatch explanation.
-# lz4armv8.S is also a binary git-diff (`patch` can't apply those at all),
-# so we pre-stage it directly from its raw post-patch source. lz4accel.c/.h
-# aren't hosted separately upstream (404) and can't be reconstructed from a
-# rename-only diff without the missing pre-image, so those 2 rename hunks
-# are accepted as a known, permanent partial-apply — they're ARM64 accel
-# helpers, not the actual LZ4/ZSTD algorithm source.
+# These 3 files are NOT optional: the patch's new lib/lz4/lz4.h
+# unconditionally `#include "lz4armv8/lz4accel.h"` (no arch guard at the
+# include site — the guard lives inside lz4accel.h itself), so a missing
+# lz4accel.h is a hard build break (fatal on every arch, not just arm64),
+# confirmed by an actual CI failure before this was fixed. lz4armv8.S is
+# also a binary git-diff (`patch` can't apply those at all). None of the
+# 3 are hosted standalone upstream except lz4armv8.S, so lz4accel.c/.h are
+# reconstructed here verbatim from their original upstream commit
+# (pascua28/android_kernel_samsung_sm8250@0ac937e "Import arm64 V8 ASM lz4
+# decompression acceleration") and pre-staged directly at their post-patch
+# path, bypassing the patch tool's rename hunks entirely for all 3 files.
+# lz4accel.h's #else branch makes it safe to include unconditionally on
+# any arch (stubs out to a no-op when not arm64+NEON).
 #
 # We used to gate the whole apply behind one blanket `--dry-run --forward`
 # check on the entire (40+ file) patch, which treated it as all-or-nothing:
-# the 2 unfixable rename hunks failing in the dry-run caused us to skip the
-# *entire* patch, including ~13 other files (the actual 1.10.0 algorithm
-# source) that apply cleanly on their own. Fixed by applying directly —
-# `patch` (unlike `git apply`) already continues past a failed hunk/file
-# instead of aborting the rest — and verifying success via a real version
-# marker in the patched source, not exit code alone (patch exits nonzero
-# even when only the 2 known-unfixable hunks failed).
+# the (then-unhandled) rename hunks failing in the dry-run caused us to
+# skip the *entire* patch, including ~13 other files (the actual 1.10.0
+# algorithm source) that apply cleanly on their own. Fixed by applying
+# directly — `patch` (unlike `git apply`) already continues past a failed
+# hunk/file instead of aborting the rest — and verifying success via a
+# real version marker in the patched source, not exit code alone (patch
+# exits nonzero even when only the (now pre-staged, harmless) rename hunks
+# fail). If the marker check fails after a real apply attempt (as happens
+# with 002-zstd.patch: this GKI tree's zstd source has drifted far enough
+# from the patch's assumed pre-image that most hunks reject outright, not
+# just a rename — dozens of hunks fail per file across nearly every file),
+# we revert every file the patch touched back to its pre-apply git state
+# instead of leaving a half-patched mix of old/new source behind.
 #
 # Non-fatal on failure (warn, not error): this is a compression-ratio/
 # speed optimization, not a correctness-critical patch — a build without
@@ -48,11 +61,120 @@ curl -LSs --fail --retry 3 --retry-all-errors --connect-timeout 30 -o /tmp/lz4ar
 
 [ -n "$LZ4_PATCH" ] && [ -n "$ZSTD_PATCH" ] || { warn "LZ4/ZSTD: a downloaded patch is empty — skipping"; return 0; }
 
-# Pre-stage the arm64 accel source at its post-patch location (see comment
-# above) so the LZ4 patch's own rename hunk failing doesn't cost us the
-# actual asm file.
+# Pre-stage all 3 arm64 accel files at their post-patch location (see
+# header comment) so the LZ4 patch's own rename hunks — permanently
+# unfixable in this tree — can't cost us files the patch's own lz4.h
+# requires unconditionally to even compile.
 mkdir -p lib/lz4/lz4armv8
 cp /tmp/lz4armv8.S lib/lz4/lz4armv8/lz4armv8.S
+cat > lib/lz4/lz4armv8/lz4accel.h << 'LZ4ACCEL_H_EOF'
+#include <linux/types.h>
+#include <asm/simd.h>
+
+#define LZ4_FAST_MARGIN                (128)
+
+#if defined(CONFIG_ARM64) && defined(CONFIG_KERNEL_MODE_NEON)
+#include <asm/neon.h>
+#include <asm/cputype.h>
+
+asmlinkage int _lz4_decompress_asm(uint8_t **dst_ptr, uint8_t *dst_begin,
+				   uint8_t *dst_end, const uint8_t **src_ptr,
+				   const uint8_t *src_end, bool dip);
+
+asmlinkage int _lz4_decompress_asm_noprfm(uint8_t **dst_ptr, uint8_t *dst_begin,
+					  uint8_t *dst_end, const uint8_t **src_ptr,
+					  const uint8_t *src_end, bool dip);
+
+static inline int lz4_decompress_accel_enable(void)
+{
+	return	may_use_simd();
+}
+
+extern int (*lz4_decompress_asm_fn[])(uint8_t **dst_ptr, uint8_t *dst_begin,
+	uint8_t *dst_end, const uint8_t **src_ptr,
+	const uint8_t *src_end, bool dip);
+
+static inline ssize_t lz4_decompress_asm(
+	uint8_t **dst_ptr, uint8_t *dst_begin, uint8_t *dst_end,
+	const uint8_t **src_ptr, const uint8_t *src_end, bool dip)
+{
+	int ret;
+
+	kernel_neon_begin();
+	ret = lz4_decompress_asm_fn[smp_processor_id()](dst_ptr, dst_begin,
+						dst_end, src_ptr,
+						src_end, dip);
+	kernel_neon_end();
+	return (ssize_t)ret;
+}
+
+#define __ARCH_HAS_LZ4_ACCELERATOR
+
+#else
+
+static inline int lz4_decompress_accel_enable(void)
+{
+	return	0;
+}
+
+static inline ssize_t lz4_decompress_asm(
+	uint8_t **dst_ptr, uint8_t *dst_begin, uint8_t *dst_end,
+	const uint8_t **src_ptr, const uint8_t *src_end, bool dip)
+{
+	return 0;
+}
+#endif
+LZ4ACCEL_H_EOF
+cat > lib/lz4/lz4armv8/lz4accel.c << 'LZ4ACCEL_C_EOF'
+#include "lz4accel.h"
+#include <asm/cputype.h>
+
+#ifdef CONFIG_CFI_CLANG
+static inline int
+__cfi_lz4_decompress_asm(uint8_t **dst_ptr, uint8_t *dst_begin,
+			 uint8_t *dst_end, const uint8_t **src_ptr,
+			 const uint8_t *src_end, bool dip)
+{
+	return _lz4_decompress_asm(dst_ptr, dst_begin, dst_end,
+				   src_ptr, src_end, dip);
+}
+
+static inline int
+__cfi_lz4_decompress_asm_noprfm(uint8_t **dst_ptr, uint8_t *dst_begin,
+				uint8_t *dst_end, const uint8_t **src_ptr,
+				const uint8_t *src_end, bool dip)
+{
+	return _lz4_decompress_asm_noprfm(dst_ptr, dst_begin, dst_end,
+					  src_ptr, src_end, dip);
+}
+
+#define _lz4_decompress_asm		__cfi_lz4_decompress_asm
+#define _lz4_decompress_asm_noprfm	__cfi_lz4_decompress_asm_noprfm
+#endif
+
+int lz4_decompress_asm_select(uint8_t **dst_ptr, uint8_t *dst_begin,
+			      uint8_t *dst_end, const uint8_t **src_ptr,
+			      const uint8_t *src_end, bool dip) {
+	const unsigned i = smp_processor_id();
+
+	switch(read_cpuid_part_number()) {
+	case ARM_CPU_PART_CORTEX_A53:
+		lz4_decompress_asm_fn[i] = _lz4_decompress_asm_noprfm;
+		return _lz4_decompress_asm_noprfm(dst_ptr, dst_begin, dst_end,
+						  src_ptr, src_end, dip);
+	}
+	lz4_decompress_asm_fn[i] = _lz4_decompress_asm;
+	return _lz4_decompress_asm(dst_ptr, dst_begin, dst_end,
+				   src_ptr, src_end, dip);
+}
+
+int (*lz4_decompress_asm_fn[NR_CPUS])(uint8_t **dst_ptr, uint8_t *dst_begin,
+	uint8_t *dst_end, const uint8_t **src_ptr,
+	const uint8_t *src_end, bool dip)
+__read_mostly = {
+	[0 ... NR_CPUS-1]  = lz4_decompress_asm_select,
+};
+LZ4ACCEL_C_EOF
 
 apply_lz4zstd_patch() {
     local name="$1" content="$2" marker_check="$3"
@@ -62,19 +184,23 @@ apply_lz4zstd_patch() {
         return 0
     fi
 
+    # Files this patch touches, so we can cleanly revert them if the apply
+    # doesn't actually land (see below) instead of leaving a half-patched
+    # mix of old/new source behind.
+    local touched_files
+    touched_files=$(echo "$content" | grep -E '^\+\+\+ b/' | sed -E 's#^\+\+\+ b/##; s/\t.*//' | sort -u)
+
     # Apply directly instead of gating behind one blanket forward dry-run
     # on the whole multi-file patch — `patch` already applies hunk-by-hunk
     # and skips a failed hunk/file without aborting the rest, so a blanket
-    # all-or-nothing pre-check only produces false negatives here (see
-    # header comment: 2 rename hunks are permanently unfixable, but ~13
-    # other files in the same patch apply cleanly on their own).
+    # all-or-nothing pre-check only produces false negatives here.
     local patch_log
     patch_log=$(echo "$content" | patch -p1 --fuzz=3 --forward --no-backup-if-mismatch 2>&1)
     local rc=$?
 
     # Verify with real evidence (a version marker from the patched source)
     # rather than trusting exit code alone, since patch exits nonzero even
-    # when only the known-unfixable hunks failed and everything else landed.
+    # when only the (pre-staged, harmless) rename hunks failed.
     if eval "$marker_check" 2>/dev/null; then
         if [ "$rc" -eq 0 ]; then
             log "LZ4/ZSTD: ${name} applied cleanly ✅"
@@ -82,8 +208,16 @@ apply_lz4zstd_patch() {
             warn "LZ4/ZSTD: ${name} applied — core source updated, known ARM64 accel rename hunks skipped (expected, non-fatal) ⚠️"
         fi
     else
-        warn "LZ4/ZSTD: ${name} core source did not update — skipping"
-        echo "$patch_log" | grep -i "hunk\|fail" >&2
+        warn "LZ4/ZSTD: ${name} core source did not update — reverting and skipping"
+        echo "$touched_files" | while read -r f; do
+            [ -z "$f" ] && continue
+            if git ls-files --error-unmatch "$f" > /dev/null 2>&1; then
+                git checkout -q -- "$f"
+            else
+                rm -f "$f"
+            fi
+            rm -f "${f}.rej"
+        done
     fi
 }
 
