@@ -37,29 +37,45 @@
 # hunk/file instead of aborting the rest — and verifying success via a
 # real version marker in the patched source, not exit code alone (patch
 # exits nonzero even when only the (now pre-staged, harmless) rename hunks
-# fail). If the marker check fails after a real apply attempt (as happens
-# with 002-zstd.patch: this GKI tree's zstd source has drifted far enough
-# from the patch's assumed pre-image that most hunks reject outright, not
-# just a rename — dozens of hunks fail per file across nearly every file),
-# we revert every file the patch touched back to its pre-apply git state
-# instead of leaving a half-patched mix of old/new source behind.
+# fail).
+#
+# ZSTD is handled differently from LZ4 (see below): the mrcxlinux
+# 002-zstd.patch targets ZSTD 1.5.7 but assumed a pre-image that no longer
+# matches this tree's 1.4.10 source closely enough — confirmed by diffing
+# both against upstream, several releases apart — so nearly every hunk
+# rejected outright, not just a rename. A patch can't bridge that gap
+# reliably, so instead of patching we fetch the full lib/zstd source tree
+# (+ include/linux/zstd*.h) directly from torvalds/linux tag v6.15, which
+# ships ZSTD 1.5.7 verbatim, and replace the vendored files wholesale.
+# Verified compatible before wiring this up: v6.15's lib/zstd/Makefile
+# keeps the same CONFIG_ZSTD_COMPRESS/DECOMPRESS/COMMON Kconfig symbols
+# (only adds two new .o entries), and include/linux/zstd.h's v6.15 diff
+# is purely additive — no existing wrapper function signature changed, so
+# other in-tree callers (f2fs, zram, etc.) keep compiling untouched. One
+# real incompatibility was found and is patched post-copy below: v6.15's
+# common/mem.h includes the generic <linux/unaligned.h>, which doesn't
+# exist yet in this 6.1 tree (only the arch-specific <asm/unaligned.h>
+# does) — left as-is this is a fatal missing-header build break.
+# (A separate intptr_t typedef removed from common/zstd_deps.h in v6.15
+# was checked too: it's gated behind ZSTD_DEPS_NEED_STDINT, which nothing
+# in this file set defines, so that branch is dead code either way —
+# no fix needed there.)
 #
 # Non-fatal on failure (warn, not error): this is a compression-ratio/
 # speed optimization, not a correctness-critical patch — a build without
 # it just keeps whatever LZ4/ZSTD version this kernel branch already ships.
 
 LZ4ZSTD_PATCH_BASE="https://raw.githubusercontent.com/mrcxlinux/kernel_patches/main/zram"
+ZSTD_SRC_BASE="https://raw.githubusercontent.com/torvalds/linux/v6.15"
 cd "${KERNEL_SRC}"
 
-log "Downloading LZ4/ZSTD patches..."
+log "Downloading LZ4 patch..."
 LZ4_PATCH=$(curl -LSs --fail --retry 3 --retry-all-errors --connect-timeout 30 "${LZ4ZSTD_PATCH_BASE}/001-lz4.patch") \
     || { warn "LZ4/ZSTD: failed to download 001-lz4.patch — skipping"; return 0; }
-ZSTD_PATCH=$(curl -LSs --fail --retry 3 --retry-all-errors --connect-timeout 30 "${LZ4ZSTD_PATCH_BASE}/002-zstd.patch") \
-    || { warn "LZ4/ZSTD: failed to download 002-zstd.patch — skipping"; return 0; }
 curl -LSs --fail --retry 3 --retry-all-errors --connect-timeout 30 -o /tmp/lz4armv8.S "${LZ4ZSTD_PATCH_BASE}/lz4armv8.S" \
     || { warn "LZ4/ZSTD: failed to download lz4armv8.S — skipping"; return 0; }
 
-[ -n "$LZ4_PATCH" ] && [ -n "$ZSTD_PATCH" ] || { warn "LZ4/ZSTD: a downloaded patch is empty — skipping"; return 0; }
+[ -n "$LZ4_PATCH" ] || { warn "LZ4/ZSTD: downloaded LZ4 patch is empty — skipping"; return 0; }
 
 # Pre-stage all 3 arm64 accel files at their post-patch location (see
 # header comment) so the LZ4 patch's own rename hunks — permanently
@@ -222,7 +238,116 @@ apply_lz4zstd_patch() {
 }
 
 apply_lz4zstd_patch "001-lz4.patch (LZ4 1.10.0)" "$LZ4_PATCH" 'grep -q "LZ4_VERSION_MINOR 10" lib/lz4/lz4.h'
-apply_lz4zstd_patch "002-zstd.patch (ZSTD 1.5.7)" "$ZSTD_PATCH" 'grep -q "ZSTD_VERSION_RELEASE  7" include/linux/zstd_lib.h'
+
+# Full lib/zstd source replacement (see header comment for why this isn't a
+# patch apply). File list is the complete v6.15 lib/zstd tree plus its
+# public include/linux/zstd*.h headers — anything not listed here is left
+# untouched.
+ZSTD_FILES=(
+    lib/zstd/Makefile
+    lib/zstd/decompress_sources.h
+    lib/zstd/zstd_common_module.c
+    lib/zstd/zstd_compress_module.c
+    lib/zstd/zstd_decompress_module.c
+    lib/zstd/common/allocations.h
+    lib/zstd/common/bits.h
+    lib/zstd/common/bitstream.h
+    lib/zstd/common/compiler.h
+    lib/zstd/common/cpu.h
+    lib/zstd/common/debug.c
+    lib/zstd/common/debug.h
+    lib/zstd/common/entropy_common.c
+    lib/zstd/common/error_private.c
+    lib/zstd/common/error_private.h
+    lib/zstd/common/fse.h
+    lib/zstd/common/fse_decompress.c
+    lib/zstd/common/huf.h
+    lib/zstd/common/mem.h
+    lib/zstd/common/portability_macros.h
+    lib/zstd/common/zstd_common.c
+    lib/zstd/common/zstd_deps.h
+    lib/zstd/common/zstd_internal.h
+    lib/zstd/compress/clevels.h
+    lib/zstd/compress/fse_compress.c
+    lib/zstd/compress/hist.c
+    lib/zstd/compress/hist.h
+    lib/zstd/compress/huf_compress.c
+    lib/zstd/compress/zstd_compress.c
+    lib/zstd/compress/zstd_compress_internal.h
+    lib/zstd/compress/zstd_compress_literals.c
+    lib/zstd/compress/zstd_compress_literals.h
+    lib/zstd/compress/zstd_compress_sequences.c
+    lib/zstd/compress/zstd_compress_sequences.h
+    lib/zstd/compress/zstd_compress_superblock.c
+    lib/zstd/compress/zstd_compress_superblock.h
+    lib/zstd/compress/zstd_cwksp.h
+    lib/zstd/compress/zstd_double_fast.c
+    lib/zstd/compress/zstd_double_fast.h
+    lib/zstd/compress/zstd_fast.c
+    lib/zstd/compress/zstd_fast.h
+    lib/zstd/compress/zstd_lazy.c
+    lib/zstd/compress/zstd_lazy.h
+    lib/zstd/compress/zstd_ldm.c
+    lib/zstd/compress/zstd_ldm.h
+    lib/zstd/compress/zstd_ldm_geartab.h
+    lib/zstd/compress/zstd_opt.c
+    lib/zstd/compress/zstd_opt.h
+    lib/zstd/compress/zstd_preSplit.c
+    lib/zstd/compress/zstd_preSplit.h
+    lib/zstd/decompress/huf_decompress.c
+    lib/zstd/decompress/zstd_ddict.c
+    lib/zstd/decompress/zstd_ddict.h
+    lib/zstd/decompress/zstd_decompress.c
+    lib/zstd/decompress/zstd_decompress_block.c
+    lib/zstd/decompress/zstd_decompress_block.h
+    lib/zstd/decompress/zstd_decompress_internal.h
+    include/linux/zstd.h
+    include/linux/zstd_lib.h
+    include/linux/zstd_errors.h
+)
+
+replace_zstd_source() {
+    log "Downloading ZSTD 1.5.7 source tree from torvalds/linux v6.15..."
+
+    if grep -q "ZSTD_VERSION_RELEASE  7" include/linux/zstd_lib.h 2>/dev/null; then
+        log "LZ4/ZSTD: ZSTD 1.5.7 already applied, skipping."
+        return 0
+    fi
+
+    # Stage the whole fetch in a scratch dir first and only touch the real
+    # tree once every file is confirmed downloaded, so a mid-fetch network
+    # failure can't leave a half-1.4.10/half-1.5.7 mix behind.
+    local staging f
+    staging=$(mktemp -d)
+    for f in "${ZSTD_FILES[@]}"; do
+        mkdir -p "${staging}/$(dirname "$f")"
+        if ! curl -LSs --fail --retry 3 --retry-all-errors --connect-timeout 30 \
+                -o "${staging}/${f}" "${ZSTD_SRC_BASE}/${f}"; then
+            warn "LZ4/ZSTD: failed to download ${f} from v6.15 — skipping ZSTD bump, keeping existing 1.4.10 source"
+            rm -rf "$staging"
+            return 0
+        fi
+    done
+
+    for f in "${ZSTD_FILES[@]}"; do
+        mkdir -p "$(dirname "$f")"
+        cp "${staging}/${f}" "$f"
+    done
+    rm -rf "$staging"
+
+    # Compat fix: this 6.1 tree predates the generic <linux/unaligned.h>
+    # wrapper header that v6.15's mem.h switched to — only the
+    # arch-specific <asm/unaligned.h> exists here (see header comment).
+    sed -i 's#include <linux/unaligned.h>#include <asm/unaligned.h>#' lib/zstd/common/mem.h
+
+    if grep -q "ZSTD_VERSION_RELEASE  7" include/linux/zstd_lib.h; then
+        log "LZ4/ZSTD: ZSTD bumped to 1.5.7 ✅"
+    else
+        warn "LZ4/ZSTD: ZSTD source replaced but version marker missing — check manually ⚠️"
+    fi
+}
+
+replace_zstd_source
 
 cd "${ROOT_DIR}"
 log "LZ4/ZSTD bump done ✅"
