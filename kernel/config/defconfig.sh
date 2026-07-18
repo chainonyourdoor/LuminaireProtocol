@@ -83,6 +83,13 @@ if [ "${LZ4KD_ENABLED:-false}" = "true" ]; then
     # don't have LZ4KD, which otherwise silently overrides the patch's
     # intent here too. Force it back to LZ4KD explicitly so it doesn't
     # require a manual `echo lz4kd > comp_algorithm` after every boot.
+    # scripts/config edits .config as flat text — it has no notion of
+    # Kconfig `choice` groups, so --enable on one choice member does NOT
+    # automatically clear sibling members the way real Kconfig evaluation
+    # would. luminaire.fragment already set ZRAM_DEF_COMP_LZ4=y earlier in
+    # this script; without explicitly disabling it here too, both ended
+    # up =y simultaneously and LZ4 (set first) kept winning on-device.
+    config --disable CONFIG_ZRAM_DEF_COMP_LZ4
     config --enable CONFIG_ZRAM_DEF_COMP_LZ4KD
     LZ4KD_STATE=$(config --state CONFIG_CRYPTO_LZ4KD 2>/dev/null || echo "unknown")
     ZRAM_STATE=$(config --state CONFIG_ZRAM 2>/dev/null || echo "unknown")
