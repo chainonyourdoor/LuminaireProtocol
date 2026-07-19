@@ -11,10 +11,10 @@
 # so sizeof(struct sched_entity) and every field offset after it stays
 # identical to a non-BORE GKI build — no vendor-module KABI break.
 
-BORE_PATCH="${LUMINAIRE_PATCH_DIR}/kernel/addons/bore/bore-android14-6.1-v5.3.0.patch"
+BORE_PATCH="${VERSION_PATCH_DIR}/patches/bore-v5.3.0.patch"
 
 log "🔥 Applying BORE CPU scheduler patch..."
-[ -f "$BORE_PATCH" ] || error "BORE: patch file not found at ${BORE_PATCH}!"
+[ -f "$BORE_PATCH" ] || error "BORE: not backported for kernel ${KERNEL_VERSION} yet (expected ${BORE_PATCH}) — this addon should have been gated out before reaching here (check run_addons()'s support map)."
 
 if patch -p1 --fuzz=3 --dry-run --reverse -d "$KERNEL_SRC" < "$BORE_PATCH" > /dev/null 2>&1; then
     log "BORE: patch already applied, skipping."

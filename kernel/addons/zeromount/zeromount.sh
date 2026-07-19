@@ -20,8 +20,13 @@
 # non-SuSFS case was removed once this addon stopped supporting non-SuSFS
 # trees), so this is a hard requirement in practice regardless.
 
-ZEROMOUNT_PATCH_URL="https://raw.githubusercontent.com/Enginex0/Super-Builders/main/android14-6.1/ReSukiSU/patches/60_zeromount-android14-6.1.patch"
-ZEROMOUNT_PATCH="/tmp/60_zeromount-android14-6.1.patch"
+case "${KERNEL_VERSION}" in
+    6.1)  ZEROMOUNT_TAG="android14-6.1" ;;
+    5.10) ZEROMOUNT_TAG="android12-5.10" ;;
+    *)    error "ZeroMount: no known Enginex0/Super-Builders patch for kernel ${KERNEL_VERSION} yet — this addon should have been gated out before reaching here (check run_addons()'s support map)." ;;
+esac
+ZEROMOUNT_PATCH_URL="https://raw.githubusercontent.com/Enginex0/Super-Builders/main/${ZEROMOUNT_TAG}/ReSukiSU/patches/60_zeromount-${ZEROMOUNT_TAG}.patch"
+ZEROMOUNT_PATCH="/tmp/60_zeromount-${ZEROMOUNT_TAG}.patch"
 PATCHER_DIR="${LUMINAIRE_PATCH_DIR}/kernel/addons/zeromount"
 
 log "Downloading ZeroMount kernel patch..."

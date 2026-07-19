@@ -180,9 +180,10 @@ def build_blocks(env):
     susfs_ver       = mdv2_code_escape(env.get("SUSFS_VER", "N/A"))
 
     addon_tokens = [t for t in env.get("ADDONS", "").split(",") if t]
+    skipped_tokens = [t for t in env.get("SKIPPED_ADDONS", "").split(",") if t]
     mountless = "N/A"
     for token in addon_tokens:
-        if token in MOUNTLESS_ADDON_TOKENS:
+        if token in MOUNTLESS_ADDON_TOKENS and token not in skipped_tokens:
             mountless = ADDON_DISPLAY_NAMES.get(token, token)
             break
     mountless = mdv2_code_escape(mountless)
@@ -190,7 +191,12 @@ def build_blocks(env):
     addon_status_lines = []
     for token in TOGGLE_ADDON_ORDER:
         name = ADDON_DISPLAY_NAMES.get(token, token)
-        status = "Enable" if token in addon_tokens else "Disable"
+        if token in skipped_tokens:
+            status = "N/A"  # not backported for this kernel version yet — distinct from a user's own Disable
+        elif token in addon_tokens:
+            status = "Enable"
+        else:
+            status = "Disable"
         addon_status_lines.append(f"{name.ljust(16)} : {mdv2_code_escape(status)}")
 
     commit_short    = env.get("GITHUB_SHA", "")[:7]
@@ -269,6 +275,7 @@ def build_telegraph_content(env):
     string itself.
     """
     addon_tokens = [t for t in env.get("ADDONS", "").split(",") if t]
+    skipped_tokens = [t for t in env.get("SKIPPED_ADDONS", "").split(",") if t]
 
     kernel_ver  = env.get("KERNEL_VERSION", "")
     linux_ver   = env.get("LINUX_VER", "N/A")
@@ -315,8 +322,13 @@ def build_telegraph_content(env):
             "children": [{"tag": "li", "children": [item]} for item in items],
         })
 
+    def addon_status_icon(token):
+        if token in skipped_tokens:
+            return "\u2796"  # ➖ not backported for this kernel version yet
+        return "\u2705" if token in addon_tokens else "\u274c"
+
     addon_rows = [
-        (ADDON_DISPLAY_NAMES.get(token, token), "\u2705" if token in addon_tokens else "\u274c")
+        (ADDON_DISPLAY_NAMES.get(token, token), addon_status_icon(token))
         for token in TOGGLE_ADDON_ORDER
     ]
     name_width = max(len(name) for name, _ in addon_rows) + 2
