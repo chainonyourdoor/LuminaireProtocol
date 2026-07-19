@@ -33,23 +33,11 @@ This repo does **not** contain kernel source — it contains all the scripts and
 ## Credits
 
 - [ccache-ECS](https://github.com/cctv18/ccache-ECS) — cctv18
+- [AnyKernel3](https://github.com/osm0sis/AnyKernel3) — osm0sis
 - [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) — ReSukiSU Team
 - [SukiSU-Ultra](https://github.com/SukiSU-Ultra/SukiSU-Ultra) — SukiSU Team
 - [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next) — KernelSU-Next Team
 - [susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu) — simonpunk
-- [AnyKernel3](https://github.com/osm0sis/AnyKernel3) — osm0sis
-- [Baseband Guard](https://github.com/vc-teahouse/Baseband-guard) — vc-teahouse
-- [BBRv3 backport](https://github.com/WildKernels/kernel_patches/tree/main/common/bbrv3) — fatalcoder524
-- [ZeroMount](https://github.com/Enginex0/zeromount) — Enginex0
-- [NoMount](https://github.com/maxsteeel/nomount) — maxsteeel
-- [Re:Kernel](https://github.com/Sakion-Team/Re-Kernel) — Sakion-Team
-- [Droidspaces](https://github.com/ravindu644/Droidspaces-OSS) — ravindu644
-- [BORE Scheduler](https://github.com/firelzrd/bore-scheduler) — firelzrd
-- [ADIOS](https://github.com/firelzrd/adios) — firelzrd
-- [NTSync](https://github.com/WildKernels/kernel_patches/tree/main/common/ntsync) — driver by Elizabeth Figura (CodeWeavers), GKI backport by luigimak & fatalcoder524
-- [WireGuard](https://www.wireguard.com/) — Jason A. Donenfeld
-- [LZ4 1.10.0 + ZSTD 1.5.7 backport](https://github.com/mrcxlinux/kernel_patches) — mrcxlinux
-- [LZ4KD](https://github.com/SukiSU-Ultra/SukiSU_patch) — SukiSU-Ultra
 - [AOSP Clang mirror](https://github.com/bachnxuan/aosp_clang_mirror) — bachnxuan
 - [Greenforce Clang](https://github.com/greenforce-project/greenforce_clang) — greenforce-project
 - [Neutron Clang](https://github.com/Neutron-Toolchains/clang-build-catalogue) — Neutron-Toolchains
