@@ -48,5 +48,6 @@ This repo does **not** contain kernel source — it contains all the scripts and
 
 ## License
 
-feel free to fork and modify — a credit/link back is appreciated
+feel free to fork and modify — a credit/link back is appreciated.
+
 nah i'm kidding, do what the fuck u want, idc
