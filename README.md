@@ -48,6 +48,5 @@ This repo does **not** contain kernel source — it contains all the scripts and
 
 ## License
 
-This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
-
-Feel free to fork and modify — a credit/link back is appreciated
+feel free to fork and modify — a credit/link back is appreciated
+nah i'm kidding, do what the fuck u want, idc
