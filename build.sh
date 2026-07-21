@@ -204,7 +204,12 @@ declare -A LUMINAIRE_SUPPORTED_VERSIONS=(
 
 run_luminaire() {
     echo "::group::✨ Luminaire Features"
-    local APPLIED_LUMINAIRE="" SKIPPED_LUMINAIRE=""
+    # Not local: telegram.sh (run_release -> telegram.sh, later in the same
+    # process) reads these directly to build the release caption. A
+    # function-local var dies at return, so it would never survive to
+    # reach telegram.sh even though both run in the same bash process —
+    # see Bug #4.
+    export APPLIED_LUMINAIRE="" SKIPPED_LUMINAIRE=""
     for feature in bore adios; do
         local supported="${LUMINAIRE_SUPPORTED_VERSIONS[$feature]:-}"
         if [[ " ${supported} " != *" ${KERNEL_VERSION} "* ]]; then
@@ -286,7 +291,10 @@ run_addons() {
         error "Addon conflict: 'zeromount' requires SuSFS (its readdir.c/namei.c/task_mmu.c hooks are SuSFS-baseline only, no non-SuSFS fallback) — enable SuSFS or pick a different mountless engine."
     fi
 
-    local APPLIED_ADDONS="" SKIPPED_ADDONS=""
+    # Not local — same reason as APPLIED_LUMINAIRE/SKIPPED_LUMINAIRE above
+    # (see run_luminaire()): telegram.sh reads these later in the same
+    # process to build the release caption.
+    export APPLIED_ADDONS="" SKIPPED_ADDONS=""
     for addon in "${ADDON_LIST[@]}"; do
         addon="${addon// /}"
         [ -z "$addon" ] && continue

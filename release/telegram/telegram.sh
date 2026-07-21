@@ -116,6 +116,9 @@ KERNEL_VARIANT_DISPLAY="$KERNEL_VARIANT_DISPLAY" \
 KERNEL_VARIANT_VERSION="$KERNEL_VARIANT_VERSION" \
 SUSFS_VER="$SUSFS_VER" \
 ADDONS="${ADDONS:-}" \
+SKIPPED_ADDONS="${SKIPPED_ADDONS:-}" \
+APPLIED_LUMINAIRE="${APPLIED_LUMINAIRE:-}" \
+SKIPPED_LUMINAIRE="${SKIPPED_LUMINAIRE:-}" \
 GITHUB_SHA="${GITHUB_SHA:-}" \
 GITHUB_SERVER_URL="${GITHUB_SERVER_URL:-https://github.com}" \
 GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-}" \
@@ -160,7 +163,7 @@ if [ "$RUN_MODE_UPPER" = "RELEASE" ] && [ -n "${TELEGRAM_CHANNEL_ID:-}" ]; then
         LINKS_DIR="${GITHUB_WORKSPACE}/variant-links"
         mkdir -p "$LINKS_DIR"
         LINK_FILE="${LINKS_DIR}/${VARIANT_KEY}.json"
-        echo "{\"variant\":\"${VARIANT_KEY}\",\"link\":\"${GROUP_MSG_LINK}\",\"linux_ver\":\"${LINUX_VER}\",\"kernel_version\":\"${KERNEL_VERSION}\",\"ksu_version\":\"${KERNEL_VARIANT_VERSION}\",\"compiler_string\":\"${COMPILER_STRING:-}\",\"lto_mode\":\"${LTO_MODE:-}\"}" > "${LINK_FILE}"
+        echo "{\"variant\":\"${VARIANT_KEY}\",\"link\":\"${GROUP_MSG_LINK}\",\"linux_ver\":\"${LINUX_VER}\",\"kernel_version\":\"${KERNEL_VERSION}\",\"ksu_version\":\"${KERNEL_VARIANT_VERSION}\",\"compiler_string\":\"${COMPILER_STRING:-}\",\"lto_mode\":\"${LTO_MODE:-}\",\"skipped_addons\":\"${SKIPPED_ADDONS:-}\",\"applied_luminaire\":\"${APPLIED_LUMINAIRE:-}\",\"skipped_luminaire\":\"${SKIPPED_LUMINAIRE:-}\"}" > "${LINK_FILE}"
         log "Variant link saved → ${LINK_FILE} ✅"
     fi
 fi

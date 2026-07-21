@@ -190,7 +190,13 @@ def build_blocks(env):
 
     addon_tokens = [t for t in env.get("ADDONS", "").split(",") if t]
     skipped_tokens = [t for t in env.get("SKIPPED_ADDONS", "").split(",") if t]
-    mountless = "N/A"
+    # Only three possible values here: None (user didn't pick a mountless
+    # engine), or the display name of whichever one they picked. Unlike the
+    # TOGGLE_ADDON_ORDER lines below, there's no N/A state to show — an
+    # unsupported-for-this-kernel-version mountless addon just falls back to
+    # "None" the same as never having been selected, since the mountless
+    # engine is a single either/or choice, not an availability flag.
+    mountless = "None"
     for token in addon_tokens:
         if token in MOUNTLESS_ADDON_TOKENS and token not in skipped_tokens:
             mountless = ADDON_DISPLAY_NAMES.get(token, token)
