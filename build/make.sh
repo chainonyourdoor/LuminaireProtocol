@@ -51,7 +51,12 @@ log "Syncing config..."
 make "${MAKE_ARGS[@]}" olddefconfig || error "olddefconfig failed!"
 
 log "Applying version patches..."
-for patch in "${VERSION_PATCH_DIR}/patches/"*.patch; do
+# Only patches/required/ — genuinely mandatory, non-feature, correctness-
+# only fixes (e.g. the KaBI patch), applied unconditionally regardless of
+# addon/feature selection. Feature patches (kernel/addons/*, kernel/
+# luminaire/*) apply their own patches/<owner>/ file directly and are not
+# read by this loop, so an unchecked addon toggle actually disables it.
+for patch in "${VERSION_PATCH_DIR}/patches/required/"*.patch; do
     [ -f "$patch" ] || continue
     log "Applying: $(basename "$patch")..."
     if patch -p1 --fuzz=3 --dry-run --forward -d "$KERNEL_SRC" < "$patch" > /dev/null 2>&1; then

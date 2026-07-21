@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# 🔥 ADDON — BORE (Burst-Oriented Response Enhancer)
+# ✨ LUMINAIRE FEATURE — BORE (Burst-Oriented Response Enhancer)
 # CPU scheduler by Masahito Suzuki (firelzrd)
 # Repo: https://github.com/firelzrd/bore-scheduler
 # ======================================================
@@ -10,11 +10,14 @@
 # ANDROID_KABI_RESERVE(1-4) slots (ANDROID_KABI_USE/_ANDROID_KABI_REPLACE),
 # so sizeof(struct sched_entity) and every field offset after it stays
 # identical to a non-BORE GKI build — no vendor-module KABI break.
+#
+# Always-on Luminaire feature — no user toggle, not part of $ADDONS. See
+# LUMINAIRE_SUPPORTED_VERSIONS in build.sh for version gating.
 
-BORE_PATCH="${VERSION_PATCH_DIR}/patches/bore-v5.3.0.patch"
+BORE_PATCH="${VERSION_PATCH_DIR}/patches/luminaire/bore-v5.3.0.patch"
 
 log "🔥 Applying BORE CPU scheduler patch..."
-[ -f "$BORE_PATCH" ] || error "BORE: not backported for kernel ${KERNEL_VERSION} yet (expected ${BORE_PATCH}) — this addon should have been gated out before reaching here (check run_addons()'s support map)."
+[ -f "$BORE_PATCH" ] || error "BORE: not backported for kernel ${KERNEL_VERSION} yet (expected ${BORE_PATCH}) — this feature should have been gated out before reaching here (check run_luminaire()'s support map)."
 
 if patch -p1 --fuzz=3 --dry-run --reverse -d "$KERNEL_SRC" < "$BORE_PATCH" > /dev/null 2>&1; then
     log "BORE: patch already applied, skipping."

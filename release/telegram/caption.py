@@ -37,8 +37,6 @@ ADDON_DISPLAY_NAMES = {
     "droidspaces": "Droidspaces",
     "zeromount":   "ZeroMount",
     "nomount":     "NoMount",
-    "bore":        "BORE",
-    "adios":       "ADIOS",
     "kasumi":      "Kasumi",
     "ntsync":      "NTSync",
     "wireguard":   "WireGuard",
@@ -53,7 +51,18 @@ MOUNTLESS_ADDON_TOKENS = ("nomount", "zeromount")
 
 # Toggle-style addons shown as explicit Enable/Disable lines in the group
 # caption, in display order.
-TOGGLE_ADDON_ORDER = ["rekernel", "bbrv3", "bbg", "droidspaces", "bore", "adios", "ntsync", "wireguard", "lz4zstd", "lz4kd", "kasumi"]
+TOGGLE_ADDON_ORDER = ["rekernel", "bbrv3", "bbg", "droidspaces", "ntsync", "wireguard", "lz4zstd", "lz4kd", "kasumi"]
+
+# Always-on Luminaire features (kernel/luminaire/*, see build.sh's
+# run_luminaire()) — structurally separate from ADDON_DISPLAY_NAMES/
+# TOGGLE_ADDON_ORDER above since these have no Enable/Disable toggle at
+# all; a build either has the feature (kernel version supports it) or
+# shows N/A (not backported yet), never a user-chosen Disable.
+LUMINAIRE_DISPLAY_NAMES = {
+    "bore":  "BORE",
+    "adios": "ADIOS",
+}
+LUMINAIRE_FEATURE_ORDER = ["bore", "adios"]
 
 # Human-readable summary of kernel/config/luminaire.fragment — the always-on
 # feature set baked into every build, regardless of which addons are
@@ -199,6 +208,16 @@ def build_blocks(env):
             status = "Disable"
         addon_status_lines.append(f"{name.ljust(16)} : {mdv2_code_escape(status)}")
 
+    luminaire_tokens = [t for t in env.get("APPLIED_LUMINAIRE", "").split(",") if t]
+    luminaire_skipped_tokens = [t for t in env.get("SKIPPED_LUMINAIRE", "").split(",") if t]
+    luminaire_status_lines = []
+    for token in LUMINAIRE_FEATURE_ORDER:
+        name = LUMINAIRE_DISPLAY_NAMES.get(token, token)
+        # No Disable state here — these are never user-toggled, only
+        # Active (this kernel version has the backport) or N/A (it doesn't yet).
+        status = "N/A" if token in luminaire_skipped_tokens else "Active"
+        luminaire_status_lines.append(f"{name.ljust(16)} : {mdv2_code_escape(status)}")
+
     commit_short    = env.get("GITHUB_SHA", "")[:7]
     commit_url      = "{}/{}/commit/{}".format(
                         env.get("GITHUB_SERVER_URL", ""),
@@ -238,6 +257,11 @@ def build_blocks(env):
         + "\n".join(addon_status_lines) +
         "```"
     )
+    block_features = (
+        "```Luminaire Features\n"
+        + "\n".join(luminaire_status_lines) +
+        "```"
+    )
     footer = "[{}]({}) \\| [Run \\#{}]({})".format(
         mdv2_escape(commit_short),
         mdv2_escape_url(commit_url),
@@ -245,7 +269,7 @@ def build_blocks(env):
         mdv2_escape_url(run_url),
     )
 
-    return block_luminaire, block_root, block_addons, footer
+    return block_luminaire, block_root, block_features, block_addons, footer
 
 
 def build_telegraph_content(env):
@@ -265,6 +289,10 @@ def build_telegraph_content(env):
         before relying on that, not assumed.
       - "Core Features": FRAGMENT_FEATURES, grouped exactly like the
         dict's categories, always-on regardless of build.
+      - "Luminaire Features": every LUMINAIRE_FEATURE_ORDER entry (ADIOS,
+        BORE) — always-on, no toggle; \u2705 if this kernel version has
+        the backport, \u2796 (not \u274c) if not, since there's no user
+        Disable state for these, only a per-version rollout gap.
       - "Optional Add-ons": every TOGGLE_ADDON_ORDER entry as a single
         monospace Feature/Status table (\u2705/\u274c) reflecting *this*
         build. A real HTML <table> isn't an option — Telegraph's allowed
@@ -276,6 +304,8 @@ def build_telegraph_content(env):
     """
     addon_tokens = [t for t in env.get("ADDONS", "").split(",") if t]
     skipped_tokens = [t for t in env.get("SKIPPED_ADDONS", "").split(",") if t]
+    luminaire_tokens = [t for t in env.get("APPLIED_LUMINAIRE", "").split(",") if t]
+    luminaire_skipped_tokens = [t for t in env.get("SKIPPED_LUMINAIRE", "").split(",") if t]
 
     kernel_ver  = env.get("KERNEL_VERSION", "")
     linux_ver   = env.get("LINUX_VER", "N/A")
@@ -327,25 +357,36 @@ def build_telegraph_content(env):
             return "\u2796"  # ➖ not backported for this kernel version yet
         return "\u2705" if token in addon_tokens else "\u274c"
 
+    def luminaire_status_icon(token):
+        # No ❌ here — these are never toggled off, only Active or N/A
+        # (not backported yet for this kernel version).
+        return "\u2796" if token in luminaire_skipped_tokens else "\u2705"
+
+    def make_status_table(rows):
+        name_width = max(len(name) for name, _ in rows) + 2
+        lines = [f"{'Feature'.ljust(name_width)}Status"]
+        lines += [f"{name.ljust(name_width)}{status}" for name, status in rows]
+        children = []
+        for i, line in enumerate(lines):
+            if i > 0:
+                children.append({"tag": "br"})
+            children.append(line)
+        return {"tag": "pre", "children": [{"tag": "code", "children": children}]}
+
+    luminaire_rows = [
+        (LUMINAIRE_DISPLAY_NAMES.get(token, token), luminaire_status_icon(token))
+        for token in LUMINAIRE_FEATURE_ORDER
+    ]
+    content.append({"tag": "h3", "children": ["Luminaire Features"]})
+    content.append({"tag": "p", "children": ["Always-on, no toggle — active whenever this kernel version has the backport."]})
+    content.append(make_status_table(luminaire_rows))
+
     addon_rows = [
         (ADDON_DISPLAY_NAMES.get(token, token), addon_status_icon(token))
         for token in TOGGLE_ADDON_ORDER
     ]
-    name_width = max(len(name) for name, _ in addon_rows) + 2
-    addon_table_lines = [f"{'Feature'.ljust(name_width)}Status"]
-    addon_table_lines += [f"{name.ljust(name_width)}{status}" for name, status in addon_rows]
-    addon_table_children = []
-    for i, line in enumerate(addon_table_lines):
-        if i > 0:
-            addon_table_children.append({"tag": "br"})
-        addon_table_children.append(line)
-    addons_block = {
-        "tag": "pre",
-        "children": [{"tag": "code", "children": addon_table_children}],
-    }
-
     content.append({"tag": "h3", "children": ["Optional Add-ons"]})
-    content.append(addons_block)
+    content.append(make_status_table(addon_rows))
 
     return content
 
@@ -541,10 +582,10 @@ def main():
 
     env = os.environ
 
-    block_luminaire, block_root, block_addons, footer = build_blocks(env)
+    block_luminaire, block_root, block_features, block_addons, footer = build_blocks(env)
 
     caption_group = "\n".join(
-        b for b in [block_luminaire, block_root, block_addons, footer] if b is not None
+        b for b in [block_luminaire, block_root, block_features, block_addons, footer] if b is not None
     )
     caption_group = truncate(caption_group, CAPTION_LIMIT)
 

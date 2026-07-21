@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# 📦 ADDON — ADIOS (Adaptive Deadline I/O Scheduler)
+# ✨ LUMINAIRE FEATURE — ADIOS (Adaptive Deadline I/O Scheduler)
 # by Masahito Suzuki (firelzrd)
 # Repo: https://github.com/firelzrd/adios
 # ======================================================
@@ -11,11 +11,14 @@
 # patch header for how that was confirmed), and a NULL pointer fix in
 # adios_completed_request() for UFS MCQ (rq->elv.priv[0] can be NULL for
 # requests that never went through elevator insert).
+#
+# Always-on Luminaire feature — no user toggle, not part of $ADDONS. See
+# LUMINAIRE_SUPPORTED_VERSIONS in build.sh for version gating.
 
-ADIOS_PATCH="${VERSION_PATCH_DIR}/patches/adios-v3.2.0.patch"
+ADIOS_PATCH="${VERSION_PATCH_DIR}/patches/luminaire/adios-v3.2.0.patch"
 
 log "📦 Applying ADIOS I/O scheduler patch..."
-[ -f "$ADIOS_PATCH" ] || error "ADIOS: not backported for kernel ${KERNEL_VERSION} yet (expected ${ADIOS_PATCH}) — this addon should have been gated out before reaching here (check run_addons()'s support map)."
+[ -f "$ADIOS_PATCH" ] || error "ADIOS: not backported for kernel ${KERNEL_VERSION} yet (expected ${ADIOS_PATCH}) — this feature should have been gated out before reaching here (check run_luminaire()'s support map)."
 
 if patch -p1 --fuzz=3 --dry-run --reverse -d "$KERNEL_SRC" < "$ADIOS_PATCH" > /dev/null 2>&1; then
     log "ADIOS: patch already applied, skipping."

@@ -68,6 +68,7 @@ main() {
     run_variant
     mark_stage_ok CHECKPOINT_VARIANT_OK
     run_core
+    run_luminaire
     run_addons
     mark_stage_ok CHECKPOINT_ADDONS_OK
     run_build
@@ -135,7 +136,13 @@ run_branding() {
 
 run_variant() {
     local script="${VERSION_PATCH_DIR}/ksu/${KERNEL_VARIANT,,}/${KERNEL_VARIANT,,}.sh"
-    if [ -f "$script" ]; then
+    if [ "$KERNEL_VARIANT" != "VANILLA" ]; then
+        # Unlike addons, a missing root-solution script is not an optional
+        # skip — the release label (Ak3-*-${KERNEL_VARIANT}-*.zip) is
+        # identity-critical, so shipping vanilla under a KSUNEXT/etc label
+        # because the variant script silently didn't exist for this kernel
+        # version is worse than failing the build outright.
+        [ -f "$script" ] || error "Root solution '${KERNEL_VARIANT}' is not available for kernel ${KERNEL_VERSION} — missing ${script}. Check kernel/${ANDROID_VERSION}-${KERNEL_VERSION}-lts/ksu/ for which variants actually exist on this version."
         echo "::group::🍀 Root Solution (${KERNEL_VARIANT})"
         source "$script" || error "Root solution script failed: $(basename "$script")"
         echo "::endgroup::"
@@ -175,6 +182,47 @@ run_core() {
 }
 
 # ======================================================
+# ✨ LUMINAIRE FEATURES (always-on, no toggle)
+# ======================================================
+# Structurally parallel to kernel/addons/, but never gated by $ADDONS or a
+# workflow checkbox — these are permanent Luminaire-branded features
+# (currently: ADIOS I/O scheduler, BORE CPU scheduler), always applied on
+# every kernel version that has a backport for them, exactly the same way
+# a distro ships its own default scheduler choice. See restructure plan
+# Bug #2: these used to live in kernel/addons/ with a toggle in build.yml,
+# which contradicted the actual intent (source was always patched in
+# regardless of the toggle, only the Kconfig enable line and the release
+# caption respected it).
+#
+# Space-separated KERNEL_VERSION values each feature actually has a patch
+# for today — same shape/purpose as ADDON_SUPPORTED_VERSIONS below, kept
+# as a separate map since these are never addons.
+declare -A LUMINAIRE_SUPPORTED_VERSIONS=(
+    [bore]="6.1"
+    [adios]="6.1"
+)
+
+run_luminaire() {
+    echo "::group::✨ Luminaire Features"
+    local APPLIED_LUMINAIRE="" SKIPPED_LUMINAIRE=""
+    for feature in bore adios; do
+        local supported="${LUMINAIRE_SUPPORTED_VERSIONS[$feature]:-}"
+        if [[ " ${supported} " != *" ${KERNEL_VERSION} "* ]]; then
+            warn "Luminaire feature '${feature}' isn't backported for kernel ${KERNEL_VERSION} yet — skipping (always-on, not a user toggle; shows as N/A in the release caption, not a Disable)."
+            SKIPPED_LUMINAIRE="${SKIPPED_LUMINAIRE:+${SKIPPED_LUMINAIRE},}${feature}"
+            continue
+        fi
+        local script="${LUMINAIRE_PATCH_DIR}/kernel/luminaire/${feature}/${feature}.sh"
+        [ -f "$script" ] || error "Luminaire feature '${feature}' is marked supported for kernel ${KERNEL_VERSION} in LUMINAIRE_SUPPORTED_VERSIONS but ${script} doesn't exist — the map is out of sync with kernel/luminaire/."
+        source "$script" || error "Luminaire feature failed: ${feature}"
+        APPLIED_LUMINAIRE="${APPLIED_LUMINAIRE:+${APPLIED_LUMINAIRE},}${feature}"
+    done
+    echo "APPLIED_LUMINAIRE=${APPLIED_LUMINAIRE}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
+    echo "SKIPPED_LUMINAIRE=${SKIPPED_LUMINAIRE}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
+    echo "::endgroup::"
+}
+
+# ======================================================
 # ⚡ ADDONS
 # ======================================================
 
@@ -186,8 +234,7 @@ run_core() {
 # backport lands for another kernel version — the addon's own .sh script
 # stays generic (Pattern A: case-switch to an upstream URL keyed by
 # version, e.g. ntsync/bbrv3/nomount/zeromount; or Pattern B: a
-# self-maintained patch under kernel/<ver>-lts/patches/, e.g.
-# adios/bore/droidspaces).
+# self-maintained patch under kernel/<ver>-lts/patches/, e.g. droidspaces).
 #
 # ZeroMount's 5.10 entry: the kernel patch itself is confirmed to exist
 # upstream (Enginex0/Super-Builders), but inject_namei.py/inject_readdir.py/
@@ -200,8 +247,6 @@ declare -A ADDON_SUPPORTED_VERSIONS=(
     [bbrv3]="5.10 6.1"
     [bbg]="6.1"
     [droidspaces]="6.1"
-    [bore]="6.1"
-    [adios]="6.1"
     [ntsync]="5.10 6.1"
     [wireguard]="5.10 6.1"
     [lz4zstd]="6.1"
