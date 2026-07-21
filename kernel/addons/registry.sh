@@ -25,11 +25,11 @@
 # fails loud if not" entry, not a verified-safe one.
 declare -A ADDON_SUPPORTED_VERSIONS=(
     [rekernel]="6.1"
-    [bbrv3]="5.10 6.1"
+    [bbrv3]="5.10 5.15 6.1"
     [bbg]="6.1"
     [droidspaces]="6.1"
-    [ntsync]="5.10 6.1"
-    [wireguard]="5.10 6.1"
+    [ntsync]="5.10 5.15 6.1"
+    [wireguard]="5.10 5.15 6.1"
     [lz4zstd]="6.1"
     [lz4kd]="6.1"
     [kasumi]="6.1"
