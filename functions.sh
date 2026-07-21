@@ -116,11 +116,29 @@ run_step() {
 wait_for_apt() {
     if [ -n "${APT_PID:-}" ]; then
         log "Waiting for background apt install (PID ${APT_PID})..."
+        # Bounded poll instead of a bare `wait`, which has no timeout and
+        # would block indefinitely on a genuinely stuck apt process (see
+        # Setup Arsenal run #430: 17+ min stuck with zero signal either
+        # way). 10 minutes covers a cold-cache install of this package
+        # list several times over; past that, something's actually wrong.
+        local waited=0 max_wait=600
+        while kill -0 "$APT_PID" 2>/dev/null; do
+            sleep 5
+            waited=$((waited + 5))
+            if [ "$waited" -ge "$max_wait" ]; then
+                sudo kill -9 "$APT_PID" 2>/dev/null || true
+                warn "apt install log tail (${APT_LOG:-/tmp/luminaire-apt-install.log}):"
+                tail -n 50 "${APT_LOG:-/tmp/luminaire-apt-install.log}" 2>/dev/null || true
+                error "Background apt install timed out after ${max_wait}s — killed PID ${APT_PID}"
+            fi
+        done
         if wait "$APT_PID"; then
             mkdir -p ~/.apt-cache
             sudo cp /var/cache/apt/archives/*.deb ~/.apt-cache/ 2>/dev/null || true
             log "Dependencies installed ✅"
         else
+            warn "apt install log tail (${APT_LOG:-/tmp/luminaire-apt-install.log}):"
+            tail -n 50 "${APT_LOG:-/tmp/luminaire-apt-install.log}" 2>/dev/null || true
             error "Background apt install failed!"
         fi
     fi
