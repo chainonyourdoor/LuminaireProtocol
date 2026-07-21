@@ -339,18 +339,23 @@ run_build() {
 # This is a thin dispatcher, same shape as run_build(): it doesn't know or
 # care what any given addon's post-build step actually does (compile an
 # LKM, whatever else some future addon needs) — it just runs
-# kernel/addons/<name>/postbuild.sh for every enabled addon that has one.
-# Addons without a postbuild.sh (the majority — anything patch/Kconfig-only)
-# are silently skipped here, same gating as run_addons() (membership in
-# $ADDONS), no separate per-addon "enabled" flag needed.
+# kernel/addons/<name>/postbuild.sh for every *applied* addon that has one.
+# Gates on membership in $APPLIED_ADDONS (the post-version-filtering list
+# from run_addons()), not raw $ADDONS — an addon skipped there (kernel
+# version unsupported) never got its main script run, so its exported
+# state (e.g. Kasumi's $KASUMI_SRC_DIR) never existed either. Gating on
+# raw $ADDONS here would still try to run its postbuild.sh and fail on
+# that missing state. Addons without a postbuild.sh (the majority —
+# anything patch/Kconfig-only) are silently skipped here, no separate
+# per-addon "enabled" flag needed.
 
 run_postbuild() {
     [ "${DRY_RUN:-false}" = "true" ] && return 0
-    [ -z "${ADDONS:-}" ] && return 0
+    [ -z "${APPLIED_ADDONS:-}" ] && return 0
 
     echo "::group::🧩 Post-Build"
 
-    IFS=',' read -ra ADDON_LIST <<< "$ADDONS"
+    IFS=',' read -ra ADDON_LIST <<< "$APPLIED_ADDONS"
     for addon in "${ADDON_LIST[@]}"; do
         addon="${addon// /}"
         [ -z "$addon" ] && continue

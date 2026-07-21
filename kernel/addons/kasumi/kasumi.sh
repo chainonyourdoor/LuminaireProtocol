@@ -51,8 +51,9 @@ fi
 # Consumed later by kernel/addons/kasumi/postbuild.sh (run_postbuild() in
 # build.sh, after run_build() finishes) and release/anykernel.sh
 # (packaging). Exported so it survives into those later stages. No separate
-# "enabled" flag needed — run_postbuild() gates on membership in $ADDONS,
-# same as run_addons() does for this script.
+# "enabled" flag needed — run_postbuild() gates on membership in
+# $APPLIED_ADDONS, same as this script only running when kasumi passed the
+# kernel-version check in run_addons().
 export KASUMI_SRC_DIR
 
 log "Kasumi source ready at ${KASUMI_SRC_DIR} ✅ (module build deferred to post-build stage)"
