@@ -35,10 +35,7 @@ get this arm right first, everything downstream depends on it.
 ```
 kernel/<android_ver>-<kernel_ver>-lts/
 ├── ksu/
-│   ├── resukisu/resukisu.sh
-│   ├── sukisu/sukisu.sh
-│   ├── susfs/susfs.sh
-│   └── <any other variant with a working backport>/<variant>.sh
+│   └── susfs/susfs.sh     # only if this version's SuSFS pairing is verified
 └── patches/
     ├── required/     # correctness-only fixes (e.g. KaBI), if any apply
     └── luminaire/     # ADIOS/BORE patch files, once backported
@@ -49,13 +46,42 @@ already handles a missing manifest gracefully (treats it as "no pins/
 candidates yet" and warns, doesn't error). It gets created the first time
 `checkpoint/engine.sh` promotes a good ref for this version.
 
-Only add a `ksu/<variant>/` folder for a root solution you've actually
-verified builds and boots on this kernel version — an empty/missing folder
-is exactly what `run_variant()`'s compatibility gate (`build.sh`) uses to
-fail loud if that variant is selected for this version. Don't pre-create
-empty stub folders "for later"; that defeats the gate.
+Root solutions themselves (`resukisu`, `sukisu`, `ksunext`) are **not**
+copied per version anymore — `kernel/ksu-shared/{resukisu,sukisu,ksunext}/`
+holds one copy each, since none of them have real per-kernel-version logic
+(each fork's own upstream `setup.sh` handles GKI-version detection itself).
+Onboarding a new kernel version normally means **zero new files** for
+these three — see step 2b instead of creating a `ksu/<variant>/` folder.
 
-## 3. `ADDON_SUPPORTED_VERSIONS` (`build.sh`)
+`ksu/susfs/susfs.sh` is the one genuine exception — SuSFS pairing really
+is per-version (different upstream branch per GKI version, different
+KSUNEXT-availability status per fork) — only create this file once you've
+actually verified the pairing for this specific kernel version. An
+empty/missing `ksu/susfs/susfs.sh` is exactly what `run_variant()` uses to
+fail loud if SuSFS is requested for a version it isn't wired up for yet.
+Don't pre-create it "for later"; that defeats the gate.
+
+## 2b. `KSU_VARIANT_SUPPORTED_VERSIONS` (`kernel/ksu-shared/registry.sh`)
+
+For every root solution actually verified to build and boot on this new
+kernel version, add the version to its space-separated list:
+
+```bash
+declare -A KSU_VARIANT_SUPPORTED_VERSIONS=(
+    [resukisu]="5.10 5.15 6.1 6.6"   # <- e.g. add 6.6 here once verified
+    [sukisu]="5.10 5.15 6.1"
+    [ksunext]="5.15 6.1"
+)
+```
+
+This is the *only* compatibility signal `run_variant()` checks now (it
+replaced "does `kernel/<ver>-lts/ksu/<variant>/` exist as a folder" — see
+step 2). Don't add a version speculatively; an entry here without the
+fork's `setup.sh` actually working on this GKI version will surface as a
+build failure inside `kernel/ksu-shared/<variant>/<variant>.sh`, not a
+clean skip.
+
+## 3. `ADDON_SUPPORTED_VERSIONS` (`kernel/addons/registry.sh`)
 
 For every addon in `kernel/addons/` that has a working patch/Kconfig path
 for this new version, add the version to its space-separated list:
@@ -73,7 +99,7 @@ the addon is even attempted (`addon_supports_kernel_version()`); an addon
 listed here without the matching patch/logic actually working will surface
 as a build failure inside that addon's own script, not a clean skip.
 
-## 4. `LUMINAIRE_SUPPORTED_VERSIONS` (`build.sh`)
+## 4. `LUMINAIRE_SUPPORTED_VERSIONS` (`kernel/luminaire/registry.sh`)
 
 Same idea, separate map, for the always-on `kernel/luminaire/` features
 (currently ADIOS, BORE — no toggle, not part of `$ADDONS`):
@@ -151,7 +177,8 @@ where it doesn't" approach — never a fresh hardcoded value.
 ## 8. Sanity pass before calling it done
 
 - [ ] `resolve_android_version()` arm added
-- [ ] `kernel/<ver>-lts/ksu/<variant>/` exists only for verified-working variants
+- [ ] `KSU_VARIANT_SUPPORTED_VERSIONS` updated for every root solution actually verified on this version
+- [ ] `kernel/<ver>-lts/ksu/susfs/susfs.sh` exists only if this version's SuSFS pairing is verified (resukisu/sukisu/ksunext themselves need no new per-version files)
 - [ ] `ADDON_SUPPORTED_VERSIONS` updated for every addon actually verified on this version
 - [ ] `LUMINAIRE_SUPPORTED_VERSIONS` updated if ADIOS/BORE have a backport for this version
 - [ ] Pattern A/A-variant addons (ntsync, bbrv3, zeromount, nomount) have their version-specific arm/file in place

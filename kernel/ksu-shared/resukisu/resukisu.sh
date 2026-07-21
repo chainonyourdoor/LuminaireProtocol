@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# 🔑 ROOT SOLUTION — ReSukiSU (android12-5.10-lts)
+# 🔑 ROOT SOLUTION — ReSukiSU
 # ======================================================
 # Repo: https://github.com/ReSukiSU/ReSukiSU
 
 KSU_DIR="${KERNEL_SRC}/KernelSU"
-PATCHER_DIR="${LUMINAIRE_PATCH_DIR}/kernel/android12-5.10-lts/ksu/resukisu"
+PATCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ======================================================
 # 1. ReSukiSU

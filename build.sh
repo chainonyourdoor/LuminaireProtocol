@@ -39,6 +39,7 @@ LUMINAIRE_PATCH_DIR="${ROOT_DIR}"
 # addon/luminaire policy itself.
 source "${LUMINAIRE_PATCH_DIR}/kernel/addons/registry.sh"
 source "${LUMINAIRE_PATCH_DIR}/kernel/luminaire/registry.sh"
+source "${LUMINAIRE_PATCH_DIR}/kernel/ksu-shared/registry.sh"
 
 # ======================================================
 # 🚀 MAIN
@@ -128,14 +129,16 @@ run_branding() {
 run_variant() {
     [ "$KERNEL_VARIANT" = "VANILLA" ] && return 0
 
-    # Unlike addons, a missing root-solution script is not an optional
-    # skip — the release label (Ak3-*-${KERNEL_VARIANT}-*.zip) is
+    # Unlike addons, an unsupported root solution is not an optional skip
+    # — the release label (Ak3-*-${KERNEL_VARIANT}-*.zip) is
     # identity-critical, so shipping vanilla under a KSUNEXT/etc label
-    # because the variant script silently didn't exist for this kernel
-    # version is worse than failing the build outright.
-    local script="${VERSION_PATCH_DIR}/ksu/${KERNEL_VARIANT,,}/${KERNEL_VARIANT,,}.sh"
+    # because the variant wasn't supported for this kernel version is
+    # worse than failing the build outright.
+    ksu_variant_supports_kernel_version "${KERNEL_VARIANT,,}" \
+        || error "Root solution '${KERNEL_VARIANT}' is not available for kernel ${KERNEL_VERSION} — not listed in KSU_VARIANT_SUPPORTED_VERSIONS (kernel/ksu-shared/registry.sh)."
+    local script="${LUMINAIRE_PATCH_DIR}/kernel/ksu-shared/${KERNEL_VARIANT,,}/${KERNEL_VARIANT,,}.sh"
     run_step "🍀" "Root Solution (${KERNEL_VARIANT})" "$script" \
-        "Root solution '${KERNEL_VARIANT}' is not available for kernel ${KERNEL_VERSION} — missing ${script}. Check kernel/${ANDROID_VERSION}-${KERNEL_VERSION}-lts/ksu/ for which variants actually exist on this version."
+        "Root solution '${KERNEL_VARIANT}' is marked supported for kernel ${KERNEL_VERSION} in KSU_VARIANT_SUPPORTED_VERSIONS but ${script} doesn't exist — the map is out of sync with kernel/ksu-shared/."
 
     [ "$SUSFS_ENABLED" = "true" ] || return 0
     local susfs_script="${VERSION_PATCH_DIR}/ksu/susfs/susfs.sh"

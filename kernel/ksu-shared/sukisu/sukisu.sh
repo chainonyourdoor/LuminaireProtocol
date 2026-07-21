@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# 🔑 ROOT SOLUTION — SukiSU-Ultra (android12-5.10-lts)
+# 🔑 ROOT SOLUTION — SukiSU-Ultra
 # ======================================================
 # Repo: https://github.com/SukiSU-Ultra/SukiSU-Ultra
 
 KSU_DIR="${KERNEL_SRC}/KernelSU"
-PATCHER_DIR="${LUMINAIRE_PATCH_DIR}/kernel/android12-5.10-lts/ksu/sukisu"
+PATCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ======================================================
 # 1. SukiSU-Ultra

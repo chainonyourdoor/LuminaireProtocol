@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# 🔑 ROOT SOLUTION — KernelSU-Next (android14-6.1-lts)
+# 🔑 ROOT SOLUTION — KernelSU-Next
 # ======================================================
 # Repo: https://github.com/KernelSU-Next/KernelSU-Next
 
@@ -10,7 +10,7 @@
 # setup.sh which both produce a "KernelSU" dir directly — KSU_DIR below is
 # intentionally different from resukisu.sh/sukisu.sh for this reason.
 KSU_DIR="${KERNEL_SRC}/KernelSU-Next"
-PATCHER_DIR="${LUMINAIRE_PATCH_DIR}/kernel/android14-6.1-lts/ksu/ksunext"
+PATCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ======================================================
 # 1. KernelSU-Next
