@@ -202,6 +202,22 @@ case "$KERNEL_VARIANT" in
                 "https://api.github.com/repos/pershoot/KernelSU-Next/commits/dev-susfs" '.sha')
             resolve_component "ksunext_susfs_fork" "KSUNEXT_SUSFS_FORK" "$latest"
 
+            # pershoot's susfs4ksu fork (gitlab.com/pershoot/susfs4ksu)
+            # genuinely only has three branches today, all android14-6.1:
+            # gki-android14-6.1-dev, gki-android14-6.1-lts-dev,
+            # aosp-android14-6.1-dev (confirmed via the fork's own project
+            # description, not assumed) — unlike simonpunk/susfs4ksu (used
+            # by ReSukiSU/SukiSU-Ultra above), which has a branch per GKI
+            # version. So this can't be derived the same way; fail loud
+            # instead of silently building a branch name for another
+            # kernel version that doesn't exist there yet (previously
+            # hardcoded to gki-android14-6.1-dev unconditionally, which
+            # would have silently kept resolving to this exact branch —
+            # and therefore a stale/wrong pin — the moment KSUNEXT+SUSFS
+            # was onboarded for any other kernel version).
+            [ "${KERNEL_VERSION}" = "6.1" ] \
+                || error "scout: KSUNEXT+SUSFS pin lookup only supports kernel 6.1 — pershoot/susfs4ksu has no gki-$(resolve_android_version)-${KERNEL_VERSION}-dev branch yet. Update scout.sh once that branch exists upstream."
+
             latest=$(latest_sha_or_empty "SuSFS (KSU-Next pairing, pershoot fork)" \
                 "https://gitlab.com/api/v4/projects/pershoot%2Fsusfs4ksu/repository/commits/gki-android14-6.1-dev" '.id')
             resolve_component "susfs_ksunext" "SUSFS_KSUNEXT" "$latest"
