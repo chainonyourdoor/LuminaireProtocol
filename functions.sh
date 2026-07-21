@@ -96,6 +96,20 @@ run_setup() {
     echo "::endgroup::"
 }
 
+# Sources a single script wrapped in a ::group:: block, erroring with a
+# custom message if the script is missing. Shared shape for build.sh's
+# single-file dispatch steps (restore_kernel_source, run_variant's two
+# calls, run_build, run_release) so each one isn't hand-rolling the same
+# "check file exists -> group -> source -> endgroup" boilerplate.
+# Args: <emoji> <label for the ::group:: and error text> <script path> <error message if script is missing>
+run_step() {
+    local emoji="$1" label="$2" script="$3" missing_msg="$4"
+    [ -f "$script" ] || error "$missing_msg"
+    echo "::group::${emoji} ${label}"
+    source "$script" || error "${label} script failed: $(basename "$script")"
+    echo "::endgroup::"
+}
+
 # Waits for the background apt install kicked off by setup/01_deps.sh
 # (APT_PID). Shared by build.sh and arsenal.sh so a fresh runner never
 # proceeds into ccache/build steps before required packages land.

@@ -4,6 +4,24 @@
 # 🏷️ BRANDING — CONFIG + APPLY
 # ======================================================
 
+# || true on both greps below: grep exits 2 (not just 1) when handed a
+# file that doesn't exist — even if it found a match in the other file
+# given alongside it. build.config.constants doesn't exist on every
+# kernel version (confirmed missing on android12-5.10-lts's source,
+# present on android14-6.1-lts's), and under build.sh's set -eo
+# pipefail, that nonzero pipe exit was killing the script silently on
+# this exact line — before ever reaching the explicit error() checks
+# below, which is the only reason "KMI_GENERATION not found!" never
+# actually printed. The || true just lets those checks do their job.
+SUBLEVEL="$(grep '^SUBLEVEL = ' "${KERNEL_SRC}/Makefile" | awk '{print $3}')" || true
+[ -n "$SUBLEVEL" ] || error "SUBLEVEL not found in kernel Makefile — kernel source may be missing or corrupted!"
+KMI_GENERATION="$(grep '^KMI_GENERATION=' \
+    "${KERNEL_SRC}/build.config.common" \
+    "${KERNEL_SRC}/build.config.constants" 2>/dev/null | head -1 | cut -d= -f2)" || true
+[ -z "$KMI_GENERATION" ] && error "KMI_GENERATION not found!"
+export SUBLEVEL KMI_GENERATION
+echo "SUBLEVEL=${SUBLEVEL}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
+
 export KERNEL_NAME="Luminaire"
 export BUILD_USER="chainonyourdoor"
 export BUILD_HOST="LuminaireCI"

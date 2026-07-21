@@ -33,6 +33,13 @@ ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Bootstrap path — needed before run_setup() sources 00_paths.sh
 LUMINAIRE_PATCH_DIR="${ROOT_DIR}"
 
+# Registries define run_addons()/run_luminaire() (plus their version-support
+# maps) — sourced here, not inside main(), so they're just ordinary function
+# calls in main() like everything else, and build.sh never has to know any
+# addon/luminaire policy itself.
+source "${LUMINAIRE_PATCH_DIR}/kernel/addons/registry.sh"
+source "${LUMINAIRE_PATCH_DIR}/kernel/luminaire/registry.sh"
+
 # ======================================================
 # 🚀 MAIN
 # ======================================================
@@ -110,23 +117,6 @@ restore_kernel_source() {
 
 run_branding() {
     echo "::group::🔖 Branding"
-    # || true on both greps below: grep exits 2 (not just 1) when handed a
-    # file that doesn't exist — even if it found a match in the other file
-    # given alongside it. build.config.constants doesn't exist on every
-    # kernel version (confirmed missing on android12-5.10-lts's source,
-    # present on android14-6.1-lts's), and under this script's set -eo
-    # pipefail, that nonzero pipe exit was killing the script silently on
-    # this exact line — before ever reaching the explicit error() checks
-    # below, which is the only reason "KMI_GENERATION not found!" never
-    # actually printed. The || true just lets those checks do their job.
-    SUBLEVEL="$(grep '^SUBLEVEL = ' "${KERNEL_SRC}/Makefile" | awk '{print $3}')" || true
-    [ -n "$SUBLEVEL" ] || error "SUBLEVEL not found in kernel Makefile — kernel source may be missing or corrupted!"
-    KMI_GENERATION="$(grep '^KMI_GENERATION=' \
-        "${KERNEL_SRC}/build.config.common" \
-        "${KERNEL_SRC}/build.config.constants" 2>/dev/null | head -1 | cut -d= -f2)" || true
-    [ -z "$KMI_GENERATION" ] && error "KMI_GENERATION not found!"
-    export SUBLEVEL KMI_GENERATION
-    echo "SUBLEVEL=${SUBLEVEL}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
     source "${LUMINAIRE_PATCH_DIR}/kernel/branding.sh" || error "Branding failed!"
     echo "::endgroup::"
 }
@@ -136,26 +126,20 @@ run_branding() {
 # ======================================================
 
 run_variant() {
-    local script="${VERSION_PATCH_DIR}/ksu/${KERNEL_VARIANT,,}/${KERNEL_VARIANT,,}.sh"
-    if [ "$KERNEL_VARIANT" != "VANILLA" ]; then
-        # Unlike addons, a missing root-solution script is not an optional
-        # skip — the release label (Ak3-*-${KERNEL_VARIANT}-*.zip) is
-        # identity-critical, so shipping vanilla under a KSUNEXT/etc label
-        # because the variant script silently didn't exist for this kernel
-        # version is worse than failing the build outright.
-        [ -f "$script" ] || error "Root solution '${KERNEL_VARIANT}' is not available for kernel ${KERNEL_VERSION} — missing ${script}. Check kernel/${ANDROID_VERSION}-${KERNEL_VERSION}-lts/ksu/ for which variants actually exist on this version."
-        echo "::group::🍀 Root Solution (${KERNEL_VARIANT})"
-        source "$script" || error "Root solution script failed: $(basename "$script")"
-        echo "::endgroup::"
-    fi
+    [ "$KERNEL_VARIANT" = "VANILLA" ] && return 0
 
-    if [ "$SUSFS_ENABLED" = "true" ] && [ "$KERNEL_VARIANT" != "VANILLA" ]; then
-        local susfs_script="${VERSION_PATCH_DIR}/ksu/susfs/susfs.sh"
-        [ -f "$susfs_script" ] || error "SuSFS script not found: $(basename "$susfs_script")"
-        echo "::group::🧬 SuSFS"
-        source "$susfs_script" || error "SuSFS script failed: $(basename "$susfs_script")"
-        echo "::endgroup::"
-    fi
+    # Unlike addons, a missing root-solution script is not an optional
+    # skip — the release label (Ak3-*-${KERNEL_VARIANT}-*.zip) is
+    # identity-critical, so shipping vanilla under a KSUNEXT/etc label
+    # because the variant script silently didn't exist for this kernel
+    # version is worse than failing the build outright.
+    local script="${VERSION_PATCH_DIR}/ksu/${KERNEL_VARIANT,,}/${KERNEL_VARIANT,,}.sh"
+    run_step "🍀" "Root Solution (${KERNEL_VARIANT})" "$script" \
+        "Root solution '${KERNEL_VARIANT}' is not available for kernel ${KERNEL_VERSION} — missing ${script}. Check kernel/${ANDROID_VERSION}-${KERNEL_VERSION}-lts/ksu/ for which variants actually exist on this version."
+
+    [ "$SUSFS_ENABLED" = "true" ] || return 0
+    local susfs_script="${VERSION_PATCH_DIR}/ksu/susfs/susfs.sh"
+    run_step "🧬" "SuSFS" "$susfs_script" "SuSFS script not found: $(basename "$susfs_script")"
 }
 
 # ======================================================
@@ -183,140 +167,13 @@ run_core() {
 }
 
 # ======================================================
-# ✨ LUMINAIRE FEATURES (always-on, no toggle)
+# ✨ LUMINAIRE FEATURES & ⚡ ADDONS
 # ======================================================
-# Structurally parallel to kernel/addons/, but never gated by $ADDONS or a
-# workflow checkbox — these are permanent Luminaire-branded features
-# (currently: ADIOS I/O scheduler, BORE CPU scheduler), always applied on
-# every kernel version that has a backport for them, exactly the same way
-# a distro ships its own default scheduler choice. See restructure plan
-# Bug #2: these used to live in kernel/addons/ with a toggle in build.yml,
-# which contradicted the actual intent (source was always patched in
-# regardless of the toggle, only the Kconfig enable line and the release
-# caption respected it).
-#
-# Space-separated KERNEL_VERSION values each feature actually has a patch
-# for today — same shape/purpose as ADDON_SUPPORTED_VERSIONS below, kept
-# as a separate map since these are never addons.
-declare -A LUMINAIRE_SUPPORTED_VERSIONS=(
-    [bore]="6.1"
-    [adios]="6.1"
-)
-
-run_luminaire() {
-    echo "::group::✨ Luminaire Features"
-    # Not local: telegram.sh (run_release -> telegram.sh, later in the same
-    # process) reads these directly to build the release caption. A
-    # function-local var dies at return, so it would never survive to
-    # reach telegram.sh even though both run in the same bash process —
-    # see Bug #4.
-    export APPLIED_LUMINAIRE="" SKIPPED_LUMINAIRE=""
-    for feature in bore adios; do
-        local supported="${LUMINAIRE_SUPPORTED_VERSIONS[$feature]:-}"
-        if [[ " ${supported} " != *" ${KERNEL_VERSION} "* ]]; then
-            warn "Luminaire feature '${feature}' isn't backported for kernel ${KERNEL_VERSION} yet — skipping (always-on, not a user toggle; shows as N/A in the release caption, not a Disable)."
-            SKIPPED_LUMINAIRE="${SKIPPED_LUMINAIRE:+${SKIPPED_LUMINAIRE},}${feature}"
-            continue
-        fi
-        local script="${LUMINAIRE_PATCH_DIR}/kernel/luminaire/${feature}/${feature}.sh"
-        [ -f "$script" ] || error "Luminaire feature '${feature}' is marked supported for kernel ${KERNEL_VERSION} in LUMINAIRE_SUPPORTED_VERSIONS but ${script} doesn't exist — the map is out of sync with kernel/luminaire/."
-        source "$script" || error "Luminaire feature failed: ${feature}"
-        APPLIED_LUMINAIRE="${APPLIED_LUMINAIRE:+${APPLIED_LUMINAIRE},}${feature}"
-    done
-    echo "APPLIED_LUMINAIRE=${APPLIED_LUMINAIRE}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
-    echo "SKIPPED_LUMINAIRE=${SKIPPED_LUMINAIRE}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
-    echo "::endgroup::"
-}
-
-# ======================================================
-# ⚡ ADDONS
-# ======================================================
-
-# ======================================================
-# ⚡ ADDON KERNEL-VERSION SUPPORT MAP — single source of truth
-# ======================================================
-# Space-separated KERNEL_VERSION values each addon actually has a patch
-# for today. This is the ONLY place that needs updating when a new
-# backport lands for another kernel version — the addon's own .sh script
-# stays generic (Pattern A: case-switch to an upstream URL keyed by
-# version, e.g. ntsync/bbrv3/nomount/zeromount; or Pattern B: a
-# self-maintained patch under kernel/<ver>-lts/patches/, e.g. droidspaces).
-#
-# ZeroMount's 5.10 entry: the kernel patch itself is confirmed to exist
-# upstream (Enginex0/Super-Builders), but inject_namei.py/inject_readdir.py/
-# fix_taskmmu.py's anchors were only ever verified against a 6.1 tree —
-# they'll error() loudly if 5.10's SuSFS-patched namei.c/readdir.c don't
-# match, rather than silently mis-patching, so this is a "probably fine,
-# fails loud if not" entry, not a verified-safe one.
-declare -A ADDON_SUPPORTED_VERSIONS=(
-    [rekernel]="6.1"
-    [bbrv3]="5.10 6.1"
-    [bbg]="6.1"
-    [droidspaces]="6.1"
-    [ntsync]="5.10 6.1"
-    [wireguard]="5.10 6.1"
-    [lz4zstd]="6.1"
-    [lz4kd]="6.1"
-    [kasumi]="6.1"
-    [nomount]="5.10 6.1"
-    [zeromount]="5.10 6.1"
-)
-
-addon_supports_kernel_version() {
-    local addon="$1"
-    local supported="${ADDON_SUPPORTED_VERSIONS[$addon]:-}"
-    # Unknown addon name -> treat as unsupported rather than silently
-    # letting it through; ADDON_SUPPORTED_VERSIONS should be kept in sync
-    # with kernel/addons/*/*.sh (same list release/telegram/caption.py's
-    # TOGGLE_ADDON_ORDER tracks).
-    [ -z "$supported" ] && return 1
-    [[ " ${supported} " == *" ${KERNEL_VERSION} "* ]]
-}
-
-run_addons() {
-    [ -z "${ADDONS:-}" ] && return 0
-    # Strip whitespace, leading/trailing commas, and duplicate commas
-    ADDONS="${ADDONS// /}"
-    ADDONS="$(echo "$ADDONS" | sed 's/^,*//;s/,*$//;s/,,*/,/g')"
-    [ -z "${ADDONS}" ] && return 0
-    echo "::group::⚡ Addons"
-    IFS=',' read -ra ADDON_LIST <<< "$ADDONS"
-
-    # Conflict matrix — addons that patch overlapping kernel subsystems and
-    # cannot be safely combined. Checked up front so a bad combo fails fast
-    # instead of leaving a half-patched tree mid-build.
-    if [[ ",${ADDONS}," == *,nomount,* ]] && [[ ",${ADDONS}," == *,zeromount,* ]]; then
-        error "Addon conflict: 'nomount' and 'zeromount' both redirect VFS paths and cannot be combined — pick one."
-    fi
-    if [[ ",${ADDONS}," == *,zeromount,* ]] && [ "${SUSFS_ENABLED:-false}" != "true" ]; then
-        error "Addon conflict: 'zeromount' requires SuSFS (its readdir.c/namei.c/task_mmu.c hooks are SuSFS-baseline only, no non-SuSFS fallback) — enable SuSFS or pick a different mountless engine."
-    fi
-
-    # Not local — same reason as APPLIED_LUMINAIRE/SKIPPED_LUMINAIRE above
-    # (see run_luminaire()): telegram.sh reads these later in the same
-    # process to build the release caption.
-    export APPLIED_ADDONS="" SKIPPED_ADDONS=""
-    for addon in "${ADDON_LIST[@]}"; do
-        addon="${addon// /}"
-        [ -z "$addon" ] && continue
-        local script="${LUMINAIRE_PATCH_DIR}/kernel/addons/${addon}/${addon}.sh"
-        if [ ! -f "$script" ]; then
-            log "⚠️ Addon not found: ${addon}"
-            continue
-        fi
-        if ! addon_supports_kernel_version "$addon"; then
-            warn "Addon '${addon}' isn't backported for kernel ${KERNEL_VERSION} yet — skipping (shows as N/A, not Disable, in the release caption)."
-            SKIPPED_ADDONS="${SKIPPED_ADDONS:+${SKIPPED_ADDONS},}${addon}"
-            continue
-        fi
-        source "$script" || error "Addon failed: ${addon}"
-        APPLIED_ADDONS="${APPLIED_ADDONS:+${APPLIED_ADDONS},}${addon}"
-    done
-
-    echo "APPLIED_ADDONS=${APPLIED_ADDONS}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
-    echo "SKIPPED_ADDONS=${SKIPPED_ADDONS}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
-    echo "::endgroup::"
-}
+# run_luminaire() and run_addons() (plus their version-support maps and
+# the addon conflict matrix) live in kernel/luminaire/registry.sh and
+# kernel/addons/registry.sh respectively — sourced near the top of this
+# file. Kept out of build.sh itself so this file stays an orchestrator
+# (decides *when* things run) rather than also owning *what's supported*.
 
 # ======================================================
 # 🏗️ BUILD
