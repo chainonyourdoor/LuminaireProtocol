@@ -3,8 +3,7 @@
 # ======================================================
 # 🧬 SuSFS — shared apply logic (any KSU fork, android14-6.1-lts)
 # ======================================================
-# Repo: https://gitlab.com/simonpunk/susfs4ksu (pershoot/susfs4ksu fork for
-# KernelSU-Next — see the pin-resolution comment below)
+# Repo: https://gitlab.com/simonpunk/susfs4ksu
 
 # SuSFS pin resolution — SukiSU-Ultra needs an exact commit paired with a
 # matching susfs4ksu commit (community-verified combo, not just "old enough").
@@ -15,9 +14,13 @@
 # hook API (ksu_handle_*) that simonpunk/susfs4ksu's patch targets, in favor
 # of an internal syscall_hook_manager — confirmed by a real build (undefined
 # ksu_handle_*/susfs_* symbols at link time, run 28714488530). pershoot
-# maintains a KernelSU-Next fork (dev-susfs branch, see ksunext.sh) paired
-# with their own susfs4ksu fork/branch, which is what's tracked below
-# instead of upstream simonpunk/susfs4ksu for this one root solution.
+# maintains a KernelSU-Next fork (dev-susfs branch, see ksunext.sh) with its
+# own SUSFS-compatible hooks — but the SuSFS *source* itself still comes
+# from simonpunk/susfs4ksu's own -dev branch, not a pershoot fork: verified
+# directly against source that every susfs_* symbol pershoot's fork calls
+# but doesn't define itself is already provided by simonpunk's official
+# susfs_def.h/susfs.h (byte-identical across kernel versions), so no
+# separate fork is actually needed for this pairing.
 if [ "$KERNEL_VARIANT" = "SUKISU" ]; then
     SUSFS_REF="${SUSFS_SUKISU_REF:-}"
     [ -n "$SUSFS_REF" ] || warn "SuSFS+SukiSU: no pin resolved — build will likely fail (see wishlist for known-good combos)"
@@ -25,7 +28,7 @@ if [ "$KERNEL_VARIANT" = "SUKISU" ]; then
     SUSFS_BRANCH="gki-android14-6.1"
 elif [ "$KERNEL_VARIANT" = "KSUNEXT" ]; then
     SUSFS_REF="${SUSFS_KSUNEXT_REF:-}"
-    SUSFS_REPO="https://gitlab.com/pershoot/susfs4ksu.git"
+    SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
     SUSFS_BRANCH="gki-android14-6.1-dev"
 else
     SUSFS_REF="${SUSFS_RESUKISU_REF:-}"
@@ -116,19 +119,21 @@ python3 "${KSU_SHARED_DIR}/fix_namespace.py" "${KERNEL_SRC}/fs/namespace.c" \
     || error "SuSFS: namespace.c fix failed!"
 log "namespace.c fixed ✅"
 
-# NOTE: pershoot's susfs4ksu fork used to ship a second patch
+# NOTE: an earlier pershoot/susfs4ksu fork (no longer used — see the
+# pin-resolution comment above) used to ship a second patch
 # (kernel_patches/60_scope-minimized_manual_hooks.patch) that scoped down
 # KernelSU-Next's manual hooks so they wouldn't collide with its
 # syscall_hook_manager wiring. That patch — and syscall_hook_manager
-# itself — is gone as of the fork's current dev-susfs branch: the branch
-# now ships the manual-hook/SuSFS integration directly in KernelSU-Next's
+# itself — is gone as of pershoot/KernelSU-Next's current dev-susfs branch:
+# the branch now ships the manual-hook/SuSFS integration directly in its
 # own source (kernel/feature, kernel/hook, kernel/selinux, etc.), so
-# there's nothing left to apply here for KSUNEXT. Confirmed via on-device
-# check (2026-07-05): CONFIG_KSU_SUSFS and its sub-options compile in,
-# and dmesg shows the integration's sucompat log line firing at runtime.
-# If pershoot's fork restructures again and SuSFS stops working on
-# KSUNEXT, check kernel_patches/ in that fork first before assuming this
-# comment is still accurate.
+# there's nothing left to apply here for KSUNEXT beyond the standard
+# simonpunk/susfs4ksu patch above. Confirmed via on-device check
+# (2026-07-05): CONFIG_KSU_SUSFS and its sub-options compile in, and dmesg
+# shows the integration's sucompat log line firing at runtime. If
+# pershoot/KernelSU-Next restructures its hooks again and SuSFS stops
+# working on KSUNEXT, check that fork's kernel/ source first before
+# assuming this comment is still accurate.
 
 rm -rf "$SUSFS_DIR"
 

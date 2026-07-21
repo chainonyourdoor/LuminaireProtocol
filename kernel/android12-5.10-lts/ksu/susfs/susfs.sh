@@ -4,24 +4,29 @@
 # 🧬 SuSFS — shared apply logic (any KSU fork, android12-5.10-lts)
 # ======================================================
 # Repo: https://gitlab.com/simonpunk/susfs4ksu
-# NOTE: KSUNEXT+SuSFS is NOT wired up yet for this kernel version — pershoot's
-# susfs4ksu fork (used for KSUNEXT on android14-6.1) only carries
-# gki-android14-6.1(-lts)-dev / aosp-android14-6.1-dev branches, no 5.10
-# equivalent found as of 2026-07. Needs a reference/fork check before this
-# can be supported — KSUNEXT itself isn't implemented for this kernel version
-# yet either (no ksu/ksunext/ dir here, unlike the resukisu/sukisu siblings).
 
 # SuSFS pin resolution — SukiSU-Ultra needs an exact commit paired with a
 # matching susfs4ksu commit (community-verified combo, not just "old enough").
 # ReSukiSU is generally compatible with SuSFS's branch tip, so it isn't
 # pinned as tightly. kernel/checkpoint/scout.sh exports the right *_REF beforehand.
+#
+# KernelSU-Next (KSUNEXT) uses pershoot's KernelSU-Next fork (dev-susfs
+# branch, see kernel/ksu-shared/ksunext/ksunext.sh — shared across all
+# kernel versions) for its own SUSFS-compatible hooks, but the SuSFS
+# *source* itself comes from simonpunk/susfs4ksu's own -dev branch, same as
+# the android14-6.1-lts sibling — verified directly against source that
+# every susfs_* symbol pershoot's fork calls but doesn't define itself is
+# already provided by simonpunk's official susfs_def.h/susfs.h
+# (byte-identical across kernel versions, including this one).
 if [ "$KERNEL_VARIANT" = "SUKISU" ]; then
     SUSFS_REF="${SUSFS_SUKISU_REF:-}"
     [ -n "$SUSFS_REF" ] || warn "SuSFS+SukiSU: no pin resolved — build will likely fail (see wishlist for known-good combos)"
     SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
     SUSFS_BRANCH="gki-android12-5.10"
 elif [ "$KERNEL_VARIANT" = "KSUNEXT" ]; then
-    error "SuSFS+KernelSU-Next is not yet supported for android12-5.10-lts (no known pershoot/susfs4ksu fork branch for this kernel version) — pick a different root solution or disable SuSFS for now."
+    SUSFS_REF="${SUSFS_KSUNEXT_REF:-}"
+    SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
+    SUSFS_BRANCH="gki-android12-5.10-dev"
 else
     SUSFS_REF="${SUSFS_RESUKISU_REF:-}"
     SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
