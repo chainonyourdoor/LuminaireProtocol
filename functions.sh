@@ -51,10 +51,11 @@ run_quiet() {
 # checkpoint/engine.sh can tell *which* stage a failure happened in just by
 # checking which of these markers made it into the job's env. This is what
 # lets engine.sh avoid blaming a KSU-fork/SuSFS candidate for a failure that
-# actually happened in an unrelated later stage (e.g. an addon like ADIOS
-# failing to apply) instead of in run_variant/run_build where that candidate
-# is actually exercised. No-op outside CI (GITHUB_ENV unset) so this is safe
-# to call from a local/manual run of build.sh too.
+# actually happened in an unrelated stage (e.g. run_addons, or run_postbuild
+# — an addon like Kasumi failing its post-build LKM compile) instead of in
+# run_variant/run_build where that candidate is actually exercised. No-op
+# outside CI (GITHUB_ENV unset) so this is safe to call from a local/manual
+# run of build.sh too.
 mark_stage_ok() {
     local marker="$1"
     [ -n "${GITHUB_ENV:-}" ] && echo "${marker}=true" >> "$GITHUB_ENV"

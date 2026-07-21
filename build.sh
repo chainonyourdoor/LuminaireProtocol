@@ -72,6 +72,7 @@ main() {
     run_addons
     mark_stage_ok CHECKPOINT_ADDONS_OK
     run_build
+    mark_stage_ok CHECKPOINT_BUILD_OK
     run_postbuild
 
     if [ "${RUN_MODE^^}" = "WARM RUN" ]; then

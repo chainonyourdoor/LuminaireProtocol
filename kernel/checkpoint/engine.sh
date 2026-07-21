@@ -153,22 +153,36 @@ for key in "${COMPONENTS[@]}"; do
         continue
     fi
 
-    # Failure. build.sh's main() only sets these two markers via
-    # mark_stage_ok() once the corresponding stage actually finishes (see
-    # functions.sh) — `set -e` means a stage that fails never reaches its
-    # own marker, so their presence tells us which stage the failure was in
-    # without engine.sh needing any of build.sh's internal state.
+    # Failure. build.sh's main() only sets these markers via mark_stage_ok()
+    # once the corresponding stage actually finishes (see functions.sh) —
+    # `set -e` means a stage that fails never reaches its own marker, so
+    # their presence tells us which stage the failure was in without
+    # engine.sh needing any of build.sh's internal state.
     #
     # - CHECKPOINT_VARIANT_OK missing -> failed at/before run_variant,
     #   which is exactly where this candidate ref gets applied -> blame it.
     # - CHECKPOINT_VARIANT_OK present but CHECKPOINT_ADDONS_OK missing ->
     #   failed in run_core or run_addons, both unrelated to the KSU-fork/
     #   SuSFS candidate this component tracks -> leave the pin alone.
-    # - Both present -> failed in run_build itself (the actual compile),
-    #   which the candidate patch can absolutely still be the cause of ->
-    #   blame it, same as a run_variant-stage failure.
+    # - CHECKPOINT_ADDONS_OK present but CHECKPOINT_BUILD_OK missing ->
+    #   failed in run_build itself (the actual compile), which the
+    #   candidate patch can absolutely still be the cause of -> blame it,
+    #   same as a run_variant-stage failure.
+    # - CHECKPOINT_BUILD_OK present -> run_build already finished, so the
+    #   failure happened in run_postbuild (e.g. Kasumi's out-of-tree LKM
+    #   compile) — unrelated to the KSU-fork/SuSFS candidate, which is only
+    #   ever exercised in run_variant/run_build -> leave the pin alone. This
+    #   used to be conflated with the run_build case above (no marker
+    #   existed between the two), which wrongly blacklisted susfs_resukisu/
+    #   susfs_sukisu candidate be08face56c3 for kernel 5.10 over an
+    #   unrelated Kasumi post-build failure — see manifest.json history.
     if [ "${CHECKPOINT_VARIANT_OK:-false}" = "true" ] && [ "${CHECKPOINT_ADDONS_OK:-false}" != "true" ]; then
         log "checkpoint: ${key} candidate ${ref:0:12} left untouched — build failed in an unrelated stage (run_core/run_addons), not in run_variant/run_build (kernel ${KERNEL_VERSION})"
+        continue
+    fi
+
+    if [ "${CHECKPOINT_ADDONS_OK:-false}" = "true" ] && [ "${CHECKPOINT_BUILD_OK:-false}" = "true" ]; then
+        log "checkpoint: ${key} candidate ${ref:0:12} left untouched — build failed in an unrelated stage (run_postbuild), not in run_variant/run_build (kernel ${KERNEL_VERSION})"
         continue
     fi
 
