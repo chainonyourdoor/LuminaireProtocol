@@ -264,7 +264,7 @@ def build_blocks(env):
         "```"
     )
     block_features = (
-        "```Luminaire Features\n"
+        "```Luminaire-Features\n"
         + "\n".join(luminaire_status_lines) +
         "```"
     )
