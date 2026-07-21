@@ -14,5 +14,10 @@
   "susfs_sukisu": {
     "good": "e29e344398995898a3b2f2a00f8979e2a599ba96",
     "bad": []
+  },
+  "ksunext_susfs_fork": {
+    "bad": [
+      "d03021727ec68b9a6a486abb6629426f267c177e"
+    ]
   }
 }
