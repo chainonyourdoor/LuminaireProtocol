@@ -38,6 +38,7 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/addons/kasumi/postbuild.sh](#kerneladdonskasumipostbuildsh)
 - [kernel/ksu-shared/resukisu/resukisu.sh](#kernelksu-sharedresukisuresukisush)
 - [kernel/addons/registry.sh](#kerneladdonsregistrysh)
+- [kernel/ksu-shared/sukisu/sukisu.sh](#kernelksu-sharedsukisusukisush)
 
 ---
 
@@ -1268,3 +1269,32 @@ bad combo fails fast instead of leaving a half-patched tree mid-build.
 as `APPLIED_LUMINAIRE`/`SKIPPED_LUMINAIRE` in
 `kernel/luminaire/registry.sh`: `telegram.sh` reads these later in the
 same process to build the release caption.
+
+---
+
+## `kernel/ksu-shared/sukisu/sukisu.sh`
+
+**Purpose of this file**: root solution — SukiSU-Ultra. Repo:
+https://github.com/SukiSU-Ultra/SukiSU-Ultra.
+
+**Builtin-branch pin** — with SuSFS enabled, the `"builtin"` branch
+(SukiSU-Ultra's own SUSFS-integrated line) is needed, resolved separately
+from the plain main/tag pin used otherwise — see
+`kernel/checkpoint/scout.sh`.
+
+**Branding target** — the builtin branch (SUSFS-integrated) restructured
+`kernel/` entirely — no `Kbuild` file, but `kernel/Makefile` has the
+identical `KSU_VERSION_FULL` lines `branding.py` patches, just in a
+different file.
+
+**Version string computation** — mirrors SukiSU-Ultra's own Kbuild/
+Makefile formula exactly — this one is NOT purely local like ReSukiSU/
+KernelSU-Next: SukiSU-Ultra's own build prefers a *live* GitHub API
+commit count over the local git history (`LOCAL_COUNT :=
+GITHUB_COMMITS` if reachable, else local `rev-list --count main`), so
+the compiled version code can differ from what plain local git history
+would say. Replicated here (not simplified) so the displayed number
+actually matches what's compiled in. Same `VERSION_BASE`/`OFFSET` and
+`GITHUB_COMMITS` logic apply on both main and builtin branches (checked
+against both upstream Kbuild/Makefile) — only the default fallback tag
+differs (4.1.3 vs 4.1.2).

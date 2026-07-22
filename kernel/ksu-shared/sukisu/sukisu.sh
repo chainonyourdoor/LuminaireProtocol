@@ -8,10 +8,6 @@
 KSU_DIR="${KERNEL_SRC}/KernelSU"
 PATCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ======================================================
-# 1. SukiSU-Ultra
-# ======================================================
-
 log "Integrating SukiSU-Ultra..."
 cd "$KERNEL_SRC"
 SUKISU_SETUP=$(curl -LSs --fail --retry 3 --retry-all-errors --connect-timeout 30 \
@@ -19,9 +15,6 @@ SUKISU_SETUP=$(curl -LSs --fail --retry 3 --retry-all-errors --connect-timeout 3
     || error "SukiSU-Ultra: failed to download setup.sh!"
 [ -n "$SUKISU_SETUP" ] || error "SukiSU-Ultra: setup.sh is empty!"
 echo "$SUKISU_SETUP" | grep -q "^#!" || error "SukiSU-Ultra: setup.sh looks invalid (no shebang)!"
-# With SuSFS enabled we need the "builtin" branch (SukiSU-Ultra's own
-# SUSFS-integrated line), resolved separately from the plain main/tag pin
-# used otherwise — see kernel/checkpoint/scout.sh.
 if [ "${SUSFS_ENABLED:-false}" = "true" ]; then
     SUKISU_REF="${SUKISU_BUILTIN_REF:-builtin}"
 fi
@@ -35,14 +28,7 @@ fi
 cd "$ROOT_DIR"
 log "SukiSU-Ultra integrated ✅"
 
-# ======================================================
-# 2. Branding
-# ======================================================
-
 log "Applying Luminaire branding..."
-# The builtin branch (SUSFS-integrated) restructured kernel/ entirely —
-# no Kbuild file, but kernel/Makefile has the identical KSU_VERSION_FULL
-# lines branding.py patches, just in a different file.
 if [ "${SUSFS_ENABLED:-false}" = "true" ]; then
     BRANDING_TARGET="${KSU_DIR}/kernel/Makefile"
 else
@@ -51,20 +37,6 @@ fi
 python3 "${PATCHER_DIR}/branding.py" "$BRANDING_TARGET" \
     || error "SukiSU-Ultra: branding patch failed!"
 log "Branding applied ✅"
-
-# ======================================================
-# 2b. Version string (for Telegram caption)
-# ======================================================
-# Mirrors SukiSU-Ultra's own Kbuild/Makefile formula exactly — this one is
-# NOT purely local like ReSukiSU/KernelSU-Next: SukiSU-Ultra's own build
-# prefers a *live* GitHub API commit count over the local git history
-# (LOCAL_COUNT := GITHUB_COMMITS if reachable, else local `rev-list --count
-# main`), so the compiled version code can differ from what plain local git
-# history would say. Replicated here (not simplified) so our displayed
-# number actually matches what's compiled in. Same VERSION_BASE/OFFSET and
-# GITHUB_COMMITS logic apply on both main and builtin branches (checked
-# against both upstream Kbuild/Makefile) — only the default fallback tag
-# differs (4.1.3 vs 4.1.2).
 
 SUKISU_GIT_COMMIT_COUNT=$(git -C "$KSU_DIR" rev-list --count main 2>/dev/null || echo "")
 SUKISU_GITHUB_COMMITS=$(curl -sI --connect-timeout 10 --max-time 15 \
@@ -97,10 +69,6 @@ else
 fi
 echo "SUKISU_VERSION_DISPLAY=${SUKISU_VERSION_DISPLAY}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
 log "Version: ${SUKISU_VERSION_DISPLAY}"
-
-# ======================================================
-# 3. Kconfig
-# ======================================================
 
 log "Enabling KSU configs..."
 if ! grep -q "^CONFIG_KSU=y" "${KERNEL_SRC}/arch/arm64/configs/gki_defconfig"; then
