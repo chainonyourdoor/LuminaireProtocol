@@ -110,6 +110,7 @@ CAPTION_GROUP_FILE="/tmp/telegram_caption_group.txt"
 CAPTION_CHANNEL_FILE="/tmp/telegram_caption_channel.txt"
 
 LINUX_VER="$LINUX_VER" \
+KERNEL_BRANCH="${KERNEL_BRANCH:-N/A}" \
 COMPILER_STRING="${COMPILER_STRING:-N/A}" \
 LTO_MODE="${LTO_MODE:-NONE}" \
 RUN_MODE="${RUN_MODE:-}" \

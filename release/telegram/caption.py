@@ -183,6 +183,7 @@ def build_blocks(env):
     linux_ver       = mdv2_code_escape(env.get("LINUX_VER", "N/A"))
     kernel_ver      = env.get("KERNEL_VERSION", "")
     source_str      = mdv2_code_escape(kernel_source_repo(kernel_ver))
+    kernel_branch   = mdv2_code_escape(env.get("KERNEL_BRANCH", "N/A"))
     compiler        = mdv2_code_escape(env.get("COMPILER_STRING", "N/A"))
     lto             = mdv2_code_escape(env.get("LTO_MODE", "NONE"))
     kernel_variant  = mdv2_code_escape(env.get("KERNEL_VARIANT_DISPLAY", "N/A"))
@@ -239,6 +240,7 @@ def build_blocks(env):
         "```Luminaire\n"
         f"Kernel    : Linux {linux_ver}\n"
         f"Source    : {source_str}\n"
+        f"Branch    : {kernel_branch}\n"
         f"Toolchain : {compiler}\n"
         f"LTO       : {lto}```"
     )
