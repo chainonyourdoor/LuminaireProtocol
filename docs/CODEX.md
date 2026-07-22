@@ -37,6 +37,7 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/addons/kasumi/kasumi.sh](#kerneladdonskasumikasumish)
 - [kernel/addons/kasumi/postbuild.sh](#kerneladdonskasumipostbuildsh)
 - [kernel/ksu-shared/resukisu/resukisu.sh](#kernelksu-sharedresukisuresukisush)
+- [kernel/addons/registry.sh](#kerneladdonsregistrysh)
 
 ---
 
@@ -1223,3 +1224,47 @@ This is KSU's own version info, not Luminaire's — `branding.py` appends
 `" Luminaire"` to `KSU_VERSION_FULL` for the manager app's display, but
 that's a separate concern from what version of ReSukiSU is actually
 running, so the raw upstream tag is used here instead.
+
+---
+
+## `kernel/addons/registry.sh`
+
+**Purpose of this file**: addon registry — support map, conflicts,
+dispatch. Sourced once by `build.sh` (functions become available for the
+rest of the process, same shape as `functions.sh`) so `build.sh` itself
+only ever calls `run_addons()` and doesn't need to know any addon policy
+lives here.
+
+**`ADDON_SUPPORTED_VERSIONS`** — single source of truth: space-separated
+`KERNEL_VERSION` values each addon actually has a patch for today. This
+is the ONLY place that needs updating when a new backport lands for
+another kernel version — the addon's own `.sh` script stays generic
+(Pattern A: case-switch to an upstream URL keyed by version, e.g.
+ntsync/bbrv3/nomount/zeromount; or Pattern B: a self-maintained patch
+under `kernel/<ver>/patches/`, e.g. droidspaces).
+
+ZeroMount's 5.10 entry: the kernel patch itself is confirmed to exist
+upstream (Enginex0/Super-Builders), but `inject_namei.py`/
+`inject_readdir.py`/`fix_taskmmu.py`'s anchors were only ever verified
+against a 6.1 tree — they'll `error()` loudly if 5.10's SuSFS-patched
+`namei.c`/`readdir.c` don't match, rather than silently mis-patching, so
+this is a "probably fine, fails loud if not" entry, not a verified-safe
+one.
+
+**`addon_supports_kernel_version()`** — unknown addon name → treat as
+unsupported rather than silently letting it through;
+`ADDON_SUPPORTED_VERSIONS` should be kept in sync with
+`kernel/addons/*/*.sh` (same list `release/telegram/caption.py`'s
+`TOGGLE_ADDON_ORDER` tracks).
+
+**`run_addons()`, ADDONS normalization** — strips whitespace, leading/
+trailing commas, and duplicate commas.
+
+**`run_addons()`, conflict matrix** — addons that patch overlapping
+kernel subsystems and cannot be safely combined. Checked up front so a
+bad combo fails fast instead of leaving a half-patched tree mid-build.
+
+**`run_addons()`, `export APPLIED_ADDONS`** — not `local` — same reason
+as `APPLIED_LUMINAIRE`/`SKIPPED_LUMINAIRE` in
+`kernel/luminaire/registry.sh`: `telegram.sh` reads these later in the
+same process to build the release caption.
