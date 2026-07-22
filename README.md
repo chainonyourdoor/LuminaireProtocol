@@ -5,7 +5,9 @@
 
 # Luminaire Protocol
 </div>
+
 ---
+
 <div align="center">
 
 [![Build](https://img.shields.io/github/actions/workflow/status/chainonyourdoor/LuminaireProtocol/build.yml?branch=main&label=build&logo=github&style=for-the-badge)](https://github.com/chainonyourdoor/LuminaireProtocol/actions/workflows/build.yml)
