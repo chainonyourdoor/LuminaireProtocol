@@ -5,18 +5,6 @@
 # ======================================================
 # Repo: https://gitlab.com/simonpunk/susfs4ksu
 
-# SuSFS pin resolution — SukiSU-Ultra needs an exact commit paired with a
-# matching susfs4ksu commit (community-verified combo, not just "old enough").
-# ReSukiSU is generally compatible with SuSFS's branch tip, so it isn't
-# pinned as tightly. kernel/checkpoint/scout.sh exports the right *_REF beforehand.
-#
-# KernelSU-Next (KSUNEXT) uses pershoot's KernelSU-Next fork (dev-susfs
-# branch, see ksunext.sh) for its own SUSFS-compatible hooks, but the SuSFS
-# *source* itself comes from simonpunk/susfs4ksu's own -dev branch, same as
-# the android14-6.1 sibling — verified directly against source that
-# every susfs_* symbol pershoot's fork calls but doesn't define itself is
-# already provided by simonpunk's official susfs_def.h/susfs.h
-# (byte-identical across kernel versions, including this one).
 if [ "$KERNEL_VARIANT" = "SUKISU" ]; then
     SUSFS_REF="${SUSFS_SUKISU_REF:-}"
     [ -n "$SUSFS_REF" ] || warn "SuSFS+SukiSU: no pin resolved — build will likely fail (see wishlist for known-good combos)"
@@ -71,24 +59,10 @@ log "SuSFS source files copied ✅"
 log "Applying SuSFS kernel patch..."
 KERNEL_PATCH="${SUSFS_DIR}/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
 if [ ! -f "$KERNEL_PATCH" ]; then
-    # Don't return/exit here — a missing/renamed patch file upstream (this
-    # has happened before, see the scope-minimized hooks history below)
-    # must not skip the Kconfig injection and CONFIG_KSU_SUSFS enablement
-    # further down. fix_namespace.py's own anchor-missing check will still
-    # catch it hard if the underlying source structure changed too.
     warn "SuSFS kernel patch not found at ${KERNEL_PATCH} — skipping patch step, continuing with Kconfig/config setup"
 elif patch -p1 --fuzz=3 --dry-run --reverse -d "$KERNEL_SRC" < "$KERNEL_PATCH" > /dev/null 2>&1; then
     log "SuSFS kernel patch already applied, skipping."
 else
-    # Pre-patch: on 6.1, sublevel >= 157 adds #include <trace/hooks/blk.h> to
-    # namespace.c which shifts context and causes hunk #1 to fail. Remove it
-    # temporarily so the patch can match, then restore after.
-    # Traced to upstream commit 60dddcb8f9 (Wang Jianzheng, 2024-06-07,
-    # kernel/common fs/namespace.c) — that commit landed on the android14-6.1
-    # history specifically, and 5.15's own SUBLEVEL numbering doesn't
-    # correspond to the same commit, so this workaround is gated to 6.1 only
-    # until someone actually checks whether/where 5.15's namespace.c needs
-    # the same treatment (don't assume — verify against the real source).
     if [ "${KERNEL_VERSION}" = "6.1" ] && [ "${SUBLEVEL:-0}" -ge 157 ]; then
         log "Pre-patch: removing blk.h from namespace.c for context match (sublevel ${SUBLEVEL})..."
         sed -i '/^#include <trace\/hooks\/blk\.h>$/d' "${KERNEL_SRC}/fs/namespace.c"
@@ -98,18 +72,13 @@ else
         && log "SuSFS kernel patch applied ✅" \
         || warn "SuSFS kernel patch: some hunks failed — continuing"
 
-    # Post-patch: restore blk.h if it was removed and patch didn't re-add it
     if [ "${KERNEL_VERSION}" = "6.1" ] && [ "${SUBLEVEL:-0}" -ge 157 ] && ! grep -qF '#include <trace/hooks/blk.h>' "${KERNEL_SRC}/fs/namespace.c"; then
         log "Post-patch: restoring blk.h to namespace.c..."
         sed -i '/^#include "internal\.h"$/a #include <trace\/hooks\/blk.h>' "${KERNEL_SRC}/fs/namespace.c"
-        # Verify the restore actually landed — if the "internal.h" anchor was
-        # itself missing/renamed upstream, sed would silently no-op and we'd
-        # lose blk.h permanently without anyone noticing until link time.
         grep -qF '#include <trace/hooks/blk.h>' "${KERNEL_SRC}/fs/namespace.c" \
             || error "SuSFS: failed to restore blk.h include in namespace.c — internal.h anchor may have changed upstream!"
     fi
 
-    # Cleanup any leftover .rej files
     find "$KERNEL_SRC" -name "*.rej" -delete 2>/dev/null || true
 fi
 

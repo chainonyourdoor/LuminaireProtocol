@@ -32,6 +32,7 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/ksu-shared/ksunext/branding.py](#kernelksu-sharedksunextbrandingpy)
 - [release/telegram/telegraph_page.py](#releasetelegramtelegraph_pagepy)
 - [kernel/addons/lz4zstd/lz4zstd.sh](#kerneladdonslz4zstdlz4zstdsh)
+- [kernel/{android12-5.10,android13-5.15,android14-6.1}/ksu/susfs/susfs.sh](#kernelandroid12-510android13-515android14-61ksususfssusfssh)
 
 ---
 
@@ -1044,3 +1045,65 @@ half-1.4.10/half-1.5.7 mix behind.
 predates the generic `<linux/unaligned.h>` wrapper header that v6.15's
 `mem.h` switched to — only the arch-specific `<asm/unaligned.h>` exists
 here (see the ZSTD incompatibility note above).
+
+---
+
+## `kernel/{android12-5.10,android13-5.15,android14-6.1}/ksu/susfs/susfs.sh`
+
+**Purpose of these files**: SuSFS — shared apply logic (any KSU fork),
+one per kernel version. Repo: https://gitlab.com/simonpunk/susfs4ksu.
+Nearly identical across all three versions (branch names/patch filenames
+swap per version); documented once here.
+
+**SuSFS pin resolution** — SukiSU-Ultra needs an exact commit paired with
+a matching susfs4ksu commit (community-verified combo, not just "old
+enough"). ReSukiSU is generally compatible with SuSFS's branch tip, so
+it isn't pinned as tightly. `kernel/checkpoint/scout.sh` exports the
+right `*_REF` beforehand.
+
+**KernelSU-Next (KSUNEXT) pairing** — uses pershoot's KernelSU-Next fork
+(dev-susfs branch, see `kernel/ksu-shared/ksunext/ksunext.sh` — shared
+across all kernel versions) for its own SUSFS-compatible hooks, but the
+SuSFS *source* itself comes from simonpunk/susfs4ksu's own `-dev` branch
+— verified directly against source that every `susfs_*` symbol
+pershoot's fork calls but doesn't define itself is already provided by
+simonpunk's official `susfs_def.h`/`susfs.h` (byte-identical across
+kernel versions).
+
+**Missing kernel-patch guard** — doesn't return/exit when the patch file
+is missing — a missing/renamed patch file upstream (this has happened
+before) must not skip the Kconfig injection and `CONFIG_KSU_SUSFS`
+enablement further down. `fix_namespace.py`'s own anchor-missing check
+will still catch it hard if the underlying source structure changed too.
+
+**`blk.h` pre-patch/post-patch workaround** — sublevel >= 157 adds
+`#include <trace/hooks/blk.h>` to `namespace.c`, which shifts context and
+causes hunk #1 to fail. It's removed temporarily so the patch can match,
+then restored after. Traced to upstream commit `60dddcb8f9` (Wang
+Jianzheng, 2024-06-07, `kernel/common fs/namespace.c`). That commit
+landed on the android14-6.1 history specifically — on android12-5.10 and
+android13-5.15, this workaround is gated to `KERNEL_VERSION = "6.1"` only
+(their own SUBLEVEL numbering doesn't correspond to the same commit),
+until someone actually checks whether/where those versions' `namespace.c`
+needs the same treatment (don't assume — verify against the real
+source). The restore step verifies the restore actually landed — if the
+`"internal.h"` anchor was itself missing/renamed upstream, `sed` would
+silently no-op and blk.h would be lost permanently without anyone
+noticing until link time.
+
+**android12-5.10/android14-6.1 historical NOTE** (present in those two
+files, since removed from android13-5.15's copy) — an earlier
+pershoot/susfs4ksu fork used to ship a second patch
+(`kernel_patches/60_scope-minimized_manual_hooks.patch`) that scoped down
+KernelSU-Next's manual hooks so they wouldn't collide with its
+`syscall_hook_manager` wiring. That patch — and `syscall_hook_manager`
+itself — is gone as of the fork's current dev-susfs branch: the branch
+now ships the manual-hook/SuSFS integration directly in KernelSU-Next's
+own source (`kernel/feature`, `kernel/hook`, `kernel/selinux`, etc.), so
+there's nothing left to apply here for KSUNEXT beyond the standard
+simonpunk/susfs4ksu patch above. Confirmed via on-device check
+(2026-07-05): `CONFIG_KSU_SUSFS` and its sub-options compile in, and
+dmesg shows the integration's sucompat log line firing at runtime. If
+pershoot's fork restructures again and SuSFS stops working on KSUNEXT,
+check `kernel_patches/` in that fork first before assuming this note is
+still accurate.
