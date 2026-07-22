@@ -41,12 +41,14 @@ fi
 # is a misconfiguration, not a silent no-op.
 RUN_MODE_UPPER="${RUN_MODE^^}"
 case "$RUN_MODE_UPPER" in
-    BUILD)     TARGET_THREAD_ID="${TELEGRAM_THREAD_ID_BUILD:-}" ;;
+    # Build mode has one topic per kernel version (TELEGRAM_THREAD_ID_BUILD_BY_VERSION
+    # in config.sh, keyed by $KERNEL_VERSION) instead of a single shared topic.
+    BUILD)     TARGET_THREAD_ID="${TELEGRAM_THREAD_ID_BUILD_BY_VERSION[$KERNEL_VERSION]:-}" ;;
     RELEASE)   TARGET_THREAD_ID="${TELEGRAM_THREAD_ID_RELEASE:-}" ;;
     *)         error "Telegram: unknown RUN_MODE '${RUN_MODE:-}' — expected Build or Release" ;;
 esac
 if [ -z "$TARGET_THREAD_ID" ]; then
-    warn "Skipping Telegram: no thread id configured for RUN_MODE=${RUN_MODE}"
+    warn "Skipping Telegram: no thread id configured for RUN_MODE=${RUN_MODE}, KERNEL_VERSION=${KERNEL_VERSION:-}"
     return 0
 fi
 
