@@ -34,6 +34,8 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/addons/lz4zstd/lz4zstd.sh](#kerneladdonslz4zstdlz4zstdsh)
 - [kernel/{android12-5.10,android13-5.15,android14-6.1}/ksu/susfs/susfs.sh](#kernelandroid12-510android13-515android14-61ksususfssusfssh)
 - [kernel/ksu-shared/ksunext/ksunext.sh](#kernelksu-sharedksunextksunextsh)
+- [kernel/addons/kasumi/kasumi.sh](#kerneladdonskasumikasumish)
+- [kernel/addons/kasumi/postbuild.sh](#kerneladdonskasumipostbuildsh)
 
 ---
 
@@ -1146,3 +1148,56 @@ confirms it.
 **Kconfig section** — no `CONFIG_KPM` here — KernelPatch is a
 SukiSU-Ultra/ReSukiSU feature, KernelSU-Next's Kconfig doesn't declare
 it.
+
+---
+
+## `kernel/addons/kasumi/kasumi.sh`
+
+**Purpose of this file**: addon — Kasumi (path manipulation/hiding LKM),
+by Anatdx. Repo: https://github.com/Anatdx/Kasumi.
+
+Kasumi is NOT an in-tree kernel patch — it's an out-of-tree LKM
+(`kasumi_lkm.ko`) built separately against a prepared kernel tree (needs
+`Module.symvers`, which only exists after the main kernel build
+finishes). This script only clones the source; the actual module compile
+happens in `kernel/addons/kasumi/postbuild.sh` (`run_postbuild()` in
+`build.sh`, after `run_build()` finishes), and packaging into the AK3 zip
+happens in `release/anykernel.sh`. This is a different shape from every
+other addon here (all of which patch source/defconfig pre-build) — don't
+move the clone logic into a patch step by mistake.
+
+**EXPERIMENTAL**: hooks VFS and syscall hot paths (openat/statx/
+newfstatat/faccessat/getxattr/readdir/etc). Upstream's own README says
+"use in controlled environments only" — default is off (`build.yml`),
+and the resulting `.ko` is shipped for manual insmod/ksud insmod, not
+auto-loaded.
+
+**No `KALLSYMS_ALL` injection needed** — Kasumi resolves non-exported
+kernel symbols (`kallsyms_lookup_name` and friends) at runtime — needs
+the full kallsyms table, not just exported ones
+(`CONFIG_KALLSYMS_ALL`). Unlike BBRv3's `TCP_CONG_ADVANCED` gate,
+`KALLSYMS_ALL` (depends on `DEBUG_KERNEL && KALLSYMS`) is already the
+resolved default in stock `gki_defconfig` (`EXPERT` selects
+`DEBUG_KERNEL`, and nothing in this repo ever disables
+`EXPERT`/`DEBUG_KERNEL`), and `kernel/config/luminaire.fragment` sets it
+explicitly on every build regardless — verified against real Kconfig
+source + a built `conf` tool, not assumed. A prior version of this
+script duplicated that injection early into `gki_defconfig` on the
+(incorrect) assumption it needed BBRv3-style early placement — don't
+re-add it without re-checking the dependency chain first.
+
+**`KASUMI_SRC_DIR` export** — consumed later by
+`kernel/addons/kasumi/postbuild.sh` (`run_postbuild()` in `build.sh`,
+after `run_build()` finishes) and `release/anykernel.sh` (packaging).
+Exported so it survives into those later stages. No separate "enabled"
+flag needed — `run_postbuild()` gates on membership in
+`$APPLIED_ADDONS`, same as this script only running when Kasumi passed
+the kernel-version check in `run_addons()`.
+
+---
+
+## `kernel/addons/kasumi/postbuild.sh`
+
+**Purpose of this file**: compiles `kasumi_lkm.ko` as an out-of-tree
+module against the kernel tree `run_build()` just finished producing
+(needs its `Module.symvers`).

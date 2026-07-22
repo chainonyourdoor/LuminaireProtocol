@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# Compiles kasumi_lkm.ko as an out-of-tree module against the kernel tree
-# run_build() just finished producing (needs its Module.symvers).
-
 [ -n "${KASUMI_SRC_DIR:-}" ] || error "Kasumi: KASUMI_SRC_DIR not set — kasumi.sh addon may not have run correctly!"
 
 log "🥷 Building Kasumi LKM (kasumi_lkm.ko)..."
