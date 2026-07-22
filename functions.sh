@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-# ==================
-# 🔧 FUNCTIONS
-# ==================
-
 COLOR_RED='\033[0;31m'
 COLOR_YELLOW='\033[0;33m'
 COLOR_CYAN='\033[0;36m'
@@ -22,16 +18,9 @@ error() {
   exit 1
 }
 
-# Runs a command, capturing combined stdout+stderr to a temp file.
-# Silent on success. On failure, prints the last 50 lines so the
-# real underlying error is visible instead of a blank failure.
 run_quiet() {
     local logfile rc
     logfile="$(mktemp)"
-    # Capture the exit status on its own line right after the command,
-    # not via `$?` after an `if cmd; then ...; fi` with no else — bash
-    # resets $? to 0 for that construct when the condition is false,
-    # which silently turned every command failure into a false success.
     "$@" > "$logfile" 2>&1
     rc=$?
     if [ "$rc" -eq 0 ]; then
@@ -45,27 +34,11 @@ run_quiet() {
     return "$rc"
 }
 
-# Exports a "this stage actually finished" marker to $GITHUB_ENV. Called
-# right after a build.sh stage completes (see main()). Thanks to `set -e`,
-# a failing stage exits before its own mark_stage_ok call ever runs — so
-# checkpoint/engine.sh can tell *which* stage a failure happened in just by
-# checking which of these markers made it into the job's env. This is what
-# lets engine.sh avoid blaming a KSU-fork/SuSFS candidate for a failure that
-# actually happened in an unrelated stage (e.g. run_addons, or run_postbuild
-# — an addon like Kasumi failing its post-build LKM compile) instead of in
-# run_variant/run_build where that candidate is actually exercised. No-op
-# outside CI (GITHUB_ENV unset) so this is safe to call from a local/manual
-# run of build.sh too.
 mark_stage_ok() {
     local marker="$1"
     [ -n "${GITHUB_ENV:-}" ] && echo "${marker}=true" >> "$GITHUB_ENV"
 }
 
-# Writes a placeholder file at the path a real kernel Image would occupy,
-# so release/anykernel.sh's packaging step (and everything downstream of
-# it — Telegram notify, checkpoint promotion) can be exercised without
-# actually compiling. Used by build/make.sh when
-# DRY_RUN=true, which build.yml only ever sets when RUN_MODE="Dry Run".
 write_dry_run_image() {
     local path="$1"
     mkdir -p "$(dirname "$path")"
@@ -73,9 +46,6 @@ write_dry_run_image() {
     log "🧪 DRY RUN — wrote placeholder image to ${path} (compile skipped)"
 }
 
-# Maps KERNEL_VERSION (e.g. "6.1") to its ANDROID_VERSION branch prefix
-# (e.g. "android14"). Shared by build.sh and arsenal.sh so the version
-# table only needs updating in one place when a new kernel is added.
 resolve_android_version() {
     case "${KERNEL_VERSION}" in
         "5.10") echo "android12" ;;
@@ -87,7 +57,6 @@ resolve_android_version() {
     esac
 }
 
-# Sources every *.sh in setup/, in order. Shared by build.sh and arsenal.sh.
 run_setup() {
     echo "::group::📦 Setup"
     for script in "${LUMINAIRE_PATCH_DIR}/setup/"*.sh; do
@@ -96,12 +65,6 @@ run_setup() {
     echo "::endgroup::"
 }
 
-# Sources a single script wrapped in a ::group:: block, erroring with a
-# custom message if the script is missing. Shared shape for build.sh's
-# single-file dispatch steps (restore_kernel_source, run_variant's two
-# calls, run_build, run_release) so each one isn't hand-rolling the same
-# "check file exists -> group -> source -> endgroup" boilerplate.
-# Args: <emoji> <label for the ::group:: and error text> <script path> <error message if script is missing>
 run_step() {
     local emoji="$1" label="$2" script="$3" missing_msg="$4"
     [ -f "$script" ] || error "$missing_msg"
@@ -110,17 +73,9 @@ run_step() {
     echo "::endgroup::"
 }
 
-# Waits for the background apt install kicked off by setup/01_deps.sh
-# (APT_PID). Shared by build.sh and arsenal.sh so a fresh runner never
-# proceeds into ccache/build steps before required packages land.
 wait_for_apt() {
     if [ -n "${APT_PID:-}" ]; then
         log "Waiting for background apt install (PID ${APT_PID})..."
-        # Bounded poll instead of a bare `wait`, which has no timeout and
-        # would block indefinitely on a genuinely stuck apt process (see
-        # Setup Arsenal run #430: 17+ min stuck with zero signal either
-        # way). 10 minutes covers a cold-cache install of this package
-        # list several times over; past that, something's actually wrong.
         local waited=0 max_wait=600
         while kill -0 "$APT_PID" 2>/dev/null; do
             sleep 5
@@ -144,15 +99,10 @@ wait_for_apt() {
     fi
 }
 
-# Retries a command with exponential backoff.
-# Usage: retry <max_attempts> <command...>
 retry() {
     local max_attempts="$1"; shift
     local attempt=1 delay=5 rc=0
     while true; do
-        # Same fix as run_quiet(): capture $? on its own line right after
-        # the command, not via `if cmd; then ...; fi` with no else — bash
-        # resets $? to 0 for that construct when the condition is false.
         "$@"
         rc=$?
         if [ "$rc" -eq 0 ]; then
@@ -168,14 +118,6 @@ retry() {
     done
 }
 
-# Human-readable note on WHY a cache-restore path is being taken, for
-# clang/kernel-source/AK3 restore log lines. Start-Build always restores
-# (USE_*_CACHE hardcoded "true" there) — Prepare Arsenal is the single
-# choke point that decides whether that shared cache is actually fresh
-# this run (CACHE_REFRESHED, set from the 'Update Arsenal' input). Without
-# this, "restored from cache ✅" reads the same whether the cache is
-# brand new or weeks old, which is misleading when read from a single
-# job's log in isolation.
 cache_freshness_note() {
     if [ "${CACHE_REFRESHED:-false}" = "true" ]; then
         echo "pre-warmed fresh by Prepare Arsenal this run"
@@ -184,11 +126,6 @@ cache_freshness_note() {
     fi
 }
 
-# Emoji for a given RUN_MODE, used in build.sh's opening/closing banners.
-# Kept as a lookup instead of embedding the emoji into RUN_MODE itself,
-# since RUN_MODE is exact-string-compared elsewhere (scout.sh, telegram.sh,
-# and build.sh's own "${RUN_MODE^^}" = "WARM RUN" check) — mutating its
-# value here would silently break those.
 mode_emoji() {
     case "$1" in
         "Dry Run")  echo "🧪" ;;
