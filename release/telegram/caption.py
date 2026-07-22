@@ -272,7 +272,7 @@ def build_blocks(env):
     has_active_luminaire = any(t not in luminaire_skipped_tokens for t in LUMINAIRE_FEATURE_ORDER)
     if has_active_luminaire:
         block_features = (
-            "```Kernel-Patch\n"
+            "```Core-Patch\n"
             + "\n".join(luminaire_status_lines) +
             "```"
         )
