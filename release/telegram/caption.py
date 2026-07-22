@@ -263,11 +263,19 @@ def build_blocks(env):
         + "\n".join(addon_status_lines) +
         "```"
     )
-    block_features = (
-        "```Luminaire-Features\n"
-        + "\n".join(luminaire_status_lines) +
-        "```"
-    )
+    # Omit the whole block when nothing in it is Active — an
+    # all-N/A Luminaire-Features section (e.g. neither BORE nor ADIOS
+    # backported yet for this kernel version) isn't useful information,
+    # just noise. main()'s caption_group join already drops None blocks.
+    has_active_luminaire = any(t not in luminaire_skipped_tokens for t in LUMINAIRE_FEATURE_ORDER)
+    if has_active_luminaire:
+        block_features = (
+            "```Luminaire-Features\n"
+            + "\n".join(luminaire_status_lines) +
+            "```"
+        )
+    else:
+        block_features = None
     footer = "[{}]({}) \\| [Run \\#{}]({})".format(
         mdv2_escape(commit_short),
         mdv2_escape_url(commit_url),
