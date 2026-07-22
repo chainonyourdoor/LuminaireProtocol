@@ -22,7 +22,7 @@ source "$(cd "$(dirname "$0")" && pwd)/functions.sh"
 KERNEL_VERSION="${KERNEL_VERSION:?KERNEL_VERSION is not set}"
 
 ANDROID_VERSION="$(resolve_android_version)"
-KERNEL_BRANCH="${ANDROID_VERSION}-${KERNEL_VERSION}-lts"
+KERNEL_BRANCH="${ANDROID_VERSION}-${KERNEL_VERSION}-live"
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LUMINAIRE_PATCH_DIR="${ROOT_DIR}"

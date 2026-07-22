@@ -7,8 +7,8 @@
 # || true on both greps below: grep exits 2 (not just 1) when handed a
 # file that doesn't exist — even if it found a match in the other file
 # given alongside it. build.config.constants doesn't exist on every
-# kernel version (confirmed missing on android12-5.10-lts's source,
-# present on android14-6.1-lts's), and under build.sh's set -eo
+# kernel version (confirmed missing on android12-5.10's source,
+# present on android14-6.1's), and under build.sh's set -eo
 # pipefail, that nonzero pipe exit was killing the script silently on
 # this exact line — before ever reaching the explicit error() checks
 # below, which is the only reason "KMI_GENERATION not found!" never

@@ -27,7 +27,7 @@ KERNEL_VERSION="${KERNEL_VERSION:?KERNEL_VERSION is not set}"
 # with RUN_MODE by the time it reaches here.
 
 ANDROID_VERSION="$(resolve_android_version)"
-KERNEL_BRANCH="${ANDROID_VERSION}-${KERNEL_VERSION}-lts"
+KERNEL_BRANCH="${ANDROID_VERSION}-${KERNEL_VERSION}-live"
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Bootstrap path — needed before run_setup() sources 00_paths.sh

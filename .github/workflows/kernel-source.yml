@@ -1,5 +1,5 @@
 name: "🌱 Kernel Source"
-run-name: "${{ inputs.force_adopt && format('🌊 Adopt fresh ACK | {0}-{1}-lts', inputs.android_version, inputs.kernel_version) || (inputs.target_stable_tag != '' && format('⚡ Catch-up | {0} | {1}-{2}-lts', inputs.target_stable_tag, inputs.android_version, inputs.kernel_version) || format('🌀 Sync live ACK | {0}-{1}-lts', inputs.android_version, inputs.kernel_version)) }}"
+run-name: "${{ inputs.force_adopt && format('🌊 Adopt fresh ACK | {0}-{1}-live', inputs.android_version, inputs.kernel_version) || (inputs.target_stable_tag != '' && format('⚡ Catch-up | {0} | {1}-{2}-live', inputs.target_stable_tag, inputs.android_version, inputs.kernel_version) || format('🌀 Sync live ACK | {0}-{1}-live', inputs.android_version, inputs.kernel_version)) }}"
 
 # The target repo (LuminaireKernel-{version}) keeps real git history, so it
 # can be merged against linux-stable to catch up on subversions ACK hasn't
@@ -39,7 +39,7 @@ on:
 
 jobs:
   upstream-sync:
-    name: "Sync ${{ inputs.android_version }}-${{ inputs.kernel_version }}-lts"
+    name: "Sync ${{ inputs.android_version }}-${{ inputs.kernel_version }}-live"
     runs-on: ubuntu-latest
     steps:
       - name: "Free up disk space"
@@ -52,7 +52,7 @@ jobs:
 
       - name: "Resolve target repo/branch"
         run: |
-          echo "TARGET_BRANCH=${{ inputs.android_version }}-${{ inputs.kernel_version }}-lts" >> $GITHUB_ENV
+          echo "TARGET_BRANCH=${{ inputs.android_version }}-${{ inputs.kernel_version }}-live" >> $GITHUB_ENV
           echo "TARGET_REPO=LuminaireKernel-${{ inputs.kernel_version }}" >> $GITHUB_ENV
 
           # A stable catch-up merge (target_stable_tag set, not adopting)
@@ -64,9 +64,9 @@ jobs:
           # straight to the real branch — those aren't introducing new,
           # unvalidated content the way a raw stable-tag merge is.
           if [ "${{ inputs.force_adopt }}" = "false" ] && [ -n "${{ inputs.target_stable_tag }}" ]; then
-            echo "PUSH_BRANCH=${{ inputs.android_version }}-${{ inputs.kernel_version }}-lts-staging" >> $GITHUB_ENV
+            echo "PUSH_BRANCH=${{ inputs.android_version }}-${{ inputs.kernel_version }}-live-staging" >> $GITHUB_ENV
           else
-            echo "PUSH_BRANCH=${{ inputs.android_version }}-${{ inputs.kernel_version }}-lts" >> $GITHUB_ENV
+            echo "PUSH_BRANCH=${{ inputs.android_version }}-${{ inputs.kernel_version }}-live" >> $GITHUB_ENV
           fi
 
       # force_adopt path: full (non-shallow) clone from live ACK, pushed as

@@ -17,7 +17,7 @@ def main():
     #     PREEMPT_RT/CC_VERSION/LD as $1.."$7  →  CC_VERSION="$6"
     # The regex below matches CC_VERSION="$N" for any N so this doesn't
     # need a per-kernel-version special case — confirmed both patterns
-    # exist in the wild (android14-6.1-lts: $2, android12-5.10-lts: $6).
+    # exist in the wild (android14-6.1: $2, android12-5.10: $6).
     #
     # CONFIG_CC_VERSION_TEXT is baked at defconfig time from raw
     # "clang --version" output — KBUILD_COMPILER_STRING is never used
@@ -66,12 +66,12 @@ def main():
             # assignment actually closes. Must ignore parens inside single
             # quotes — the sed pattern 's/(compatible with [^)]*)//' has
             # literal '(' ')' chars that aren't real shell grouping. Naive
-            # raw counting broke on android12-5.10-lts's mkcompile_h, where
+            # raw counting broke on android12-5.10's mkcompile_h, where
             # that whole quoted sed clause sits on the SAME line as the
             # opening "$(": depth hit 0 after just that one line (the quoted
             # parens happened to balance out), leaving the real closing line
             # (" | sed '...')" ) unconsumed as an orphan — which starts with
-            # "|", causing a shell syntax error at runtime. android14-6.1-lts's
+            # "|", causing a shell syntax error at runtime. android14-6.1's
             # version has the sed clause on its own separate line, so the same
             # naive counting happened to land on the right line there by
             # coincidence, masking the bug until this kernel version.

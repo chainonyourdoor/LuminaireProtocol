@@ -8,11 +8,11 @@
 # the ONLY compatibility signal for root solutions now — resukisu.sh/
 # sukisu.sh/ksunext.sh live once under kernel/ksu-shared/ (they have no
 # real per-kernel-version logic; each fork's own setup.sh handles GKI
-# version detection upstream), so "does kernel/<ver>-lts/ksu/<variant>/
+# version detection upstream), so "does kernel/<ver>/ksu/<variant>/
 # exist" is no longer a meaningful question to ask.
 #
 # SuSFS pairing is a separate, genuinely per-version question — still
-# gated by kernel/<ver>-lts/ksu/susfs/susfs.sh existing (or erroring, for
+# gated by kernel/<ver>/ksu/susfs/susfs.sh existing (or erroring, for
 # combinations like KSUNEXT+SUSFS that aren't wired up yet), not by
 # anything in this map.
 declare -A KSU_VARIANT_SUPPORTED_VERSIONS=(

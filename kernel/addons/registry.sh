@@ -15,7 +15,7 @@
 # backport lands for another kernel version — the addon's own .sh script
 # stays generic (Pattern A: case-switch to an upstream URL keyed by
 # version, e.g. ntsync/bbrv3/nomount/zeromount; or Pattern B: a
-# self-maintained patch under kernel/<ver>-lts/patches/, e.g. droidspaces).
+# self-maintained patch under kernel/<ver>/patches/, e.g. droidspaces).
 #
 # ZeroMount's 5.10 entry: the kernel patch itself is confirmed to exist
 # upstream (Enginex0/Super-Builders), but inject_namei.py/inject_readdir.py/

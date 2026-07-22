@@ -123,7 +123,7 @@ on:
 # No workflow-level concurrency lock: each dispatch is left free to run
 # in parallel with others (including same kernel_version), so different
 # variant/LTO/build-system combos can be tried side by side. This is
-# safe for kernel/<android_ver>-<kernel_version>-lts/manifest.json — kernel/checkpoint/engine.sh already
+# safe for kernel/<android_ver>-<kernel_version>/manifest.json — kernel/checkpoint/engine.sh already
 # handles concurrent writers via its fetch-rebase-push retry loop
 # (originally built for the matrix jobs within a single run, but it
 # doesn't care whether the writer is from this run or another one).

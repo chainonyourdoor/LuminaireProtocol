@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# 🧬 SuSFS — shared apply logic (any KSU fork, android12-5.10-lts)
+# 🧬 SuSFS — shared apply logic (any KSU fork, android12-5.10)
 # ======================================================
 # Repo: https://gitlab.com/simonpunk/susfs4ksu
 
@@ -14,7 +14,7 @@
 # branch, see kernel/ksu-shared/ksunext/ksunext.sh — shared across all
 # kernel versions) for its own SUSFS-compatible hooks, but the SuSFS
 # *source* itself comes from simonpunk/susfs4ksu's own -dev branch, same as
-# the android14-6.1-lts sibling — verified directly against source that
+# the android14-6.1 sibling — verified directly against source that
 # every susfs_* symbol pershoot's fork calls but doesn't define itself is
 # already provided by simonpunk's official susfs_def.h/susfs.h
 # (byte-identical across kernel versions, including this one).

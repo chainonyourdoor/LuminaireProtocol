@@ -26,7 +26,7 @@ shift
 COMPONENTS=("$@")
 
 [ -n "${KERNEL_VERSION:-}" ] || error "checkpoint: KERNEL_VERSION not set"
-MANIFEST_REL="kernel/$(resolve_android_version)-${KERNEL_VERSION}-lts/manifest.json"
+MANIFEST_REL="kernel/$(resolve_android_version)-${KERNEL_VERSION}/manifest.json"
 MANIFEST="${LUMINAIRE_PATCH_DIR}/${MANIFEST_REL}"
 
 any_candidate_used="false"

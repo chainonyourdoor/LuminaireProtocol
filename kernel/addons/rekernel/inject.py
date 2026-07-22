@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Re:Kernel source injector for android14-6.1-lts.
+Re:Kernel source injector for android14-6.1.
 
 Injects a Netlink server into three kernel files:
   - drivers/android/rekernel.h     (new file — Netlink server impl)
@@ -376,7 +376,7 @@ def patch_binder_alloc_c(src):
 
     # Hook
     alloc_anchors = [
-        # GKI android14-6.1-lts (newer): "< size" only
+        # GKI android14-6.1 (newer): "< size" only
         (
             "\tif (is_async && alloc->free_async_space < size) {\n"
             "\t\tbinder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC,\n"

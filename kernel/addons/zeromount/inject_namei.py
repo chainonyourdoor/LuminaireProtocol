@@ -14,7 +14,7 @@
 #
 # All anchors below are matched against real, unpatched upstream
 # fs/namei.c (chainonyourdoor/LuminaireKernel-6.1,
-# android14-6.1-lts) — they don't depend on SuSFS or any KSU fork
+# android14-6.1-live) — they don't depend on SuSFS or any KSU fork
 # having touched the file first, so this applies identically and
 # correctly regardless of variant or patch order (baseline-agnostic by
 # design, even though SuSFS is required at the addon level — see

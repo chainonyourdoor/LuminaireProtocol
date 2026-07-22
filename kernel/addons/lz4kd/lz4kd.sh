@@ -8,7 +8,7 @@
 # Adds the lz4k/lz4kd compressor backends for zram (kernel-delta-aware
 # variants of LZ4) plus the Kconfig/Makefile/zcomp.c wiring to register
 # them. Version-keyed by upstream per kernel branch — this repo only
-# targets android14-6.1-lts, so only that one path is used below; add a
+# targets android14-6.1, so only that one path is used below; add a
 # case statement here if a second kernel version is ever supported.
 
 LZ4KD_RAW_BASE="https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/main/other/zram"

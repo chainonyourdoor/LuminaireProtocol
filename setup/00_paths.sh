@@ -36,7 +36,7 @@ LTO_CACHE_DIR="/dev/shm/ldcache"
 # Guard here instead of silently re-deriving it, so a future entrypoint that
 # forgets to set it fails loud instead of masking the mistake.
 LUMINAIRE_PATCH_DIR="${LUMINAIRE_PATCH_DIR:?LUMINAIRE_PATCH_DIR must be set by the entrypoint before run_setup() runs}"
-VERSION_PATCH_DIR="${LUMINAIRE_PATCH_DIR}/kernel/${ANDROID_VERSION}-${KERNEL_VERSION}-lts"
+VERSION_PATCH_DIR="${LUMINAIRE_PATCH_DIR}/kernel/${ANDROID_VERSION}-${KERNEL_VERSION}"
 
 # Build config
 DEFCONFIG="gki_defconfig"
