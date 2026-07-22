@@ -1,8 +1,12 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/primer/octicons/main/icons/cpu-24.svg" width="64" height="64" />
+<img src="https://raw.githubusercontent.com/primer/octicons/main/icons/cpu-24.svg" width="150" height="150" />
+
 
 # Luminaire Protocol
+</div>
+---
+<div align="center">
 
 [![Build](https://img.shields.io/github/actions/workflow/status/chainonyourdoor/LuminaireProtocol/build.yml?branch=main&label=build&logo=github&style=for-the-badge)](https://github.com/chainonyourdoor/LuminaireProtocol/actions/workflows/build.yml)
 [![Telegram](https://img.shields.io/badge/Telegram-Luminaire-blue?style=for-the-badge&logo=telegram)](https://t.me/LuminaireProtocol)
@@ -21,6 +25,6 @@ This repo does **not** contain kernel source — it contains all the scripts and
 ---
 <div align="center">
 
-feel free to fork and modify🗿
+feel free to fork and modify
 
 </div>
