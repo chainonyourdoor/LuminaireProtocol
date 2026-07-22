@@ -31,6 +31,7 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/core/openssl3_compat/patch.py](#kernelcoreopenssl3_compatpatchpy)
 - [kernel/ksu-shared/ksunext/branding.py](#kernelksu-sharedksunextbrandingpy)
 - [release/telegram/telegraph_page.py](#releasetelegramtelegraph_pagepy)
+- [kernel/addons/lz4zstd/lz4zstd.sh](#kerneladdonslz4zstdlz4zstdsh)
 
 ---
 
@@ -951,3 +952,95 @@ in `caption.py`).
 Telegraph fall back to the account's own default `author_name` (set once
 at `createAccount` time), instead of overriding it per-page with a
 hardcoded value.
+
+---
+
+## `kernel/addons/lz4zstd/lz4zstd.sh`
+
+**Purpose of this file**: bumps ZRAM compression to LZ4 1.10.0 + ZSTD
+1.5.7. Patch source: https://github.com/mrcxlinux/kernel_patches
+(`zram/`). Pure library version bump — no Kconfig involved, this just
+replaces the vendored `lib/lz4` and `lib/zstd` source with newer upstream
+releases. Non-fatal on failure (warn, not error): this is a compression-
+ratio/speed optimization, not a correctness-critical patch — a build
+without it just keeps whatever LZ4/ZSTD version this kernel branch
+already ships.
+
+**LZ4 rename-hunk problem** — the LZ4 patch contains 3 git-style rename
+hunks (`fs/f2fs/lz4armv8/{lz4accel.c,lz4accel.h,lz4armv8.S}` →
+`lib/lz4/lz4armv8/...`) that assume an old f2fs-local copy already exists
+pre-patch. This GKI tree never carried that dir, so all 3 renames fail no
+matter what — confirmed by diffing `lib/lz4/lz4_compress.c` etc. against
+the patch's own assumed pre-image (byte-identical match), which rules out
+a source-mismatch explanation. These 3 files are NOT optional: the
+patch's new `lib/lz4/lz4.h` unconditionally `#include
+"lz4armv8/lz4accel.h"` (no arch guard at the include site — the guard
+lives inside `lz4accel.h` itself), so a missing `lz4accel.h` is a hard
+build break (fatal on every arch, not just arm64), confirmed by an actual
+CI failure before this was fixed. `lz4armv8.S` is also a binary git-diff
+(`patch` can't apply those at all). None of the 3 are hosted standalone
+upstream except `lz4armv8.S`, so `lz4accel.c`/`.h` are reconstructed here
+verbatim from their original upstream commit
+(pascua28/android_kernel_samsung_sm8250@0ac937e "Import arm64 V8 ASM lz4
+decompression acceleration") and pre-staged directly at their post-patch
+path, bypassing the patch tool's rename hunks entirely for all 3 files.
+`lz4accel.h`'s `#else` branch makes it safe to include unconditionally on
+any arch (stubs out to a no-op when not arm64+NEON).
+
+**Why the apply isn't gated behind a blanket dry-run** — previously
+gated the whole apply behind one blanket `--dry-run --forward` check on
+the entire (40+ file) patch, which treated it as all-or-nothing: the
+(then-unhandled) rename hunks failing in the dry-run caused it to skip
+the *entire* patch, including ~13 other files (the actual 1.10.0
+algorithm source) that apply cleanly on their own. Fixed by applying
+directly — `patch` (unlike `git apply`) already continues past a failed
+hunk/file instead of aborting the rest — and verifying success via a real
+version marker in the patched source, not exit code alone (patch exits
+nonzero even when only the now pre-staged, harmless rename hunks fail).
+
+**Why ZSTD is a full source replacement, not a patch** — the mrcxlinux
+`002-zstd.patch` targets ZSTD 1.5.7 but assumed a pre-image that no
+longer matches this tree's 1.4.10 source closely enough — confirmed by
+diffing both against upstream, several releases apart — so nearly every
+hunk rejected outright, not just a rename. A patch can't bridge that gap
+reliably, so instead of patching, the full `lib/zstd` source tree (+
+`include/linux/zstd*.h`) is fetched directly from `torvalds/linux` tag
+`v6.15`, which ships ZSTD 1.5.7 verbatim, replacing the vendored files
+wholesale. Verified compatible before wiring this up: v6.15's
+`lib/zstd/Makefile` keeps the same `CONFIG_ZSTD_COMPRESS/DECOMPRESS/
+COMMON` Kconfig symbols (only adds two new `.o` entries), and
+`include/linux/zstd.h`'s v6.15 diff is purely additive — no existing
+wrapper function signature changed, so other in-tree callers (f2fs, zram,
+etc.) keep compiling untouched.
+
+One real incompatibility was found and is patched post-copy: v6.15's
+`common/mem.h` includes the generic `<linux/unaligned.h>`, which doesn't
+exist yet in this 6.1 tree (only the arch-specific `<asm/unaligned.h>`
+does) — left as-is this is a fatal missing-header build break. (A
+separate `intptr_t` typedef removed from `common/zstd_deps.h` in v6.15
+was checked too: it's gated behind `ZSTD_DEPS_NEED_STDINT`, which nothing
+in this file set defines, so that branch is dead code either way — no fix
+needed there.)
+
+**`apply_lz4zstd_patch()`, `touched_files`** — files this patch touches,
+so they can be cleanly reverted if the apply doesn't actually land,
+instead of leaving a half-patched mix of old/new source behind.
+
+**`apply_lz4zstd_patch()`, marker verification** — verifies with real
+evidence (a version marker from the patched source) rather than trusting
+exit code alone, since `patch` exits nonzero even when only the
+pre-staged, harmless rename hunks failed.
+
+**`ZSTD_FILES`** — the complete v6.15 `lib/zstd` tree plus its public
+`include/linux/zstd*.h` headers — anything not listed here is left
+untouched.
+
+**`replace_zstd_source()`, staging dir** — the whole fetch is staged in a
+scratch dir first and the real tree is only touched once every file is
+confirmed downloaded, so a mid-fetch network failure can't leave a
+half-1.4.10/half-1.5.7 mix behind.
+
+**`replace_zstd_source()`, `mem.h` sed fix** — compat fix: this 6.1 tree
+predates the generic `<linux/unaligned.h>` wrapper header that v6.15's
+`mem.h` switched to — only the arch-specific `<asm/unaligned.h>` exists
+here (see the ZSTD incompatibility note above).
