@@ -19,5 +19,8 @@ This repo does **not** contain kernel source — it contains all the scripts and
 4. Package and release via AnyKernel3 and send to Telegram
 
 ---
+<div align="center">
 
-feel free to fork and modify
+feel free to fork and modify🗿
+
+</div>
