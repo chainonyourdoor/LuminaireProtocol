@@ -1,21 +1,11 @@
 #!/usr/bin/env bash
 
-# ======================================================
-# 📢 RELEASE — TELEGRAM CHANNEL POST
-# ======================================================
-# Aggregates all variant links and sends a single photo post to the channel.
-# Called from the notify-channel job after all builds have finished.
-
 CAPTION_BUILDER="${LUMINAIRE_PATCH_DIR}/release/telegram/caption.py"
 TELEGRAPH_BUILDER="${LUMINAIRE_PATCH_DIR}/release/telegram/telegraph_page.py"
 BANNER_DIR="${LUMINAIRE_PATCH_DIR}/release/telegram"
 
-# Run standalone (bash release/telegram/channel_post.sh) from notify-channel,
-# unlike telegram.sh which is sourced from build.sh's run_release() — so
-# log/warn/error/retry() aren't in scope until sourced explicitly here.
 # shellcheck source=functions.sh
 source "${LUMINAIRE_PATCH_DIR}/functions.sh"
-# Source non-sensitive Telegram config
 # shellcheck source=release/telegram/config.sh
 source "${LUMINAIRE_PATCH_DIR}/release/telegram/config.sh"
 # shellcheck source=release/telegram/common.sh
@@ -24,9 +14,6 @@ source "${LUMINAIRE_PATCH_DIR}/release/telegram/common.sh"
 TELEGRAM_API_TIMEOUT="${TELEGRAM_API_TIMEOUT:-60}"
 TELEGRAM_MAX_RETRIES="${TELEGRAM_MAX_RETRIES:-3}"
 
-# ------------------------------------------------------
-# Guard clauses
-# ------------------------------------------------------
 if [ -z "${TELEGRAM_BOT_TOKEN:-}" ]; then
     warn "Skipping channel post: TELEGRAM_BOT_TOKEN not set"
     exit 0
@@ -36,9 +23,6 @@ if [ -z "${TELEGRAM_CHANNEL_ID:-}" ]; then
     exit 0
 fi
 
-# ------------------------------------------------------
-# Find banner
-# ------------------------------------------------------
 BANNER_PATH=""
 for ext in jpg jpeg png; do
     candidate="${BANNER_DIR}/banner.${ext}"
@@ -53,11 +37,6 @@ if [ -z "$BANNER_PATH" ]; then
     exit 0
 fi
 
-# ------------------------------------------------------
-# Collect variant links from artifact JSON files
-# Expects: LINKS_DIR env var pointing to dir with *.json files
-# Each JSON: {"variant": "VANILLA", "link": "https://t.me/c/..."}
-# ------------------------------------------------------
 LINKS_DIR="${LINKS_DIR:-/tmp/variant-links}"
 
 if [ ! -d "$LINKS_DIR" ]; then
@@ -65,12 +44,6 @@ if [ ! -d "$LINKS_DIR" ]; then
     exit 0
 fi
 
-# Parse all variant JSON files — extract links, linux_ver, kernel_version,
-# and (where present) ksu_version per variant. compiler_string, lto_mode,
-# skipped_addons, applied_luminaire, and skipped_luminaire are release-wide
-# constants (single global workflow inputs, not per-variant — see
-# telegram.sh where they're written), so the first non-empty value wins,
-# same as linux_ver/kernel_version below.
 LINKS_PARSED=$(python3 -c "
 import json, glob, sys
 links_dir = '${LINKS_DIR}'
@@ -123,19 +96,6 @@ fi
 log "Variant links: $VARIANT_LINKS_JSON"
 log "Linux version: $LINUX_VER | Kernel: $KERNEL_VERSION"
 
-# ------------------------------------------------------
-# Diff: variants selected for this run vs. variants that actually
-# produced a download link. Release mode is only ever triggered after a
-# Build run already confirmed every selected variant is fine — so if a
-# variant that was selected here doesn't have a link, its matrix job
-# failed unexpectedly for *this* run (e.g. a checkpoint pin expired
-# between Build and Release, or an upstream regression). That's exactly
-# the situation a Release-mode failure should stay loud about instead of
-# quietly shipping a partial channel post — so this hard-fails the whole
-# job rather than posting whatever succeeded. Skipping the channel post
-# on any mismatch also means a stale manual CHANGELOG mention of the
-# failed variant never reaches the channel in the first place.
-# ------------------------------------------------------
 MISSING_VARIANTS_JSON=$(VARIANT_LINKS_JSON="$VARIANT_LINKS_JSON" python3 -c "
 import json, os
 matrix_json = os.environ.get('EXPECTED_MATRIX_JSON', '')
@@ -161,13 +121,6 @@ if [ "$MISSING_VARIANTS_JSON" != "[]" ]; then
     error "Aborting channel post: variant(s) selected but missing a download link — ${MISSING_VARIANTS_JSON}. Check the Start-Build job for that variant before re-running Release."
 fi
 
-# ------------------------------------------------------
-# Create per-release Telegraph Features page
-# Never fails the job: telegraph_page.py always exits 0 and prints an
-# empty line on failure (missing token, API down, retries exhausted) —
-# caption.py's build_channel_caption() falls back to plain text pointing
-# at the zip caption's Add-ons block when FEATURES_URL is empty.
-# ------------------------------------------------------
 FEATURES_URL=$(
     LINUX_VER="${LINUX_VER:-N/A}" \
     KERNEL_VERSION="${KERNEL_VERSION:-}" \
@@ -187,9 +140,6 @@ else
     warn "No Features page this run — channel caption will fall back to the zip's Add-ons block"
 fi
 
-# ------------------------------------------------------
-# Build channel caption
-# ------------------------------------------------------
 CAPTION_GROUP_DUMMY="/tmp/channel_post_group_dummy.txt"
 CAPTION_CHANNEL_FILE="/tmp/channel_post_caption.txt"
 
@@ -212,9 +162,6 @@ python3 "$CAPTION_BUILDER" "$CAPTION_GROUP_DUMMY" "$CAPTION_CHANNEL_FILE" \
 CAPTION_CHANNEL="$(cat "$CAPTION_CHANNEL_FILE")"
 rm -f "$CAPTION_CHANNEL_FILE" "$CAPTION_GROUP_DUMMY"
 
-# ------------------------------------------------------
-# Send photo to channel
-# ------------------------------------------------------
 log "📸 Sending channel post..."
 if telegram_api_call "sendPhoto" /tmp/tg_channel_response.json "Channel send" \
         -F "chat_id=${TELEGRAM_CHANNEL_ID}" \

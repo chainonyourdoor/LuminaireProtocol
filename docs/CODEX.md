@@ -15,6 +15,8 @@ Organized per-path, matching the repo's folder structure.
 - [functions.sh](#functionssh)
 - [kernel/checkpoint/scout.sh](#kernelcheckpointscoutsh)
 - [kernel/checkpoint/engine.sh](#kernelcheckpointenginesh)
+- [release/telegram/caption.py](#releasetelegramcaptionpy)
+- [release/telegram/channel_post.sh](#releasetelegramchannel_postsh)
 
 ---
 
@@ -328,3 +330,227 @@ state.
   between the two), which wrongly blacklisted the `susfs_resukisu`/
   `susfs_sukisu` candidate `be08face56c3` for kernel 5.10 due to an
   unrelated Kasumi post-build failure — see `manifest.json` history.
+
+---
+
+## `release/telegram/caption.py`
+
+**`PUSH_TEXT_LIMIT`** — Telegram's `sendMessage` text limit (4096), kept
+separate from `CAPTION_LIMIT` (1024) which is the `sendDocument`/
+`sendPhoto` caption limit used everywhere else in this file.
+
+**`ADDON_DISPLAY_NAMES`** — single source of truth for addon display
+names, shared by `build_blocks()` (per-build group caption) and
+`build_channel_caption()` (channel post). Adding a new addon only means
+adding an entry here (plus `TOGGLE_ADDON_ORDER` below if it should show as
+an explicit Enable/Disable line in the group caption's Add-ons block).
+
+**`MOUNTLESS_ADDON_TOKENS`** — mountless-engine addons are mutually
+exclusive (only one, or none, active per build) and shown as a single
+"Mountless Engine" line rather than their own Enable/Disable row.
+
+**`TOGGLE_ADDON_ORDER`** — toggle-style addons shown as explicit
+Enable/Disable lines in the group caption, in display order.
+
+**`CORE_PATCH_DISPLAY_NAMES` / `CORE_PATCH_ORDER`** — always-on Luminaire
+features (`kernel/luminaire/*`, see `build.sh`'s `run_luminaire()`) —
+structurally separate from `ADDON_DISPLAY_NAMES`/`TOGGLE_ADDON_ORDER`
+since these have no Enable/Disable toggle at all; a build either has the
+feature (kernel version supports it) or shows N/A (not backported yet),
+never a user-chosen Disable. Named `CORE_PATCH_*` (not `LUMINAIRE_*`) to
+match the "Core-Patch" caption label and avoid confusion with
+`block_luminaire` (the unrelated Kernel/Source/Toolchain overview block
+further down).
+
+**`FRAGMENT_FEATURES`** — human-readable summary of
+`kernel/config/luminaire.fragment`, the always-on feature set baked into
+every build regardless of which addons are toggled. Hand-curated (the
+fragment itself is raw Kconfig, not something to surface verbatim to
+readers) and used only by `build_telegraph_content()`. Keep this in sync
+manually whenever `luminaire.fragment`'s sections change — there's no
+automated link between the two, so a stale entry here won't be caught by
+anything. Grouped to mirror the fragment's own section comments
+(Mountify/OverlayFS, Kallsyms, Performance, ZRAM, I/O Scheduler, F2FS, TCP
+BBR, IP Set, IPv6 NAT, Networking extras, debug overhead), not a flat list
+— easier to scan on the Telegraph page.
+
+**`LTO_DISPLAY`** — maps `LTO_MODE` raw values ("NONE"/"THIN"/"FULL", from
+the workflow's LTO choice input) to their display form on the Telegraph
+Overview block.
+
+**`html_escape()`** — text-node escaping for Telegram HTML `parse_mode` —
+only `& < >` matter here (no attribute context); order matters, `&` must
+go first or it would double-escape the entities just inserted for `<` and
+`>`.
+
+**`html_escape_attr()`** — same as `html_escape()` plus quote-escaping, for
+use inside an `href="..."` attribute value.
+
+**`kernel_source_repo()`** — single source of truth (within `caption.py`)
+for the kernel source repo naming convention — `LuminaireKernel-{version}`,
+e.g. `LuminaireKernel-6.1`. Matches `download/make.sh` and
+`.github/workflows/kernel-source.yml`, which each define this pattern
+independently on the shell side (different domain, build-time vs
+caption-time, not worth threading through env just to unify). Used by both
+`build_blocks()` (zip caption) and `build_telegraph_content()` (Telegraph
+Overview) so the two never drift apart from each other at least.
+
+**`build_blocks()`, mountless-engine resolution** — only three possible
+values here: `None` (user didn't pick a mountless engine), or the display
+name of whichever one they picked. Unlike the `TOGGLE_ADDON_ORDER` lines
+below, there's no N/A state to show — an unsupported-for-this-kernel-
+version mountless addon just falls back to "None" the same as never
+having been selected, since the mountless engine is a single either/or
+choice, not an availability flag.
+
+**`build_blocks()`, toggle addon status** — `"N/A"` means not backported
+for this kernel version yet, distinct from a user's own `"Disable"`.
+
+**`build_blocks()`, core-patch status** — no Disable state here: these are
+never user-toggled, only `"Active"` (this kernel version has the backport)
+or `"N/A"` (it doesn't yet).
+
+**`build_blocks()`, `block_core_patch`** — the whole block is omitted when
+nothing in it is Active — an all-N/A Core-Patch section (e.g. neither BORE
+nor ADIOS backported yet for this kernel version) isn't useful
+information, just noise. `main()`'s `caption_group` join already drops
+`None` blocks.
+
+**`build_telegraph_content()`** — builds the Node-array content for a
+per-release Telegraph page (see Telegraph's Content Format:
+https://telegra.ph/api#Content-format). Three sections:
+- "Overview": release-wide build facts (Kernel/Source/Toolchain/LTO).
+  Source is derived from `KERNEL_VERSION` (repo is always
+  `LuminaireKernel-{version}` — see `download/make.sh`). Toolchain/LTO
+  come from `telegram.sh`'s per-variant JSON (`compiler_string`/
+  `lto_mode` — see `channel_post.sh`'s "first non-empty wins" parsing)
+  rather than a per-variant source, because they're both backed by single
+  global workflow inputs (`LTO_MODE`) or a value derived from one
+  (`COMPILER_STRING` from the one `CLANG_VARIANT` used release-wide) —
+  verified against `build.yml` before relying on that, not assumed.
+- "Core Features": `FRAGMENT_FEATURES`, grouped exactly like the dict's
+  categories, always-on regardless of build.
+- "Luminaire Features": every `CORE_PATCH_ORDER` entry (ADIOS, BORE) —
+  always-on, no toggle; check-mark if this kernel version has the
+  backport, minus-sign (not X) if not, since there's no user Disable
+  state for these, only a per-version rollout gap.
+- "Optional Add-ons": every `TOGGLE_ADDON_ORDER` entry as a single
+  monospace Feature/Status table (check/X) reflecting *this* build. A
+  real HTML `<table>` isn't an option — Telegraph's allowed tag set has no
+  table/tr/td, so this is a `<pre><code>` block with manually
+  column-aligned text instead, replacing the old enabled/disabled two-list
+  split.
+
+Returns a plain Python list (`json.dumps`'d by the caller), not a JSON
+string itself.
+
+**`build_push_caption()`** — caption for the plain push-event notify
+(`.github/workflows/notify.yml`), distinct from `build_blocks()`/
+`build_channel_caption()` above (those are for release/build posts, still
+MarkdownV2 — only the push notify uses HTML). Layout follows the redesign
+from commits `b69f6bf`/`8a860ed` (header line, Branch in inline code,
+Author linked, Title/Message as boxed blocks, Commit link as the closing
+line) — only the markup language changed from MarkdownV2 to HTML, the
+structure itself didn't. Uses HTML `parse_mode` instead of MarkdownV2: HTML
+only needs `& < >` escaped in text nodes, so a stray unescaped character
+can't silently break the whole message the way one missed MDv2 special
+char can.
+
+**`build_push_caption()`, `title_block`** — `<pre><code class="language-X">`
+is how Telegram HTML gets the small "language" label in the corner of the
+box — the same visual Telegram gives a MarkdownV2 fenced block tagged
+` ```X ... ``` ` (what `b69f6bf` originally used). A plain `<pre>` alone
+doesn't carry that label.
+
+**`build_push_caption()`, body budget** — the body block is budgeted
+against what's left after `head_full` + `footer` + the fixed wrapper tags,
+so `truncate()` never has to cut inside a `<pre>`/`<code>` tag itself —
+only the escaped body shortens.
+
+**`build_channel_caption()`** — `variant_links`: dict
+`{ "VANILLA": "https://t.me/c/...", "RESUKISU_SUSFS": "...", ... }`.
+`variant_versions`: dict `{ "RESUKISU": "v4.1.0 (35002/2)",
+"SUKISU_SUSFS": "4.1.2 (40819/2)", ... }` — optional. Keys match
+`variant_links`' keys exactly (including the `_SUSFS` suffix where
+applicable). All three forks resolve a version string (see
+`resukisu.sh`/`sukisu.sh`/`ksunext.sh`'s "Version string" step); a fork
+only lacks an entry if that step itself failed to resolve anything. Only
+variants present in `variant_links` will be listed.
+
+**`build_channel_caption()`, "What's Inside?" link** — links out to a
+per-release Telegraph page (built fresh per release, never reused — see
+`build_telegraph_content()`) listing every always-on fragment feature plus
+every addon's Enable/Disable status for this build. `FEATURES_URL` is
+populated by `channel_post.sh` after calling `telegraph_page.py`; left
+empty if that call failed (Telegraph API down, etc.), in which case this
+falls back to plain text pointing at the Add-ons block already present in
+the zip's own caption — chosen over pointing into the zip's contents
+directly, since the archive itself carries no bundled feature manifest.
+
+**`build_channel_caption()`, download links** — variant lines rendered as
+a blockquote (each line prefixed with `>` per Telegram MarkdownV2's
+blockquote syntax); the "Download" heading itself stays outside the quote.
+A bare `>` blank line is inserted between entries — still part of the same
+quote (the left bar stays unbroken), but gives each link more vertical
+breathing room so adjacent links aren't a mis-tap risk on small screens.
+
+**`build_channel_caption()`, changelog block** — manual input, optional,
+capped so it can't crowd out the rest of the caption if someone pastes
+something huge. Rendered as a code block, same style as the group
+caption's Root-solution/Add-ons blocks, instead of plain bold text.
+
+**`build_channel_caption()`, traceability line** — commit + workflow run
+that produced this post. Kept tight against the changelog block (single
+newline, no blank-line gap) when a changelog is present, since both are
+"fine print" — everything else still gets the normal blank-line spacing.
+
+**`main()`** — push-notify mode: `caption.py push <output_file>` —
+separate from the release/build mode below (2 positional args, no
+subcommand), since it's a different caller (`notify.yml`) with a different
+env-var shape (`BRANCH`/`AUTHOR`/`COMMIT`/`URL`/`TITLE`/`BODY` vs. the
+build-metadata vars `build_blocks()`/`build_channel_caption()` expect).
+
+**`main()`, channel caption** — built from `VARIANT_LINKS_JSON` (provided
+by `channel_post.sh`).
+
+---
+
+## `release/telegram/channel_post.sh`
+
+**Purpose of this file**: aggregates all variant links and sends a single
+photo post to the channel. Called from the `notify-channel` job after all
+builds have finished.
+
+Runs standalone (`bash release/telegram/channel_post.sh`) from
+`notify-channel`, unlike `telegram.sh` which is sourced from `build.sh`'s
+`run_release()` — so `log`/`warn`/`error`/`retry()` aren't in scope until
+sourced explicitly here.
+
+**Variant JSON parsing** — parses all variant JSON files, extracting
+links, `linux_ver`, `kernel_version`, and (where present) `ksu_version`
+per variant. `compiler_string`, `lto_mode`, `skipped_addons`,
+`applied_luminaire`, and `skipped_luminaire` are release-wide constants
+(single global workflow inputs, not per-variant — see `telegram.sh` where
+they're written), so the first non-empty value wins, same as
+`linux_ver`/`kernel_version`.
+
+`LINKS_DIR` env var points to a dir with `*.json` files, each shaped like
+`{"variant": "VANILLA", "link": "https://t.me/c/..."}`.
+
+**Missing-variants diff** — compares variants selected for this run
+against variants that actually produced a download link. Release mode is
+only ever triggered after a Build run already confirmed every selected
+variant is fine — so if a variant that was selected here doesn't have a
+link, its matrix job failed unexpectedly for *this* run (e.g. a checkpoint
+pin expired between Build and Release, or an upstream regression). That's
+exactly the situation a Release-mode failure should stay loud about
+instead of quietly shipping a partial channel post — so this hard-fails
+the whole job rather than posting whatever succeeded. Skipping the channel
+post on any mismatch also means a stale manual `CHANGELOG` mention of the
+failed variant never reaches the channel in the first place.
+
+**Telegraph Features page creation** — never fails the job:
+`telegraph_page.py` always exits 0 and prints an empty line on failure
+(missing token, API down, retries exhausted) — `caption.py`'s
+`build_channel_caption()` falls back to plain text pointing at the zip
+caption's Add-ons block when `FEATURES_URL` is empty.
