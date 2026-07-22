@@ -272,7 +272,7 @@ def build_blocks(env):
     has_active_luminaire = any(t not in luminaire_skipped_tokens for t in LUMINAIRE_FEATURE_ORDER)
     if has_active_luminaire:
         block_features = (
-            "```Luminaire-Features\n"
+            "```Kernel-Patch\n"
             + "\n".join(luminaire_status_lines) +
             "```"
         )
@@ -332,7 +332,7 @@ def build_telegraph_content(env):
     lto_display     = LTO_DISPLAY.get(lto_raw, lto_raw or "N/A")
 
     intro = (
-        f"LuminaireProtocol \u2014 an Android GKI kernel build. This page "
+        f"Luminaire Protocol \u2014 an Android GKI kernel build. This page "
         f"lists every feature and addon available as of this release; "
         f"addon status reflects this specific build."
     )
