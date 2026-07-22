@@ -36,6 +36,7 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/ksu-shared/ksunext/ksunext.sh](#kernelksu-sharedksunextksunextsh)
 - [kernel/addons/kasumi/kasumi.sh](#kerneladdonskasumikasumish)
 - [kernel/addons/kasumi/postbuild.sh](#kerneladdonskasumipostbuildsh)
+- [kernel/ksu-shared/resukisu/resukisu.sh](#kernelksu-sharedresukisuresukisush)
 
 ---
 
@@ -1201,3 +1202,24 @@ the kernel-version check in `run_addons()`.
 **Purpose of this file**: compiles `kasumi_lkm.ko` as an out-of-tree
 module against the kernel tree `run_build()` just finished producing
 (needs its `Module.symvers`).
+
+---
+
+## `kernel/ksu-shared/resukisu/resukisu.sh`
+
+**Purpose of this file**: root solution — ReSukiSU. Repo:
+https://github.com/ReSukiSU/ReSukiSU.
+
+**Version string computation** — mirrors the exact values ReSukiSU's own
+Kbuild computes at kernel-build time (`kernel/Kbuild`: `KSU_TAG_NAME` via
+`git describe`, `KSU_VERSION` via `30000 + commit-count + 700`) plus the
+UAPI protocol version the manager app displays alongside them
+(`uapi/supercall.h`: `KERNEL_SU_UAPI_VERSION`, a fixed constant, not a
+runtime/device value). Recomputed here rather than parsed out of the
+Kbuild file, since Kbuild only holds the shell formula, not the resolved
+value.
+
+This is KSU's own version info, not Luminaire's — `branding.py` appends
+`" Luminaire"` to `KSU_VERSION_FULL` for the manager app's display, but
+that's a separate concern from what version of ReSukiSU is actually
+running, so the raw upstream tag is used here instead.
