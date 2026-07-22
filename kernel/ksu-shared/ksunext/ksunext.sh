@@ -5,25 +5,12 @@
 # ======================================================
 # Repo: https://github.com/KernelSU-Next/KernelSU-Next
 
-# setup.sh clones into ${GKI_ROOT}/KernelSU-Next and symlinks
-# drivers/kernelsu -> KernelSU-Next/kernel, unlike ReSukiSU/SukiSU-Ultra's
-# setup.sh which both produce a "KernelSU" dir directly — KSU_DIR below is
-# intentionally different from resukisu.sh/sukisu.sh for this reason.
 KSU_DIR="${KERNEL_SRC}/KernelSU-Next"
 PATCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# ======================================================
-# 1. KernelSU-Next
-# ======================================================
 
 log "Integrating KernelSU-Next..."
 cd "$KERNEL_SRC"
 if [ "${SUSFS_ENABLED:-false}" = "true" ]; then
-    # Official KernelSU-Next has no SUSFS-compatible hook API on its dev
-    # branch (see susfs.sh) — pershoot's fork keeps a dev-susfs branch that
-    # does, paired with their own susfs4ksu fork. Maintainer flags this
-    # fork as not production-ready; tracked like any other candidate via
-    # kernel/checkpoint/scout.sh.
     log "SUSFS enabled — using pershoot/KernelSU-Next's dev-susfs fork"
     KSUNEXT_SETUP_URL="https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh"
     KSUNEXT_SETUP_REF="${KSUNEXT_SUSFS_FORK_REF:-dev-susfs}"
@@ -46,31 +33,10 @@ fi
 cd "$ROOT_DIR"
 log "KernelSU-Next integrated ✅"
 
-# ======================================================
-# 2. Branding
-# ======================================================
-
 log "Applying Luminaire branding..."
 python3 "${PATCHER_DIR}/branding.py" "${KSU_DIR}/kernel/Kbuild" \
     || error "KernelSU-Next: branding patch failed!"
 log "Branding applied ✅"
-
-# ======================================================
-# 2b. Version string (for Telegram caption)
-# ======================================================
-# Official KernelSU-Next's Kbuild: KSU_VERSION = 30000 + rev-list --count
-# HEAD, KSU_VERSION_TAG = `git describe --tags --abbrev=0` at HEAD (fallback
-# v0.0.1). Simple and purely local, like ReSukiSU's formula.
-#
-# pershoot/KernelSU-Next's dev-susfs fork (used when SUSFS_ENABLED) computes
-# both from a BASE_COMMIT instead of raw HEAD — the merge-base between HEAD
-# and origin/<branch-with-suffix-stripped> (falls back to origin/main, then
-# HEAD itself) — so fork-specific commits on top of upstream don't inflate
-# the version number. Replicated here rather than simplified to raw HEAD,
-# since that would give a different number than what's actually compiled.
-# This fork is flagged not-production-ready upstream (see section 1's
-# comment), so treat this version string as unverified until a real build
-# confirms it.
 
 if [ "${SUSFS_ENABLED:-false}" = "true" ]; then
     KSUNEXT_CUR_BRANCH=$(git -C "$KSU_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "HEAD")
@@ -94,12 +60,6 @@ else
 fi
 echo "KSUNEXT_VERSION_DISPLAY=${KSUNEXT_VERSION_DISPLAY}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
 log "Version: ${KSUNEXT_VERSION_DISPLAY}"
-
-# ======================================================
-# 3. Kconfig
-# ======================================================
-# No CONFIG_KPM here — KernelPatch is a SukiSU-Ultra/ReSukiSU feature,
-# KernelSU-Next's Kconfig doesn't declare it.
 
 log "Enabling KSU configs..."
 if ! grep -q "^CONFIG_KSU=y" "${KERNEL_SRC}/arch/arm64/configs/gki_defconfig"; then

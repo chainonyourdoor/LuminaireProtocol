@@ -33,6 +33,7 @@ Organized per-path, matching the repo's folder structure.
 - [release/telegram/telegraph_page.py](#releasetelegramtelegraph_pagepy)
 - [kernel/addons/lz4zstd/lz4zstd.sh](#kerneladdonslz4zstdlz4zstdsh)
 - [kernel/{android12-5.10,android13-5.15,android14-6.1}/ksu/susfs/susfs.sh](#kernelandroid12-510android13-515android14-61ksususfssusfssh)
+- [kernel/ksu-shared/ksunext/ksunext.sh](#kernelksu-sharedksunextksunextsh)
 
 ---
 
@@ -1107,3 +1108,41 @@ dmesg shows the integration's sucompat log line firing at runtime. If
 pershoot's fork restructures again and SuSFS stops working on KSUNEXT,
 check `kernel_patches/` in that fork first before assuming this note is
 still accurate.
+
+---
+
+## `kernel/ksu-shared/ksunext/ksunext.sh`
+
+**Purpose of this file**: root solution — KernelSU-Next. Repo:
+https://github.com/KernelSU-Next/KernelSU-Next.
+
+**`KSU_DIR`** — `setup.sh` clones into `${GKI_ROOT}/KernelSU-Next` and
+symlinks `drivers/kernelsu -> KernelSU-Next/kernel`, unlike ReSukiSU/
+SukiSU-Ultra's `setup.sh` which both produce a `"KernelSU"` dir directly —
+`KSU_DIR` here is intentionally different from `resukisu.sh`/`sukisu.sh`
+for this reason.
+
+**SuSFS fork selection** — official KernelSU-Next has no SUSFS-compatible
+hook API on its dev branch (see `susfs.sh`) — pershoot's fork keeps a
+dev-susfs branch that does, paired with their own susfs4ksu fork. The
+maintainer flags this fork as not production-ready; tracked like any
+other candidate via `kernel/checkpoint/scout.sh`.
+
+**Version string computation** — official KernelSU-Next's Kbuild:
+`KSU_VERSION = 30000 + rev-list --count HEAD`, `KSU_VERSION_TAG = git
+describe --tags --abbrev=0` at HEAD (fallback `v0.0.1`). Simple and
+purely local, like ReSukiSU's formula.
+
+pershoot/KernelSU-Next's dev-susfs fork (used when `SUSFS_ENABLED`)
+computes both from a `BASE_COMMIT` instead of raw HEAD — the merge-base
+between HEAD and `origin/<branch-with-suffix-stripped>` (falls back to
+`origin/main`, then HEAD itself) — so fork-specific commits on top of
+upstream don't inflate the version number. Replicated here rather than
+simplified to raw HEAD, since that would give a different number than
+what's actually compiled. This fork is flagged not-production-ready
+upstream, so treat this version string as unverified until a real build
+confirms it.
+
+**Kconfig section** — no `CONFIG_KPM` here — KernelPatch is a
+SukiSU-Ultra/ReSukiSU feature, KernelSU-Next's Kconfig doesn't declare
+it.
