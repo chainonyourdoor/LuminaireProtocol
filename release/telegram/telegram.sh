@@ -1,23 +1,15 @@
 #!/usr/bin/env bash
 
-# ======================================================
-# 📨 RELEASE — TELEGRAM
-# ======================================================
-
 TELEGRAM_API_TIMEOUT="${TELEGRAM_API_TIMEOUT:-60}"
 TELEGRAM_MAX_RETRIES="${TELEGRAM_MAX_RETRIES:-3}"
 TELEGRAM_MAX_FILE_BYTES=$((50 * 1024 * 1024))
 CAPTION_BUILDER="${LUMINAIRE_PATCH_DIR}/release/telegram/caption.py"
 
-# Source non-sensitive Telegram config (chat ID, thread IDs, channel ID)
 # shellcheck source=release/telegram/config.sh
 source "${LUMINAIRE_PATCH_DIR}/release/telegram/config.sh"
 # shellcheck source=release/telegram/common.sh
 source "${LUMINAIRE_PATCH_DIR}/release/telegram/common.sh"
 
-# ------------------------------------------------------
-# Guard clauses
-# ------------------------------------------------------
 if [ "${DRY_RUN:-false}" = "true" ]; then
     log "Skipping Telegram: Dry Run mode (pipeline test only)"
     return 0
@@ -35,14 +27,8 @@ if [ ! -f "${ZIP_PATH:-}" ]; then
     return 0
 fi
 
-# Pick the destination topic from RUN_MODE. Warm Run mode never reaches this
-# script (build.sh exits before run_release), and Dry Run returns above
-# before this point — so only Build/Release are valid here, anything else
-# is a misconfiguration, not a silent no-op.
 RUN_MODE_UPPER="${RUN_MODE^^}"
 case "$RUN_MODE_UPPER" in
-    # Build mode has one topic per kernel version (TELEGRAM_THREAD_ID_BUILD_BY_VERSION
-    # in config.sh, keyed by $KERNEL_VERSION) instead of a single shared topic.
     BUILD)     TARGET_THREAD_ID="${TELEGRAM_THREAD_ID_BUILD_BY_VERSION[$KERNEL_VERSION]:-}" ;;
     RELEASE)   TARGET_THREAD_ID="${TELEGRAM_THREAD_ID_RELEASE:-}" ;;
     *)         error "Telegram: unknown RUN_MODE '${RUN_MODE:-}' — expected Build or Release" ;;
@@ -52,9 +38,6 @@ if [ -z "$TARGET_THREAD_ID" ]; then
     return 0
 fi
 
-# ------------------------------------------------------
-# File size check
-# ------------------------------------------------------
 ZIP_SIZE_BYTES=$(stat -c%s "$ZIP_PATH" 2>/dev/null || stat -f%z "$ZIP_PATH" 2>/dev/null || echo 0)
 if [ "$ZIP_SIZE_BYTES" -eq 0 ]; then
     warn "Skipping Telegram: could not determine size of ${ZIP_PATH}, or file is empty"
@@ -66,9 +49,6 @@ if [ "$ZIP_SIZE_BYTES" -gt "$TELEGRAM_MAX_FILE_BYTES" ]; then
     return 0
 fi
 
-# ------------------------------------------------------
-# Build display fields for caption builder
-# ------------------------------------------------------
 LINUX_VER="${KERNEL_VERSION}.${SUBLEVEL}"
 
 case "${KERNEL_VARIANT}" in
@@ -79,9 +59,6 @@ case "${KERNEL_VARIANT}" in
     *)        KERNEL_VARIANT_DISPLAY="${KERNEL_VARIANT}" ;;
 esac
 
-# Each fork resolves its own version string in its integration script
-# (resukisu.sh / sukisu.sh / ksunext.sh, "Version string" step) and exports
-# it via $GITHUB_ENV — pick the one matching this build's fork.
 KERNEL_VARIANT_VERSION=""
 case "${KERNEL_VARIANT}" in
     RESUKISU) KERNEL_VARIANT_VERSION="${RESUKISU_VERSION_DISPLAY:-}" ;;
@@ -103,9 +80,6 @@ if [ "$SUSFS_ENABLED" = "true" ] && [ "$KERNEL_VARIANT" != "VANILLA" ]; then
     fi
 fi
 
-# ------------------------------------------------------
-# Build group caption (no VARIANT_LINKS_JSON yet)
-# ------------------------------------------------------
 CAPTION_GROUP_FILE="/tmp/telegram_caption_group.txt"
 CAPTION_CHANNEL_FILE="/tmp/telegram_caption_channel.txt"
 
@@ -132,9 +106,6 @@ python3 "$CAPTION_BUILDER" "$CAPTION_GROUP_FILE" "$CAPTION_CHANNEL_FILE" \
 CAPTION="$(cat "$CAPTION_GROUP_FILE")"
 rm -f "$CAPTION_GROUP_FILE" "$CAPTION_CHANNEL_FILE"
 
-# ------------------------------------------------------
-# Send to group topic — capture message_id
-# ------------------------------------------------------
 log "📤 Sending ${ZIP_NAME} to Telegram (${RUN_MODE_UPPER} topic)..."
 
 GROUP_MESSAGE_ID=""
@@ -148,10 +119,6 @@ if telegram_api_call "sendDocument" /tmp/telegram_response.json "Telegram group 
     log "Group topic sent ✅ (message_id=${GROUP_MESSAGE_ID})"
 fi
 
-# ------------------------------------------------------
-# Save variant link for channel post aggregation
-# (channel post itself is handled by notify-channel job, Release mode only)
-# ------------------------------------------------------
 if [ "$RUN_MODE_UPPER" = "RELEASE" ] && [ -n "${TELEGRAM_CHANNEL_ID:-}" ]; then
     if [ -z "$GROUP_MESSAGE_ID" ]; then
         warn "Telegram: could not get group message_id — skipping variant link save"

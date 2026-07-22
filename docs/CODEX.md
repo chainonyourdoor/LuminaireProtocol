@@ -17,6 +17,7 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/checkpoint/engine.sh](#kernelcheckpointenginesh)
 - [release/telegram/caption.py](#releasetelegramcaptionpy)
 - [release/telegram/channel_post.sh](#releasetelegramchannel_postsh)
+- [release/telegram/telegram.sh](#releasetelegramtelegramsh)
 
 ---
 
@@ -554,3 +555,24 @@ failed variant never reaches the channel in the first place.
 (missing token, API down, retries exhausted) — `caption.py`'s
 `build_channel_caption()` falls back to plain text pointing at the zip
 caption's Add-ons block when `FEATURES_URL` is empty.
+
+---
+
+## `release/telegram/telegram.sh`
+
+**Thread routing (`RUN_MODE` → `TARGET_THREAD_ID`)** — picks the
+destination topic from `RUN_MODE`. Warm Run mode never reaches this script
+(`build.sh` exits before `run_release`), and Dry Run returns above before
+this point — so only Build/Release are valid here, anything else is a
+misconfiguration, not a silent no-op. Build mode has one topic per kernel
+version (`TELEGRAM_THREAD_ID_BUILD_BY_VERSION` in `config.sh`, keyed by
+`$KERNEL_VERSION`) instead of a single shared topic.
+
+**`KERNEL_VARIANT_VERSION`** — each fork resolves its own version string
+in its integration script (`resukisu.sh`/`sukisu.sh`/`ksunext.sh`,
+"Version string" step) and exports it via `$GITHUB_ENV` — this picks the
+one matching this build's fork.
+
+**Variant link save** — the channel post itself is handled by the
+`notify-channel` job (Release mode only); this just writes this variant's
+link JSON for that job to aggregate later.
