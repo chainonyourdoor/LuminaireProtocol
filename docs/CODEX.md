@@ -19,6 +19,12 @@ Organized per-path, matching the repo's folder structure.
 - [release/telegram/channel_post.sh](#releasetelegramchannel_postsh)
 - [release/telegram/telegram.sh](#releasetelegramtelegramsh)
 - [kernel/config/defconfig.sh](#kernelconfigdefconfigsh)
+- [kernel/ksu-shared/fix_namespace.py](#kernelksu-sharedfix_namespacepy)
+- [kernel/addons/zeromount/inject_namei.py](#kerneladdonszeromountinject_nameipy)
+- [kernel/addons/zeromount/inject_readdir.py](#kerneladdonszeromountinject_readdirpy)
+- [kernel/addons/zeromount/strip_namei_hunk.py](#kerneladdonszeromountstrip_namei_hunkpy)
+- [kernel/addons/zeromount/strip_readdir_hunk.py](#kerneladdonszeromountstrip_readdir_hunkpy)
+- [kernel/addons/zeromount/fix_taskmmu.py](#kerneladdonszeromountfix_taskmmupy)
 
 ---
 
@@ -638,3 +644,148 @@ simultaneously and LZ4 (set first) kept winning on-device.
 **BBG block** — BBG requires `baseband_guard` in `CONFIG_LSM` — patched
 here because `.config` is not available yet when `bbg.sh` runs (before
 `make defconfig`).
+
+---
+
+## `kernel/ksu-shared/fix_namespace.py`
+
+**Idempotency check** — both markers present means either the main patch
+applied hunk #1 successfully (after `blk.h` pre-patch removal in
+`susfs.sh`), or a previous run of this fallback already injected them.
+Either way, nothing left to do.
+
+---
+
+## `kernel/addons/zeromount/inject_namei.py`
+
+**Purpose of this file**: inject ZeroMount hooks into `fs/namei.c`.
+Handles `namei.c` injection for every ZeroMount build (RESUKISU, SUKISU,
+KSUNEXT — ZeroMount requires SuSFS, so VANILLA is never a valid combo, see
+`zeromount.sh`), replacing the `namei.c` hunks from the ZeroMount patch,
+which are diffed against a SuSFS-patched baseline and mis-apply on a
+non-SuSFS tree (see `strip_namei_hunk.py` for the full explanation). The
+ZeroMount patch is pre-stripped of its `namei.c` hunks before being
+applied, so this worker is always the sole authority for `namei.c`
+injection.
+
+All anchors are matched against real, unpatched upstream `fs/namei.c`
+(`chainonyourdoor/LuminaireKernel-6.1`, `android14-6.1-live`) — they don't
+depend on SuSFS or any KSU fork having touched the file first, so this
+applies identically and correctly regardless of variant or patch order
+(baseline-agnostic by design, even though SuSFS is required at the addon
+level — see `zeromount.sh`).
+
+**Include injection** — `#include <linux/zeromount.h>` goes after the last
+file-local include, before the function bodies start.
+
+**`GETNAME_ANCHOR`** — in `getname_flags()`, right before the final
+`return result;` of its non-empty-path path. Anchored on the three-line
+block immediately preceding that return, which is unique to this function
+(`getname_kernel()` also calls `audit_getname(result)` but with a blank
+line before its return and without the two preceding `result->` assignments).
+
+**Permission-check short-circuit** — identical block injected at the top
+of both `generic_permission()` and `inode_permission()`, each anchored on
+the first real statement of that specific function (unique per function,
+so the two can't cross-match each other).
+
+---
+
+## `kernel/addons/zeromount/inject_readdir.py`
+
+**Purpose of this file**: inject ZeroMount hooks into `fs/readdir.c`.
+Handles `readdir.c` injection for every ZeroMount build (RESUKISU, SUKISU,
+KSUNEXT — ZeroMount requires SuSFS, so VANILLA is never a valid combo, see
+`zeromount.sh`), replacing the `readdir.c` hunks from the ZeroMount patch
+which require SuSFS context to apply cleanly. The ZeroMount patch is
+pre-stripped of its `readdir.c` hunk (via `strip_readdir_hunk.py`) before
+being applied, so this worker is always the sole authority for
+`readdir.c` injection.
+
+**`find_getdents_non_compat()`** — returns the line index of
+`SYSCALL_DEFINE3(getdents, ...)` that is NOT inside `#ifdef
+CONFIG_COMPAT`. Only the non-compat variant is wanted.
+
+**`SEARCH_WINDOW`** — search within a generous window after
+`getdents_idx` — dynamic enough to handle upstream `readdir.c` growing
+without hardcoded line limits.
+
+**Injection sequence** — 1) `#include <linux/zeromount.h>`. 2) inject
+`initial_count` + `MAGIC_POS` check after the `fdget_pos` block (pattern:
+`fdget_pos` line followed by `if (!f.file)`). 3) inject the `MAGIC_POS`
+early-exit before `iterate_dir` and `zeromount_inject_dents` after it. 4)
+inject the `zm_out:` label before `fdput_pos(f)`. Each window is
+recalculated after every insert since line indices shift.
+
+---
+
+## `kernel/addons/zeromount/strip_namei_hunk.py`
+
+**Purpose of this file**: strip the `fs/namei.c` hunks from the ZeroMount
+patch.
+
+The ZeroMount patch's `fs/namei.c` section is diffed against a SuSFS-
+patched baseline — its first hunk's unchanged context includes `#ifdef
+CONFIG_KSU_SUSFS_UNICODE_FILTER` / `extern bool
+susfs_check_unicode_bypass(...)`, which only exists once SuSFS has already
+been patched in. Applying it to a non-SuSFS tree means that context can't
+match, and `--fuzz=3` will still force a match rather than fail outright —
+landing the later hunks (the `generic_permission()`/`inode_permission()`
+permission-check injections) outside the actual function bodies,
+producing "undeclared identifier 'inode'/'mask'" compile errors. Confirmed
+via a VANILLA build failure (`fs/namei.c:833`) while the same patch
+applied cleanly on all three SuSFS-patched variants in the same run —
+VANILLA (and any non-SuSFS variant) is no longer a supported combo for
+this addon at all (see `zeromount.sh`), but the failure mode that led here
+is still the reason this strip exists.
+
+`inject_namei.py` handles `fs/namei.c` via anchor-based injection instead
+(anchors are baseline-agnostic real function bodies), so the patch hunks
+are not needed. This mirrors `strip_readdir_hunk.py`, which strips the
+same-root-cause-affected `fs/readdir.c` hunk.
+
+This script strips the `namei.c` diff section from the patch file
+in-place before it is applied, guaranteeing zero hunk failures and zero
+silent mis-application.
+
+---
+
+## `kernel/addons/zeromount/strip_readdir_hunk.py`
+
+**Purpose of this file**: strip the `fs/readdir.c` hunk from the
+ZeroMount patch.
+
+The ZeroMount patch contains a `readdir.c` hunk that anchors on
+`CONFIG_KSU_SUSFS_SUS_PATH` context, causing it to fail on a non-SuSFS
+tree (VANILLA, or any variant with SuSFS disabled — neither is a
+supported combo for this addon, see `zeromount.sh`). `inject_readdir.py`
+handles `readdir.c` via anchor-based injection instead, so the patch hunk
+is not needed regardless.
+
+This script strips the `readdir.c` diff section from the patch file
+in-place before it is applied, guaranteeing zero hunk failures.
+
+---
+
+## `kernel/addons/zeromount/fix_taskmmu.py`
+
+**Purpose of this file**: fix a scope bug in `task_mmu.c`'s show_map_vma
+injection.
+
+ZeroMount now requires SuSFS unconditionally (`build.sh`'s addon conflict
+matrix errors out before this ever runs on a non-SuSFS tree — see
+`run_addons()`), so this only has to handle the with-SuSFS scope bug.
+There used to be a second "broken_vanilla" case here for non-SuSFS trees
+(`zeromount_spoof_mmap_metadata()` landing inside the `if(!mm){}` block
+instead of `if(file){}`); it's gone along with non-SuSFS support.
+
+**`broken`/`fixed` patterns** — the zeromount call landed after the
+`SUS_KSTAT` block but still inside `if(file){}` scope; `fixed` moves it
+back outside.
+
+**Fallback branch** — `zeromount_spoof_mmap_metadata` present but not
+matching the known broken pattern means either already fixed by a
+previous run (idempotent, not an error) or the surrounding SuSFS code
+shifted upstream (a real problem, but indistinguishable from "already
+fixed" by string match alone). Exits 0 either way; if this masks a real
+upstream drift, the actual compile error downstream will surface it.
