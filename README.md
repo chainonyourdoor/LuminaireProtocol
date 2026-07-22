@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/primer/octicons/main/icons/cpu-24.svg" width="150" height="150" />
+<img src="https://raw.githubusercontent.com/primer/octicons/main/icons/cpu-24.svg" width="300" height="300" />
 
 
 # Luminaire Protocol
