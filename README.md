@@ -4,17 +4,10 @@
 
 
 # Luminaire Protocol
-</div>
-
----
-
-<div align="center">
 
 [![Build](https://img.shields.io/github/actions/workflow/status/chainonyourdoor/LuminaireProtocol/build.yml?branch=main&label=build&logo=github&style=for-the-badge)](https://github.com/chainonyourdoor/LuminaireProtocol/actions/workflows/build.yml)
 [![Telegram](https://img.shields.io/badge/Telegram-Luminaire-blue?style=for-the-badge&logo=telegram)](https://t.me/LuminaireProtocol)
 </div>
-
----
 
 **Luminaire Protocol** is a build orchestration repository for the **Luminaire** Android GKI kernel.
 This repo does **not** contain kernel source — it contains all the scripts and GitHub Actions workflows that:
