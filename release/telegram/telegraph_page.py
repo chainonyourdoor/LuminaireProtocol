@@ -5,25 +5,8 @@ import time
 import urllib.request
 import urllib.error
 
-# ======================================================
-# 📄 RELEASE — TELEGRAPH FEATURES PAGE
-# ======================================================
-# Creates a fresh Telegraph page for this release (never reused across
-# releases — see the "bikin baru tiap release" decision: reusing one page
-# would let historical Telegram channel posts silently drift, since anyone
-# scrolling back and clicking an old "Features" link would see whatever the
-# page currently says, not what was true when that post went out).
-#
-# This is a standalone script (not sourced) so it can be called once from
-# channel_post.sh, before the channel caption is built, and its stdout
-# captured directly as the page URL. Never causes the build/post to fail:
-# on any error it prints an empty line to stdout and exits 0 — the caller
-# (channel_post.sh) treats an empty result as "no Features link, fall back
-# to the zip caption's Add-ons block" (see build_channel_caption() in
-# caption.py).
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import caption  # noqa: E402  (path insert must happen first)
+import caption  # noqa: E402
 
 TELEGRAPH_API_TIMEOUT = int(os.environ.get("TELEGRAPH_API_TIMEOUT", "30"))
 TELEGRAPH_MAX_RETRIES = int(os.environ.get("TELEGRAPH_MAX_RETRIES", "3"))
@@ -39,9 +22,6 @@ def build_title(env):
 
 
 def create_page(token, title, content):
-    # No explicit author_name here — omitting it makes Telegraph fall back
-    # to the account's own default author_name (set once at createAccount
-    # time), instead of overriding it per-page with a hardcoded value.
     payload = json.dumps({
         "access_token": token,
         "title": title,

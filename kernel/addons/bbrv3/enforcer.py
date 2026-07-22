@@ -1,16 +1,6 @@
 import sys
 
-# Re-asserts bbr3 as net.ipv4.tcp_congestion_control a handful of times
-# during early boot so a vendor init script writing over it doesn't stick
-# (confirmed root cause on MediaTek devices: /vendor/etc/init/*.rc scripts
-# running at `on early-init`, e.g. `write .../tcp_congestion_control bic`).
-# Stops after LUMINAIRE_BBR3_ENFORCE_TRIES — this only needs to win the
-# boot-time race, not fight the user's own later choice (e.g. manually
-# switching algorithm via a kernel manager app).
-#
-# Lives inside net/ipv4/tcp_cong.c rather than a new file because
-# tcp_set_default_congestion_control() isn't EXPORT_SYMBOL'd — it's only
-# callable from within the same translation unit.
+
 ENFORCER_BLOCK = '''
 /* ======================================================
  * Luminaire: BBRv3 default-congestion enforcer
@@ -56,25 +46,19 @@ MARKER = "luminaire_bbr3_enforce_init"
 
 def main():
     path = sys.argv[1]
-
     with open(path, "r") as f:
         content = f.read()
-
     if MARKER in content:
         print("[info] bbrv3 enforcer: already patched — skipping")
         sys.exit(0)
-
     anchor = "late_initcall(tcp_congestion_default);"
     if anchor not in content:
         print(f"[error] bbrv3 enforcer: anchor '{anchor}' not found in {path} "
               f"— upstream may have refactored tcp_cong.c!", file=sys.stderr)
         sys.exit(1)
-
     content = content.replace(anchor, anchor + "\n" + ENFORCER_BLOCK, 1)
-
     with open(path, "w") as f:
         f.write(content)
-
     print("[info] bbrv3 enforcer: injected ✅")
     sys.exit(0)
 

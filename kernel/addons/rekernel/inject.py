@@ -1,15 +1,4 @@
 #!/usr/bin/env python3
-"""
-Re:Kernel source injector for android14-6.1.
-
-Injects a Netlink server into three kernel files:
-  - drivers/android/rekernel.h     (new file — Netlink server impl)
-  - drivers/android/binder.c       (binder_transaction hooks)
-  - drivers/android/binder_alloc.c (async buffer full hook)
-  - kernel/signal.c                (signal hook)
-
-Idempotent: checks for marker before injecting.
-"""
 
 import sys
 import os
@@ -251,7 +240,6 @@ def already_patched(content):
 
 
 def inject_after_any(content, anchors, injection, label):
-    """Try multiple anchors in order; return on first match."""
     for anchor in anchors:
         if anchor in content:
             idx = content.index(anchor) + len(anchor)
@@ -262,10 +250,6 @@ def inject_after_any(content, anchors, injection, label):
 
 
 def inject_include_fallback(content, include_line):
-    """
-    Fallback: insert include_line after the last #include directive
-    found within the first 120 lines of the file.
-    """
     lines = content.split("\n")
     last_idx = -1
     for i, line in enumerate(lines[:120]):
@@ -278,10 +262,6 @@ def inject_include_fallback(content, include_line):
 
 
 def inject_include(content, local_includes, include_line, label):
-    """
-    Inject include_line after the first matching local include anchor.
-    Falls back to last-#include-in-header-section method.
-    """
     content, ok = inject_after_any(content, local_includes, include_line, label)
     if not ok:
         print(f"  [INFO] {label}: trying last-include fallback")
@@ -294,12 +274,9 @@ def inject_include(content, local_includes, include_line, label):
 def patch_binder_c(src):
     path = os.path.join(src, "drivers", "android", "binder.c")
     content = read(path)
-
     if already_patched(content):
         print("  binder.c: already patched, skipping")
         return
-
-    # ── Step 1: inject include (CRITICAL — abort hooks if this fails) ──
     include_anchors = [
         '#include "binder_alloc.h"',
         '#include "binder_trace.h"',
@@ -308,12 +285,9 @@ def patch_binder_c(src):
     content, ok_include = inject_include(
         content, include_anchors, '#include "rekernel.h"', "binder.c include"
     )
-
     if not ok_include:
         print("  [ERROR] binder.c: cannot inject include — aborting patch!")
         sys.exit(1)
-
-    # ── Step 2: reply hook ──
     reply_anchors = [
         (
             "\t\ttarget_proc = target_thread->proc;\n"
@@ -325,8 +299,6 @@ def patch_binder_c(src):
     content, ok_reply = inject_after_any(
         content, reply_anchors, BINDER_REPLY_HOOK, "binder reply hook"
     )
-
-    # ── Step 3: transaction hook ──
     txn_anchors = [
         "\t\te->to_node = target_node->debug_id;\n",
         "\t\tt->to_proc = target_proc;\n",
@@ -334,13 +306,7 @@ def patch_binder_c(src):
     content, ok_txn = inject_after_any(
         content, txn_anchors, BINDER_TXN_HOOK, "binder txn hook"
     )
-
     if not ok_reply or not ok_txn:
-        # A partial injection (e.g. only txn hooked) would still contain the
-        # "Re:Kernel" marker via its own comment, so rekernel.sh's downstream
-        # `grep -q "Re:Kernel" binder.c` guard can't distinguish full from
-        # partial injection. Treat partial as fatal here instead, matching
-        # the fail-fast behavior of the other patch.py scripts in this repo.
         missing = []
         if not ok_reply:
             missing.append("reply")
@@ -348,7 +314,6 @@ def patch_binder_c(src):
             missing.append("txn")
         print(f"  [ERROR] binder.c: hook(s) not injected ({'+'.join(missing)}) — aborting to avoid silent partial patch!")
         sys.exit(1)
-
     write(path, content)
     print("  binder.c: patched ✅ (include + reply+txn)")
 
@@ -356,12 +321,9 @@ def patch_binder_c(src):
 def patch_binder_alloc_c(src):
     path = os.path.join(src, "drivers", "android", "binder_alloc.c")
     content = read(path)
-
     if already_patched(content):
         print("  binder_alloc.c: already patched, skipping")
         return
-
-    # Include
     include_anchors = [
         "#include <linux/shrinker.h>",
         "#include <linux/slab.h>",
@@ -373,10 +335,7 @@ def patch_binder_alloc_c(src):
     if not ok_include:
         print("  [ERROR] binder_alloc.c: cannot inject include — aborting patch!")
         sys.exit(1)
-
-    # Hook
     alloc_anchors = [
-        # GKI android14-6.1 (newer): "< size" only
         (
             "\tif (is_async && alloc->free_async_space < size) {\n"
             "\t\tbinder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC,\n"
@@ -386,7 +345,6 @@ def patch_binder_alloc_c(src):
             "\t\tgoto out;\n"
             "\t}\n"
         ),
-        # Older kernels: "< size + sizeof(struct binder_buffer)"
         (
             "\tif (is_async &&\n"
             "\t    alloc->free_async_space < size + sizeof(struct binder_buffer)) {\n"
@@ -400,11 +358,9 @@ def patch_binder_alloc_c(src):
     content, ok_hook = inject_after_any(
         content, alloc_anchors, BINDER_ALLOC_HOOK, "binder_alloc hook"
     )
-
     if not ok_hook:
         print("  [ERROR] binder_alloc.c: alloc hook not injected — aborting!")
         sys.exit(1)
-
     write(path, content)
     print("  binder_alloc.c: patched ✅ (include + hook)")
 
@@ -412,12 +368,9 @@ def patch_binder_alloc_c(src):
 def patch_signal_c(src):
     path = os.path.join(src, "kernel", "signal.c")
     content = read(path)
-
     if already_patched(content):
         print("  signal.c: already patched, skipping")
         return
-
-    # Include
     include_anchors = [
         "#include <linux/freezer.h>",
         "#include <linux/posix-timers.h>",
@@ -431,8 +384,6 @@ def patch_signal_c(src):
     if not ok_include:
         print("  [ERROR] signal.c: cannot inject include — aborting patch!")
         sys.exit(1)
-
-    # Hook
     signal_anchors = [
         (
             "\tif (lock_task_sighand(p, &flags)) {\n"
@@ -451,11 +402,9 @@ def patch_signal_c(src):
     content, ok_hook = inject_after_any(
         content, signal_anchors, SIGNAL_HOOK, "signal hook"
     )
-
     if not ok_hook:
         print("  [ERROR] signal.c: signal hook not injected — aborting!")
         sys.exit(1)
-
     write(path, content)
     print("  signal.c: patched ✅ (include + hook)")
 

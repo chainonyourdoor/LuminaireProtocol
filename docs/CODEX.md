@@ -25,6 +25,12 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/addons/zeromount/strip_namei_hunk.py](#kerneladdonszeromountstrip_namei_hunkpy)
 - [kernel/addons/zeromount/strip_readdir_hunk.py](#kerneladdonszeromountstrip_readdir_hunkpy)
 - [kernel/addons/zeromount/fix_taskmmu.py](#kerneladdonszeromountfix_taskmmupy)
+- [kernel/addons/rekernel/inject.py](#kerneladdonsrekernelinjectpy)
+- [kernel/addons/bbrv3/enforcer.py](#kerneladdonsbbrv3enforcerpy)
+- [kernel/core/compiler_string/patch.py](#kernelcorecompiler_stringpatchpy)
+- [kernel/core/openssl3_compat/patch.py](#kernelcoreopenssl3_compatpatchpy)
+- [kernel/ksu-shared/ksunext/branding.py](#kernelksu-sharedksunextbrandingpy)
+- [release/telegram/telegraph_page.py](#releasetelegramtelegraph_pagepy)
 
 ---
 
@@ -789,3 +795,159 @@ previous run (idempotent, not an error) or the surrounding SuSFS code
 shifted upstream (a real problem, but indistinguishable from "already
 fixed" by string match alone). Exits 0 either way; if this masks a real
 upstream drift, the actual compile error downstream will surface it.
+
+---
+
+## `kernel/addons/rekernel/inject.py`
+
+**Purpose of this file**: Re:Kernel source injector for android14-6.1.
+Injects a Netlink server into three kernel files: `drivers/android/
+rekernel.h` (new file — Netlink server impl), `drivers/android/binder.c`
+(binder_transaction hooks), `drivers/android/binder_alloc.c` (async
+buffer full hook), and `kernel/signal.c` (signal hook). Idempotent: checks
+for a marker before injecting.
+
+**`inject_after_any()`** — tries multiple anchors in order; returns on
+first match.
+
+**`inject_include_fallback()`** — fallback: inserts `include_line` after
+the last `#include` directive found within the first 120 lines of the
+file.
+
+**`inject_include()`** — injects `include_line` after the first matching
+local include anchor, falling back to the last-`#include`-in-header-
+section method.
+
+**`patch_binder_c()`, partial-injection guard** — a partial injection
+(e.g. only the txn hook landing) would still contain the "Re:Kernel"
+marker via its own comment, so `rekernel.sh`'s downstream `grep -q
+"Re:Kernel" binder.c` guard can't distinguish full from partial injection.
+Treated as fatal here instead, matching the fail-fast behavior of the
+other `patch.py` scripts in this repo.
+
+---
+
+## `kernel/addons/bbrv3/enforcer.py`
+
+**`ENFORCER_BLOCK`** — re-asserts bbr3 as
+`net.ipv4.tcp_congestion_control` a handful of times during early boot so
+a vendor init script writing over it doesn't stick (confirmed root cause
+on MediaTek devices: `/vendor/etc/init/*.rc` scripts running at `on
+early-init`, e.g. `write .../tcp_congestion_control bic`). Stops after
+`LUMINAIRE_BBR3_ENFORCE_TRIES` — this only needs to win the boot-time
+race, not fight the user's own later choice (e.g. manually switching
+algorithm via a kernel manager app). Lives inside `net/ipv4/tcp_cong.c`
+rather than a new file because `tcp_set_default_congestion_control()`
+isn't `EXPORT_SYMBOL`'d — it's only callable from within the same
+translation unit.
+
+---
+
+## `kernel/core/compiler_string/patch.py`
+
+**Purpose of this file**: patches `mkcompile_h`'s `CC_VERSION`/
+`LD_VERSION` lines to produce a clean compiler string.
+
+`mkcompile_h` is called by the kernel Makefile — the exact positional arg
+number varies by kernel version/convention: GKI 6.1-style (trimmed):
+`scripts/mkcompile_h "$(UTS_MACHINE)" "$(CONFIG_CC_VERSION_TEXT)" "$(LD)"`
+→ `CC_VERSION="$2"`. Older/mainline-style (e.g. 5.10's GKI tree, still
+close to upstream `scripts/mkcompile_h`): TARGET/ARCH/SMP/PREEMPT/
+PREEMPT_RT/CC_VERSION/LD as `$1..$7` → `CC_VERSION="$6"`. The regex
+matches `CC_VERSION="$N"` for any N so this doesn't need a per-kernel-
+version special case — confirmed both patterns exist in the wild
+(android14-6.1: `$2`, android12-5.10: `$6`).
+
+`CONFIG_CC_VERSION_TEXT` is baked at defconfig time from raw `clang
+--version` output — `KBUILD_COMPILER_STRING` is never used here.
+`CC_VERSION` is hardcoded to the clean string directly. `LD_VERSION`
+reads raw `ld.lld -v` output with the full LLVM commit URL; it's replaced
+with a clean extraction that yields `"LLD X.Y.Z"` only. Result:
+`LINUX_COMPILER = "Cirrus Clang 23.0.0, LLD 23.0.0"`.
+
+**Idempotency check** (same convention as `module_bypass/patch.py`) —
+without it, re-running the patcher against an already-patched file hits a
+false "partial match": the CC pattern (`CC_VERSION="$2"`) no longer
+matches since it's now a literal string, but the LD pattern
+(`LD_VERSION=$()`) still matches its own already-patched replacement
+(`clean_ld` also starts with `LD_VERSION=$(`) — `cc_replaced=False,
+ld_replaced=True`, which trips the fatal partial-match abort below even
+though the file is actually fully and correctly patched already.
+
+**Paren-depth tracking for `LD_VERSION=$(...)`** — tracks paren depth to
+find where this multi-line assignment actually closes. Must ignore
+parens inside single quotes — the sed pattern `'s/(compatible with
+[^)]*)//'` has literal `(` `)` chars that aren't real shell grouping.
+Naive raw counting broke on android12-5.10's `mkcompile_h`, where that
+whole quoted sed clause sits on the same line as the opening `"$("`:
+depth hit 0 after just that one line (the quoted parens happened to
+balance out), leaving the real closing line (`" | sed '...')"`)
+unconsumed as an orphan — which starts with `|`, causing a shell syntax
+error at runtime. android14-6.1's version has the sed clause on its own
+separate line, so the same naive counting happened to land on the right
+line there by coincidence, masking the bug until this kernel version.
+
+**Partial-match abort** — writing a half-patched file would produce an
+inconsistent compiler string (e.g. CC patched but LD still raw LLVM URL
+output). Treated as fatal so the issue is visible rather than silently
+wrong.
+
+---
+
+## `kernel/core/openssl3_compat/patch.py`
+
+**Purpose of this file**: fixes a half-applied OpenSSL-3 compat backport
+in `certs/extract-cert.c`. `key_pass`'s declaration is gated behind
+`#ifdef USE_PKCS11_ENGINE`, but nothing in the file ever defines that
+macro, and the PKCS#11 branch further down uses `key_pass` completely
+unguarded. Result on any OpenSSL 3.x toolchain: `key_pass`'s declaration
+gets compiled out while its usage doesn't, i.e. "use of undeclared
+identifier 'key_pass'".
+
+Fix: define `USE_PKCS11_ENGINE` whenever the ENGINE API is actually
+available. This is safe for this file specifically because
+`ENGINE_load_builtin_engines()`/`ENGINE_by_id()`/etc. a few lines down are
+already called unconditionally (not gated by this macro at all) — so if
+ENGINE support isn't there, this file was already broken before this
+patch touches it.
+
+---
+
+## `kernel/ksu-shared/ksunext/branding.py`
+
+**Purpose of this file**: injects Luminaire branding into KernelSU-Next's
+Kbuild version tag.
+
+KernelSU-Next's Kbuild has no `KSU_VERSION_FULL` (unlike ReSukiSU/
+SukiSU-Ultra) — it only builds `KSU_VERSION_TAG` from `KSU_GIT_TAG` (or a
+hardcoded fallback when not a git repo), so that's the anchor here.
+
+Kbuild consumes `KSU_VERSION_TAG` unquoted in `ccflags-y` (just the raw
+string with no surrounding single quotes), so a space in the branding
+suffix breaks shell tokenization of `ccflags-y` and clang chokes on the
+second half as a bogus input file. Both `ccflags-y` lines are wrapped in
+single quotes to make the whole define one token — same fix already
+applied in `resukisu/branding.py` and `sukisu/branding.py`.
+
+---
+
+## `release/telegram/telegraph_page.py`
+
+**Purpose of this file**: creates a fresh Telegraph page for this release
+(never reused across releases — reusing one page would let historical
+Telegram channel posts silently drift, since anyone scrolling back and
+clicking an old "Features" link would see whatever the page currently
+says, not what was true when that post went out).
+
+This is a standalone script (not sourced) so it can be called once from
+`channel_post.sh`, before the channel caption is built, with its stdout
+captured directly as the page URL. Never causes the build/post to fail:
+on any error it prints an empty line to stdout and exits 0 — the caller
+(`channel_post.sh`) treats an empty result as "no Features link, fall
+back to the zip caption's Add-ons block" (see `build_channel_caption()`
+in `caption.py`).
+
+**`create_page()`** — no explicit `author_name` here — omitting it makes
+Telegraph fall back to the account's own default `author_name` (set once
+at `createAccount` time), instead of overriding it per-page with a
+hardcoded value.
