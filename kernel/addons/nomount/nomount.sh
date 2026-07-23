@@ -41,12 +41,6 @@ else
     find "$KERNEL_SRC" -name "*.rej" -delete 2>/dev/null || true
 fi
 
-# Guard: verify NoMount was actually wired in before enabling the config.
-# Without this, hunk failures above only warn — the build would otherwise
-# report success with CONFIG_NOMOUNT=y while the feature is dead code.
-# We check that some caller in fs/ (other than the copied source itself)
-# now #includes nomount.h — that's the minimum signal the patch actually
-# hooked NoMount into the VFS rather than just dropping unused files.
 if ! grep -rlF '#include "nomount.h"' "${KERNEL_SRC}/fs/" 2>/dev/null \
         | grep -qv '/nomount\.c$'; then
     warn "NoMount: no caller includes nomount.h after patch — integration may have failed entirely"

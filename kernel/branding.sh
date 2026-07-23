@@ -1,18 +1,5 @@
 #!/usr/bin/env bash
 
-# ======================================================
-# 🏷️ BRANDING — CONFIG + APPLY
-# ======================================================
-
-# || true on both greps below: grep exits 2 (not just 1) when handed a
-# file that doesn't exist — even if it found a match in the other file
-# given alongside it. build.config.constants doesn't exist on every
-# kernel version (confirmed missing on android12-5.10's source,
-# present on android14-6.1's), and under build.sh's set -eo
-# pipefail, that nonzero pipe exit was killing the script silently on
-# this exact line — before ever reaching the explicit error() checks
-# below, which is the only reason "KMI_GENERATION not found!" never
-# actually printed. The || true just lets those checks do their job.
 SUBLEVEL="$(grep '^SUBLEVEL = ' "${KERNEL_SRC}/Makefile" | awk '{print $3}')" || true
 [ -n "$SUBLEVEL" ] || error "SUBLEVEL not found in kernel Makefile — kernel source may be missing or corrupted!"
 KMI_GENERATION="$(grep '^KMI_GENERATION=' \
@@ -31,5 +18,4 @@ export KBUILD_BUILD_HOST="$BUILD_HOST"
 export LOCALVERSION="-${ANDROID_VERSION}-${KMI_GENERATION}-${KERNEL_NAME}"
 export KBUILD_BUILD_TIMESTAMP="$(date '+%a %b %d %T %Z %Y')"
 
-# env vars are enough, kernel reads them directly
 log "Branding: ${BUILD_USER}@${BUILD_HOST} | ${LOCALVERSION} ✅"

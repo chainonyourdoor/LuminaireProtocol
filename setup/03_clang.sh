@@ -1,18 +1,12 @@
 #!/usr/bin/env bash
 
-# ======================================================
-# 🧰 SETUP — CLANG DISPATCHER
-# ======================================================
-
 CLANG_CACHE_DIR="${HOME}/clang-cache"
 
 if [ "${USE_CLANG_CACHE}" = "true" ] && [ -d "${CLANG_CACHE_DIR}/bin" ]; then
     log "Restoring Clang from cache (${CLANG_VARIANT})..."
     mkdir -p "$TOOL_CLANG_DIR"
     cp -a "${CLANG_CACHE_DIR}/." "${TOOL_CLANG_DIR}/"
-    # actions/cache does not always preserve file permissions — fix after restore
     chmod +x "${TOOL_CLANG_DIR}/bin/"* 2>/dev/null || true
-    # Restore glibc compat libs if they were cached alongside clang
     if [ -d "${CLANG_CACHE_DIR}/.neutron-tc-cache" ] && [ ! -d "${HOME}/.neutron-tc" ]; then
         cp -a "${CLANG_CACHE_DIR}/.neutron-tc-cache" "${HOME}/.neutron-tc"
     fi
@@ -29,7 +23,6 @@ if [ "${USE_CLANG_CACHE}" = "true" ] && [ -d "${CLANG_CACHE_DIR}/bin" ]; then
         if [ -d "${HOME}/.neutron-tc" ]; then
             cp -a "${HOME}/.neutron-tc" "${CLANG_CACHE_DIR}/.neutron-tc-cache"
         fi
-        # Workflow always re-saves clang cache after this step regardless
         log "Clang re-downloaded and cached ✅"
     else
         log "Clang restored ✅ ($(cache_freshness_note))"
@@ -42,8 +35,6 @@ else
     [ -d "${TOOL_CLANG_DIR}/bin" ] || error "Clang binary missing after download — ${CLANG_VARIANT} script may have failed!"
     mkdir -p "$CLANG_CACHE_DIR"
     cp -a "${TOOL_CLANG_DIR}/." "${CLANG_CACHE_DIR}/"
-    # Also cache glibc compat libs (e.g. ~/.neutron-tc) so restored binary
-    # can load patched interpreter without re-running antman --patch=glibc
     if [ -d "${HOME}/.neutron-tc" ]; then
         cp -a "${HOME}/.neutron-tc" "${CLANG_CACHE_DIR}/.neutron-tc-cache"
     fi

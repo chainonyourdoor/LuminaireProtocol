@@ -5,12 +5,6 @@
 # Driver by Elizabeth Figura (CodeWeavers), GKI backport by luigimak & fatalcoder524
 # Patch source: https://github.com/WildKernels/kernel_patches
 # ======================================================
-# Backports drivers/misc/ntsync.c (mainlined upstream, not yet present on
-# this branch) plus the per-branch Kconfig/Makefile wiring. Mainly useful
-# for Wine-based Windows compatibility layers (Winlator and similar) —
-# NTSync offloads Windows NT wait/mutex/event primitives to the kernel
-# instead of emulating them in userspace, which is significantly faster
-# for games/apps that lean on them heavily.
 
 NTSYNC_PATCHES_BASE="https://github.com/WildKernels/kernel_patches/raw/main/common/ntsync"
 

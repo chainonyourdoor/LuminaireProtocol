@@ -51,6 +51,15 @@ Organized per-path, matching the repo's folder structure.
 - [release/telegram/common.sh](#releasetelegramcommonsh)
 - [kernel/luminaire/bore/bore.sh](#kernelluminaireboreboresh)
 - [setup/00_paths.sh](#setup00_pathssh)
+- [release/telegram/config.sh](#releasetelegramconfigsh)
+- [kernel/branding.sh](#kernelbrandingsh)
+- [kernel/core/openssl3_compat/openssl3_compat.sh](#kernelcoreopenssl3_compatopenssl3_compatsh)
+- [kernel/addons/ntsync/ntsync.sh](#kerneladdonsntsyncntsyncsh)
+- [setup/01_deps.sh](#setup01_depssh)
+- [kernel/addons/nomount/nomount.sh](#kerneladdonsnomountnomountsh)
+- [kernel/addons/lz4kd/lz4kd.sh](#kerneladdonslz4kdlz4kdsh)
+- [setup/03_clang.sh](#setup03_clangsh)
+- [kernel/addons/wireguard/wireguard.sh](#kerneladdonswireguardwireguardsh)
 
 ---
 
@@ -1598,3 +1607,142 @@ workflow input (e.g. `"Make - Cirrus"`) into `BUILD_SYSTEM` +
 `run_setup()` find this very file. Guarded here instead of silently
 re-deriving it, so a future entrypoint that forgets to set it fails
 loud instead of masking the mistake.
+
+---
+
+## `release/telegram/config.sh`
+
+**Purpose of this file**: Telegram config — chat/group/thread IDs.
+`TELEGRAM_CI_GROUP` handles bot notifications (Build/Release/Event
+topics); `TELEGRAM_GROUP` ("LuminaireLab") is the community discussion
+group. `TELEGRAM_THREAD_ID_EVENT` is the Repository Event topic.
+
+**`TELEGRAM_THREAD_ID_BUILD_BY_VERSION`** — Experimental Builds, for
+Build mode (flash-test before being declared stable). One topic per
+kernel version. Keyed by `$KERNEL_VERSION` (matches the `build.yml`
+"Kernel Version" dropdown, e.g. `"5.10"`/`"5.15"`/`"6.1"`) so
+`telegram.sh` can route without a chain of if/elif. A version without an
+entry here (e.g. 6.6/6.12 before their own topic is created) has no
+fallback — `telegram.sh` warns and skips the send rather than dumping an
+unrelated kernel version's build into another version's topic.
+
+**`TELEGRAM_THREAD_ID_RELEASE`** — Release Builds, for Release mode
+(stable build published to the channel).
+
+---
+
+## `kernel/branding.sh`
+
+**Purpose of this file**: branding — config + apply. Resolves
+`SUBLEVEL`/`KMI_GENERATION` from the kernel source, then exports
+build-identity env vars (`KERNEL_NAME`, `BUILD_USER`, `BUILD_HOST`,
+`LOCALVERSION`, etc.) that the kernel reads directly — no source patch
+needed.
+
+**`|| true` on both greps** — `grep` exits 2 (not just 1) when handed a
+file that doesn't exist — even if it found a match in the other file
+given alongside it. `build.config.constants` doesn't exist on every
+kernel version (confirmed missing on android12-5.10's source, present on
+android14-6.1's), and under `build.sh`'s `set -eo pipefail`, that
+nonzero pipe exit was killing the script silently on this exact line —
+before ever reaching the explicit `error()` checks below, which is the
+only reason "KMI_GENERATION not found!" never actually printed. The
+`|| true` just lets those checks do their job.
+
+---
+
+## `kernel/core/openssl3_compat/openssl3_compat.sh`
+
+**Purpose of this file**: OpenSSL 3 compat — `certs/extract-cert.c`.
+`certs/extract-cert.c` ships from upstream with a half-applied backport
+of the OpenSSL-3 compat fix: it gates `key_pass`'s declaration behind
+`#ifdef USE_PKCS11_ENGINE`, but never defines that macro anywhere in the
+file, and the PKCS#11 branch further down uses `key_pass` completely
+unguarded. Result: "error: use of undeclared identifier 'key_pass'" on
+any OpenSSL 3.x toolchain (every current GitHub Actions runner) — breaks
+every build regardless of addons/root solution/build system. See
+`kernel/core/openssl3_compat/patch.py` in this document for the actual
+fix (defines the missing macro).
+
+---
+
+## `kernel/addons/ntsync/ntsync.sh`
+
+**Purpose of this file**: addon — NTSync. Driver by Elizabeth Figura
+(CodeWeavers), GKI backport by luigimak & fatalcoder524. Patch source:
+https://github.com/WildKernels/kernel_patches.
+
+Backports `drivers/misc/ntsync.c` (mainlined upstream, not yet present
+on this branch) plus the per-branch Kconfig/Makefile wiring. Mainly
+useful for Wine-based Windows compatibility layers (Winlator and
+similar) — NTSync offloads Windows NT wait/mutex/event primitives to
+the kernel instead of emulating them in userspace, which is
+significantly faster for games/apps that lean on them heavily.
+
+---
+
+## `setup/01_deps.sh`
+
+**Purpose of this file**: setup — apt dependencies. `PKGS` are the
+packages needed for a Make kernel build.
+
+**Background apt-install log** — output goes to a file, not
+`/dev/null` — `wait_for_apt()` (in `functions.sh`) tails this on
+failure/timeout so a stuck or failed install is diagnosable instead of
+a silent black box (see Setup Arsenal run #430: 17+ min stuck on
+"Waiting for background apt install" with zero visibility into why).
+
+**`DPkg::Lock::Timeout=60`** — makes apt itself give up after 60 seconds
+if the dpkg lock is held by another process (e.g. the runner image's
+own apt-daily/unattended-upgrades timer), instead of blocking forever.
+
+---
+
+## `kernel/addons/nomount/nomount.sh`
+
+**Purpose of this file**: addon — NoMount (VFS path injection
+framework). Repo: https://github.com/maxsteeel/nomount. Status: Beta.
+
+**Post-patch integration guard** — verifies NoMount was actually wired
+in before enabling the config. Without this, hunk failures earlier only
+warn — the build would otherwise report success with
+`CONFIG_NOMOUNT=y` while the feature is dead code. The check confirms
+some caller in `fs/` (other than the copied source itself) now
+`#include`s `nomount.h` — that's the minimum signal the patch actually
+hooked NoMount into the VFS rather than just dropping unused files.
+
+---
+
+## `kernel/addons/lz4kd/lz4kd.sh`
+
+**Purpose of this file**: addon — LZ4KD (ZRAM compression
+optimization). Source: https://github.com/SukiSU-Ultra/SukiSU_patch
+(`other/zram/`).
+
+Adds the lz4k/lz4kd compressor backends for zram (kernel-delta-aware
+variants of LZ4) plus the Kconfig/Makefile/zcomp.c wiring to register
+them. Version-keyed by upstream per kernel branch — this repo only
+targets android14-6.1, so only that one path is used; a case statement
+would be needed here if a second kernel version is ever supported.
+
+---
+
+## `setup/03_clang.sh`
+
+**Purpose of this file**: setup — Clang dispatcher. Restores Clang from
+cache when available, otherwise downloads via the selected
+`CLANG_VARIANT` script (`setup/clang/<variant>.sh`) and caches the
+result (including glibc compat libs, e.g. `~/.neutron-tc`, so a
+restored binary can load its patched interpreter without re-running
+`antman --patch=glibc`).
+
+---
+
+## `kernel/addons/wireguard/wireguard.sh`
+
+**Purpose of this file**: addon — WireGuard (kernel-level VPN).
+Upstream: https://www.wireguard.com/.
+
+No patch needed — WireGuard has been in mainline Linux since 5.6, so
+`drivers/net/wireguard/` is already present in this GKI tree. This is
+purely a Kconfig flip, same as any other config-only addon here.
