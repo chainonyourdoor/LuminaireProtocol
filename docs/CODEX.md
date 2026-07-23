@@ -39,6 +39,7 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/ksu-shared/resukisu/resukisu.sh](#kernelksu-sharedresukisuresukisush)
 - [kernel/addons/registry.sh](#kerneladdonsregistrysh)
 - [kernel/ksu-shared/sukisu/sukisu.sh](#kernelksu-sharedsukisusukisush)
+- [kernel/addons/bbrv3/bbrv3.sh](#kerneladdonsbbrv3bbrv3sh)
 
 ---
 
@@ -1298,3 +1299,47 @@ actually matches what's compiled in. Same `VERSION_BASE`/`OFFSET` and
 `GITHUB_COMMITS` logic apply on both main and builtin branches (checked
 against both upstream Kbuild/Makefile) — only the default fallback tag
 differs (4.1.3 vs 4.1.2).
+
+---
+
+## `kernel/addons/bbrv3/bbrv3.sh`
+
+**Purpose of this file**: addon — BBRv3, TCP congestion control backport
+by fatalcoder524. Patch source:
+https://github.com/WildKernels/kernel_patches.
+
+**⚠️ CRITICAL — `gki_defconfig` injection order (do not simplify this
+without re-reading the full history below)**: `DEFAULT_BBR3` is injected
+directly into `gki_defconfig` BEFORE `make defconfig` runs. This must be
+done here (not via `scripts/config`) because `make olddefconfig` resets
+any post-defconfig changes that violate Kconfig constraints.
+
+`CONFIG_TCP_CONG_BBR3` and `CONFIG_DEFAULT_BBR3` both live inside `if
+TCP_CONG_ADVANCED ... endif` in `net/ipv4/Kconfig`. `TCP_CONG_ADVANCED`
+is normally only enabled later via `luminaire.fragment` (merged AFTER
+`make gki_defconfig` already ran). Without also setting it here, `make
+gki_defconfig` sees `TCP_CONG_ADVANCED` unset, treats the whole if-block
+(including the BBR3 answers) as nonexistent, and silently falls back to
+`TCP_CONG_CUBIC` (`depends on !TCP_CONG_ADVANCED`, default y) instead —
+**this was the actual root cause of BBR3 never sticking as default**, a
+bug that took 9 commits to find (see the BBRv3 default-congestion saga in
+the repo's fix history). If this injection is ever moved to run after
+`luminaire.fragment` merges, or switched to `scripts/config` alone, this
+exact bug comes back.
+
+**android12-5.10 extra sysctl patch** — `proc_dou8vec_minmax` backport
+needed on this kernel version specifically for BBRv3 sysctl plumbing to
+compile.
+
+**Enforcer injection (`enforcer.py`)** — some vendor init scripts
+(confirmed on MediaTek devices: an `on early-init` write in
+`/vendor/etc/init/*.rc`) overwrite
+`/proc/sys/net/ipv4/tcp_congestion_control` shortly after boot, silently
+overriding the compiled `CONFIG_DEFAULT_BBR3`. That happens entirely in
+userspace, after the kernel has already booted, so no defconfig/Kconfig
+fix can prevent it — this must be enforced by the kernel itself,
+repeatedly, so it wins regardless of what userspace does afterward.
+Doing it kernel-side (rather than a root-manager `service.d` script)
+means it also works on VANILLA builds with no root solution installed at
+all. See `kernel/addons/bbrv3/enforcer.py` in this document for the
+enforcer's own mechanism.
