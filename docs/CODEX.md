@@ -32,7 +32,7 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/ksu/variants/ksunext/branding.py](#kernelksuvariantsksunextbrandingpy)
 - [release/telegram/telegraph_page.py](#releasetelegramtelegraph_pagepy)
 - [kernel/addons/lz4zstd/lz4zstd.sh](#kerneladdonslz4zstdlz4zstdsh)
-- [kernel/{android12-5.10,android13-5.15,android14-6.1}/ksu/susfs/susfs.sh](#kernelandroid12-510android13-515android14-61ksususfssusfssh)
+- [kernel/ksu/susfs/{android12-5.10,android13-5.15,android14-6.1}/susfs.sh](#kernelksususfsandroid12-510android13-515android14-61susfssh)
 - [kernel/ksu/variants/ksunext/ksunext.sh](#kernelksuvariantsksunextksunextsh)
 - [kernel/addons/kasumi/kasumi.sh](#kerneladdonskasumikasumish)
 - [kernel/addons/kasumi/postbuild.sh](#kerneladdonskasumipostbuildsh)
@@ -99,6 +99,21 @@ need to know any addon/luminaire policy at all.
 `build/make.sh` (bc/bison/flex) need these packages already present before
 running. `arsenal.sh` has always done this from the start; `build.sh`
 previously didn't, which could race on fresh runners.
+
+**`KSU_MANIFEST` supported-version gate** — checks
+`kernel/ksu/manifests/${ANDROID_VERSION}-${KERNEL_VERSION}.json` exists
+before doing anything else. This used to check for the existence of
+`kernel/<version>/` itself (`VERSION_PATCH_DIR`), which broke once the
+Phase 1/2 minimal-structure refactor finished moving everything out of
+that tree (KSU/SuSFS/checkpoint to `kernel/ksu/`, generic patches to
+`kernel/patches/<version>/`) — `kernel/<version>/` is now permanently
+empty for every version, so the old check would `error()` out on every
+single build, including already-supported ones. The manifest file is
+the thing that actually signals "KSU/SuSFS is implemented for this
+version" (it's what the checkpoint system writes pins into — see
+`kernel/ksu/checkpoint/engine.sh`), so it's the correct gate regardless
+of what else does or doesn't exist under `kernel/`. `VERSION_PATCH_DIR`
+itself is fully removed, not just unused.
 
 **`run_variant()`** — an unsupported root solution is NOT an optional skip
 (unlike addons) — the release label (`Ak3-*-${KERNEL_VARIANT}-*.zip`) is
@@ -236,7 +251,7 @@ Exported (via `$GITHUB_ENV`) for each relevant component:
 `<COMPONENT>_REF` (the SHA actually used for the build),
 `CANDIDATE_<COMPONENT>` ("true" if that REF is an unverified candidate).
 
-**Manifest not yet existing** (`kernel/<ver>/manifest.json` not found) —
+**Manifest not yet existing** (`kernel/ksu/manifests/<ver>.json` not found) —
 just means no pin has ever been promoted for this version yet, normal for
 a kernel version with no checkpoint history, not a misconfiguration. Falls
 back to an empty object `{}` so `resolve_component`'s `// ""` / `// []`
@@ -1095,7 +1110,7 @@ here (see the ZSTD incompatibility note above).
 
 ---
 
-## `kernel/{android12-5.10,android13-5.15,android14-6.1}/ksu/susfs/susfs.sh`
+## `kernel/ksu/susfs/{android12-5.10,android13-5.15,android14-6.1}/susfs.sh`
 
 **Purpose of these files**: SuSFS — shared apply logic (any KSU fork),
 one per kernel version. Repo: https://gitlab.com/simonpunk/susfs4ksu.
@@ -1298,7 +1313,7 @@ is the ONLY place that needs updating when a new backport lands for
 another kernel version — the addon's own `.sh` script stays generic
 (Pattern A: case-switch to an upstream URL keyed by version, e.g.
 ntsync/bbrv3/nomount/zeromount; or Pattern B: a self-maintained patch
-under `kernel/<ver>/patches/`, e.g. droidspaces).
+under `kernel/patches/<ver>/`, e.g. droidspaces).
 
 ZeroMount's 5.10 entry: the kernel patch itself is confirmed to exist
 upstream (Enginex0/Super-Builders), but `inject_namei.py`/
@@ -1602,7 +1617,7 @@ upstream), so "does `kernel/<ver>/ksu/<variant>/` exist" is no longer a
 meaningful question to ask.
 
 SuSFS pairing is a separate, genuinely per-version question — still
-gated by `kernel/<ver>/ksu/susfs/susfs.sh` existing (or erroring, for
+gated by `kernel/ksu/susfs/<ver>/susfs.sh` existing (or erroring, for
 combinations like KSUNEXT+SUSFS that aren't wired up yet), not by
 anything in this map.
 
@@ -1658,6 +1673,17 @@ workflow input (e.g. `"Make - Cirrus"`) into `BUILD_SYSTEM` +
 `run_setup()` find this very file. Guarded here instead of silently
 re-deriving it, so a future entrypoint that forgets to set it fails
 loud instead of masking the mistake.
+
+**`PATCHES_DIR`** — points at `kernel/patches/${ANDROID_VERSION}-
+${KERNEL_VERSION}/` (`luminaire/` + `required/` subdirs). Consumed by
+`build/make.sh`'s required-patch loop and by individual feature scripts
+that read their own patch directly (`droidspaces.sh`, `adios.sh`,
+`bore.sh`). Previously these version-specific patches lived under
+`kernel/<version>/patches/`; that whole `kernel/<version>/` tree is now
+empty (everything else was already consolidated under `kernel/ksu/` —
+see `kernel/ksu/registry.sh` in this document), so this was the last
+thing still anchored there before the directory could be considered
+fully retired.
 
 ---
 
