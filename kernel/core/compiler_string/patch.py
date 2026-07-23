@@ -30,6 +30,7 @@ def main():
             depth = 0
             in_squote = False
             j = i
+            closed = False
             while j < len(lines):
                 for ch in lines[j]:
                     if ch == "'":
@@ -40,8 +41,12 @@ def main():
                         elif ch == ")":
                             depth -= 1
                 if depth <= 0:
+                    closed = True
                     break
                 j += 1
+            if not closed:
+                print("[error] compiler_string_patch: LD_VERSION=$(...) block never closes before EOF — refusing to write (would silently drop the rest of the file)", flush=True)
+                sys.exit(1)
             out.append(clean_ld)
             i = j + 1
             ld_replaced = True

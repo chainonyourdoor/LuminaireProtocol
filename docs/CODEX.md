@@ -884,6 +884,16 @@ translation unit.
 
 ## `kernel/core/compiler_string/patch.py`
 
+**Audit fix (2026-07)**: the paren-depth scanner for
+`LD_VERSION=$(...)` had no explicit failure path if the block never
+closed before EOF (e.g. a future `mkcompile_h` format drift) — it would
+silently consume every remaining line into the replacement and drop the
+rest of the file without any error. Added a `closed` flag: if the scan
+reaches EOF without depth returning to 0, it now aborts loudly
+(`sys.exit(1)`) instead of writing a truncated file. Verified against
+both known real formats (single-line and multi-line `LD_VERSION=$(...)`)
+after the fix — both still patch correctly.
+
 **Purpose of this file**: patches `mkcompile_h`'s `CC_VERSION`/
 `LD_VERSION` lines to produce a clean compiler string.
 
@@ -1261,6 +1271,21 @@ running, so the raw upstream tag is used here instead.
 
 ## `kernel/addons/registry.sh`
 
+**Audit fix (2026-07)**: the zeromount-requires-SuSFS conflict check used
+to fire before the kernel-version-support check — selecting zeromount on
+a kernel version it isn't backported for yet (e.g. 5.15) with SuSFS
+disabled showed a misleading "requires SuSFS" error instead of the real
+reason ("not backported for this kernel version yet"). Gated the
+conflict check behind `addon_supports_kernel_version "zeromount"` so an
+unsupported-version selection now falls through to the normal per-addon
+skip-with-warning path in the loop below, and the SuSFS error only fires
+when zeromount actually is available for this kernel version but SuSFS
+isn't enabled. The underlying requirement itself is not being relaxed —
+zeromount has no non-SuSFS code path at all (confirmed:
+`inject_namei.py`/`inject_readdir.py`/`fix_taskmmu.py` are all
+SuSFS-baseline-only) — this fix only changes which error message the
+person actually sees.
+
 **Purpose of this file**: addon registry — support map, conflicts,
 dispatch. Sourced once by `build.sh` (functions become available for the
 rest of the process, same shape as `functions.sh`) so `build.sh` itself
@@ -1333,6 +1358,22 @@ differs (4.1.3 vs 4.1.2).
 ---
 
 ## `kernel/addons/bbrv3/bbrv3.sh`
+
+**Audit fix (2026-07)**: the case statement used to include a `6.12`
+branch pointing at
+`0001-net-tcp-backport-BBRv3-to-android16-6.12.patch`. Verified against
+the actual upstream tree (`WildKernels/kernel_patches`) — that file does
+not exist; only 5.10/5.15/6.1/6.6 patches are published. Removed the
+`6.12` case (was unreachable anyway since `ADDON_SUPPORTED_VERSIONS`
+only lists `5.10 5.15 6.1`, but referencing a nonexistent file was
+factually wrong and would 404 if this addon's version support is ever
+extended without re-checking first). The `6.6` case was verified to
+exist upstream and is left as-is — harmless, ready dead code for if/when
+6.6 support is added to the registry. Same check should be repeated
+for `ntsync.sh` if this addon's support map is ever extended too — as of
+this audit, ntsync's upstream directory has both `android15-6.6` and
+`android16-6.12` patches published, so that addon's dead code is
+accurate.
 
 **Purpose of this file**: addon — BBRv3, TCP congestion control backport
 by fatalcoder524. Patch source:
