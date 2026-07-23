@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-# ======================================================
-# ⚡ SETUP — CCACHE-ECS
-# ======================================================
-
 CCACHE_CACHE_DIR="${HOME}/ccache-bin"
 
 if [ -f "${CCACHE_CACHE_DIR}/ccache" ]; then
@@ -32,11 +28,6 @@ else
 fi
 
 export CCACHE_COMPILER="${TOOL_CLANG_DIR}/bin/clang"
-# Note: TOOL_CLANG_DIR/bin/clang is not yet on disk at this point —
-# 03_clang.sh downloads it next. CCACHE_COMPILER is read by ccache at
-# compile time (not at export time), so this is safe as long as clang
-# is in place before any make invocation. The || check in 03_clang.sh
-# guarantees that.
 export CCACHE_BASEDIR="$KERNEL_SRC"
 export CCACHE_IS_KERNEL_COMPILING="true"
 export CCACHE_COMPILERCHECK="none"
@@ -48,25 +39,9 @@ export CCACHE_COMPRESSLEVEL=1
 [ -n "${CCACHE_DIR}" ] || error "ccache: CCACHE_DIR is not set!"
 [ -n "${CCACHE_MAXSIZE}" ] || error "ccache: CCACHE_MAXSIZE is not set!"
 
-# Write sloppiness config — allows ccache-ECS to ignore file timestamps,
-# ctime, mtime, and time macros for cache validation.
-#
-# file_stat_matches is deliberately excluded: it lets ccache trust a
-# header's stat (mtime+size) instead of re-hashing its content. This bit
-# us with Kconfig-gated addons (LZ4KD, and very likely BORE, which shows
-# the identical symptom) — a fresh syncconfig can regenerate
-# include/generated/autoconf.h with different CONFIG_X content but the
-# same stat on this CI's runners, so ccache served a stale object
-# compiled under the OLD config state, silently. Confirmed via on-device
-# testing: CONFIG_CRYPTO_LZ4K compiled fine and registered in
-# /proc/crypto, but the specific object (zcomp.o) gating zram's backend
-# list on that same macro reused a cached build from before the config
-# was ever correctly set, so the zram-visible feature never appeared.
-# Do not re-add this without re-testing that exact scenario.
 mkdir -p "${CCACHE_DIR}"
 echo "sloppiness = include_file_ctime,include_file_mtime,pch_defines,file_macro,time_macros" \
     >> "${CCACHE_DIR}/ccache.conf"
 
-# Reset stats (not cache data) for fresh tracking
 ${TOOL_CCACHE_BIN} --zero-stats > /dev/null 2>&1 || true
 log "ccache ready | dir: ${CCACHE_DIR} | max: ${CCACHE_MAXSIZE}"

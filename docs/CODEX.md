@@ -41,6 +41,16 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/ksu-shared/sukisu/sukisu.sh](#kernelksu-sharedsukisusukisush)
 - [kernel/addons/bbrv3/bbrv3.sh](#kerneladdonsbbrv3bbrv3sh)
 - [kernel/luminaire/registry.sh](#kernelluminaireregistrysh)
+- [setup/02_ccache.sh](#setup02_ccachesh)
+- [arsenal.sh](#arsenalsh)
+- [kernel/addons/zeromount/zeromount.sh](#kerneladdonszeromountzeromountsh)
+- [build/make.sh](#buildmakesh)
+- [release/anykernel.sh](#releaseanykernelsh)
+- [kernel/luminaire/adios/adios.sh](#kernelluminaireadiosadiossh)
+- [kernel/ksu-shared/registry.sh](#kernelksu-sharedregistrysh)
+- [release/telegram/common.sh](#releasetelegramcommonsh)
+- [kernel/luminaire/bore/bore.sh](#kernelluminaireboreboresh)
+- [setup/00_paths.sh](#setup00_pathssh)
 
 ---
 
@@ -1375,3 +1385,216 @@ not `local`: `telegram.sh` (`run_release` → `telegram.sh`, later in the
 same process) reads these directly to build the release caption. A
 function-local var dies at return, so it would never survive to reach
 `telegram.sh` even though both run in the same bash process.
+
+---
+
+## `setup/02_ccache.sh`
+
+**Purpose of this file**: setup — ccache-ECS.
+
+**`CCACHE_COMPILER`** — `TOOL_CLANG_DIR/bin/clang` is not yet on disk at
+this point — `03_clang.sh` downloads it next. `CCACHE_COMPILER` is read
+by ccache at compile time (not at export time), so this is safe as long
+as clang is in place before any `make` invocation. The `||` check in
+`03_clang.sh` guarantees that.
+
+**Sloppiness config** — allows ccache-ECS to ignore file timestamps,
+ctime, mtime, and time macros for cache validation. `file_stat_matches`
+is deliberately excluded: it lets ccache trust a header's stat
+(mtime+size) instead of re-hashing its content. This bit us with
+Kconfig-gated addons (LZ4KD, and very likely BORE, which shows the
+identical symptom) — a fresh syncconfig can regenerate
+`include/generated/autoconf.h` with different `CONFIG_X` content but the
+same stat on this CI's runners, so ccache served a stale object compiled
+under the OLD config state, silently. Confirmed via on-device testing:
+`CONFIG_CRYPTO_LZ4K` compiled fine and registered in `/proc/crypto`, but
+the specific object (`zcomp.o`) gating zram's backend list on that same
+macro reused a cached build from before the config was ever correctly
+set, so the zram-visible feature never appeared. Do not re-add
+`file_stat_matches` without re-testing that exact scenario.
+
+---
+
+## `arsenal.sh`
+
+**Purpose of this file**: Luminaire Protocol Arsenal Orchestrator —
+pre-warms setup/download for a kernel version outside a full build
+(no compile step).
+
+**`exec 2>&1`** — same reasoning as `build.sh`: GitHub Actions captures
+stdout and stderr as separate buffered streams and doesn't guarantee
+their relative order in the rendered log. `log()`/`warn()`/`error()`
+write to stderr while `::group::`/`::endgroup::` write to stdout, so
+without this, log lines can render outside the `::group::` block they
+were actually written inside of. Merging stderr into stdout here keeps
+everything on one stream, preserving actual write order.
+
+**`main()`, Finalize block placement** — `wait_for_apt` is called here
+(not right after `run_setup`) so the background `apt install` kicked off
+by `setup/01_deps.sh` overlaps with `run_download`'s network-bound
+kernel source fetch instead of blocking in front of it. Grouped together
+with the final "ready" log since both are just wrap-up, not part of the
+download itself.
+
+**`run_setup()`** is defined in `functions.sh`, shared with `build.sh`.
+
+---
+
+## `kernel/addons/zeromount/zeromount.sh`
+
+**Purpose of this file**: addon — ZeroMount (VFS path redirection
+engine). Repo: https://github.com/Enginex0/zeromount. Patch source:
+https://github.com/Enginex0/Super-Builders.
+
+Self-contained patch (creates `fs/zeromount.c`, `include/linux/
+zeromount.h`, Kconfig + Makefile wiring). `readdir.c` and `namei.c`
+hunks are stripped before apply — both are diffed against a SuSFS-
+patched baseline and are handled exclusively by `inject_readdir.py`/
+`inject_namei.py` instead.
+
+**Requires SuSFS** — `build.sh`'s addon conflict matrix (`run_addons()`)
+rejects this addon outright when `SUSFS_ENABLED` isn't true, on any
+variant including VANILLA (which can never have SuSFS). This is a
+design decision, not a hard limitation of every script here:
+`inject_namei.py`/`inject_readdir.py` are baseline-agnostic and would
+work on a non-SuSFS tree too, but `fix_taskmmu.py`'s scope fix only
+handles the SuSFS-patched pattern (its non-SuSFS case was removed once
+this addon stopped supporting non-SuSFS trees), so this is a hard
+requirement in practice regardless.
+
+---
+
+## `build/make.sh`
+
+**Purpose of this file**: build — make. Runs defconfig generation,
+Luminaire config application, version patches, and the actual kernel
+compile.
+
+**Timestamp freezing disabled** — libfakestat/libfaketimeMT is
+disabled — the prebuilt `.so` files are not compatible with the GitHub
+Actions Ubuntu runner libc and cause segfaults in all spawned processes.
+ccache-ECS still provides significant cache improvement via
+`CCACHE_IS_KERNEL_COMPILING=true` and content-hash validation.
+
+**Version patches loop (`patches/required/`)** — only
+`patches/required/` — genuinely mandatory, non-feature, correctness-only
+fixes (e.g. the KaBI patch), applied unconditionally regardless of
+addon/feature selection. Feature patches (`kernel/addons/*`, `kernel/
+luminaire/*`) apply their own `patches/<owner>/` file directly and are
+not read by this loop, so an unchecked addon toggle actually disables
+it.
+
+---
+
+## `release/anykernel.sh`
+
+**Purpose of this file**: release — AnyKernel3 packaging.
+
+**Kasumi module inclusion** — Kasumi is an out-of-tree LKM, not
+something AK3's ramdisk-patch flow can auto-load like an in-tree CONFIG
+option — it ships as a plain `.ko` in the zip under `modules/`, for
+manual `insmod`/`ksud insmod` on-device. No auto-load hook here on
+purpose (see `kernel/addons/kasumi/kasumi.sh` in this document: this is
+explicitly experimental/opt-in, not something that should silently
+start hooking VFS/syscall paths on every boot).
+
+**zram.ko (LZ4KD) inclusion** — `zram.ko` (LZ4KD support) lives on the
+read-only, dm-verity-protected `system_dlkm` partition on-device, not
+the boot ramdisk — AK3's normal repack flow can't touch it, so there's
+no in-zip auto-load path here (same constraint as Kasumi, different
+reason: that's opt-in-by-design, this is a partition AK3 structurally
+cannot reach). Shipped for manual `insmod`/`ksud insmod` testing
+(`swapoff` + `rmmod zram` first) until a `system_dlkm.img`
+rebuild+fastboot-flash path exists, if ever.
+
+---
+
+## `kernel/luminaire/adios/adios.sh`
+
+**Purpose of this file**: Luminaire feature — ADIOS (Adaptive Deadline
+I/O Scheduler), by Masahito Suzuki (firelzrd). Repo:
+https://github.com/firelzrd/adios.
+
+Backport to android14-6.1: `elevator_get()` instead of
+`elevator_find_get()` (doesn't exist on 6.1), mq-deadline preserved as
+fallback default when ADIOS default is not selected (this tree has no
+SSG scheduler — see the patch header for how that was confirmed), and a
+NULL pointer fix in `adios_completed_request()` for UFS MCQ
+(`rq->elv.priv[0]` can be NULL for requests that never went through
+elevator insert).
+
+Always-on Luminaire feature — no user toggle, not part of `$ADDONS`. See
+`LUMINAIRE_SUPPORTED_VERSIONS` in `kernel/luminaire/registry.sh` for
+version gating.
+
+---
+
+## `kernel/ksu-shared/registry.sh`
+
+**Purpose of this file**: KSU root-solution support map — single source
+of truth. Same shape/purpose as `kernel/addons/registry.sh`'s
+`ADDON_SUPPORTED_VERSIONS` and `kernel/luminaire/registry.sh`'s
+`LUMINAIRE_SUPPORTED_VERSIONS`. This is the ONLY compatibility signal
+for root solutions now — `resukisu.sh`/`sukisu.sh`/`ksunext.sh` live
+once under `kernel/ksu-shared/` (they have no real per-kernel-version
+logic; each fork's own `setup.sh` handles GKI version detection
+upstream), so "does `kernel/<ver>/ksu/<variant>/` exist" is no longer a
+meaningful question to ask.
+
+SuSFS pairing is a separate, genuinely per-version question — still
+gated by `kernel/<ver>/ksu/susfs/susfs.sh` existing (or erroring, for
+combinations like KSUNEXT+SUSFS that aren't wired up yet), not by
+anything in this map.
+
+---
+
+## `release/telegram/common.sh`
+
+**Purpose of this file**: Telegram — shared API call helper. Sends one
+multipart POST to the Telegram Bot API with HTTP-level retry and
+exponential backoff. This is intentionally separate from `retry()` in
+`functions.sh`: `retry()` only checks a command's exit code, but curl
+exits 0 even when Telegram returns 429/5xx in the HTTP body — the retry
+decision here depends on inspecting the response status itself, so a
+generic exit-code retry can't express it.
+
+**`telegram_api_call()`** — usage: `telegram_api_call <method>
+<response_file> <label> <curl -F args...>`. On success: returns 0,
+response body left in `<response_file>`, and `TG_RESPONSE` holds its
+contents. On failure (retries exhausted or non-retryable status):
+returns 1.
+
+---
+
+## `kernel/luminaire/bore/bore.sh`
+
+**Purpose of this file**: Luminaire feature — BORE (Burst-Oriented
+Response Enhancer), CPU scheduler by Masahito Suzuki (firelzrd). Repo:
+https://github.com/firelzrd/bore-scheduler.
+
+KABI-safe backport to v5.3.0-equivalent for android14-6.1: all BORE
+fields live inside `struct sched_entity`'s existing
+`ANDROID_KABI_RESERVE(1-4)` slots (`ANDROID_KABI_USE`/
+`_ANDROID_KABI_REPLACE`), so `sizeof(struct sched_entity)` and every
+field offset after it stays identical to a non-BORE GKI build — no
+vendor-module KABI break.
+
+Always-on Luminaire feature — no user toggle, not part of `$ADDONS`. See
+`LUMINAIRE_SUPPORTED_VERSIONS` in `kernel/luminaire/registry.sh` for
+version gating.
+
+---
+
+## `setup/00_paths.sh`
+
+**Purpose of this file**: setup — paths & build config.
+
+**`BUILD_SYSTEM`/`CLANG_VARIANT` parsing** — parses the combined
+workflow input (e.g. `"Make - Cirrus"`) into `BUILD_SYSTEM` +
+`CLANG_VARIANT` separately.
+
+**`LUMINAIRE_PATCH_DIR` guard** — bootstrapped by the entrypoint
+(`build.sh`/`arsenal.sh`) before `run_setup()` runs — it's what lets
+`run_setup()` find this very file. Guarded here instead of silently
+re-deriving it, so a future entrypoint that forgets to set it fails
+loud instead of masking the mistake.

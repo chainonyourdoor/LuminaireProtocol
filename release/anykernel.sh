@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-# ======================================================
-# 📦 RELEASE — ANYKERNEL3 PACKAGING
-# ======================================================
-
 case "${KERNEL_VARIANT}" in
     VANILLA)  ZIP_VARIANT_TAG="VANILLA" ;;
     RESUKISU) ZIP_VARIANT_TAG="RESUKISU" ;;
@@ -44,25 +40,12 @@ done
 
 cp "$KERNEL_IMG" "${TOOL_AK3_DIR}/"
 
-# Kasumi is an out-of-tree LKM, not something AK3's ramdisk-patch flow can
-# auto-load like an in-tree CONFIG option — it ships as a plain .ko in the
-# zip under modules/, for manual `insmod`/`ksud insmod` on-device. No
-# auto-load hook here on purpose (see kernel/addons/kasumi/kasumi.sh: this
-# is explicitly experimental/opt-in, not something that should silently
-# start hooking VFS/syscall paths on every boot).
 if [ -n "${KASUMI_KO:-}" ] && [ -f "${KASUMI_KO}" ]; then
     mkdir -p "${TOOL_AK3_DIR}/modules"
     cp "$KASUMI_KO" "${TOOL_AK3_DIR}/modules/"
     log "Kasumi: kasumi_lkm.ko included in zip under modules/ (manual insmod required) ✅"
 fi
 
-# zram.ko (LZ4KD support) lives on the read-only, dm-verity-protected
-# system_dlkm partition on-device, not the boot ramdisk — AK3's normal
-# repack flow can't touch it, so there's no in-zip auto-load path here
-# (same constraint as Kasumi, different reason: that's opt-in-by-design,
-# this is a partition AK3 structurally cannot reach). Shipped for manual
-# `insmod`/`ksud insmod` testing (swapoff + rmmod zram first) until a
-# system_dlkm.img rebuild+fastboot-flash path exists, if ever.
 ZRAM_KO="${OUT_DIR}/drivers/block/zram/zram.ko"
 if [ -f "$ZRAM_KO" ]; then
     mkdir -p "${TOOL_AK3_DIR}/modules"

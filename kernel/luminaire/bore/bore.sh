@@ -5,14 +5,6 @@
 # CPU scheduler by Masahito Suzuki (firelzrd)
 # Repo: https://github.com/firelzrd/bore-scheduler
 # ======================================================
-# KABI-safe backport to v5.3.0-equivalent for android14-6.1: all BORE
-# fields live inside struct sched_entity's existing
-# ANDROID_KABI_RESERVE(1-4) slots (ANDROID_KABI_USE/_ANDROID_KABI_REPLACE),
-# so sizeof(struct sched_entity) and every field offset after it stays
-# identical to a non-BORE GKI build — no vendor-module KABI break.
-#
-# Always-on Luminaire feature — no user toggle, not part of $ADDONS. See
-# LUMINAIRE_SUPPORTED_VERSIONS in build.sh for version gating.
 
 BORE_PATCH="${VERSION_PATCH_DIR}/patches/luminaire/bore-v5.3.0.patch"
 

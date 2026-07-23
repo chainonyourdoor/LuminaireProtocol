@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-# ======================================================
-# 🏗️ BUILD — MAKE
-# ======================================================
-
 MAKE_ARGS=(
     -C "$KERNEL_SRC"
     O="$OUT_DIR"
@@ -21,10 +17,8 @@ MAKE_ARGS=(
     -j"$(nproc --all)"
 )
 
-# Ensure LTO cache dir exists on RAM disk
 mkdir -p "$LTO_CACHE_DIR"
 
-# ThinLTO: wrap ld.lld to redirect cache to RAM disk
 if [ "${LTO_MODE}" = "THIN" ]; then
     LD_WRAPPER="${KERNEL_SRC}/ld-wrapper"
     cat > "$LD_WRAPPER" << 'WRAPPER_EOF'
@@ -38,7 +32,6 @@ WRAPPER_EOF
     log "ThinLTO ld-wrapper enabled (cache: /dev/shm/ldcache) ✅"
 fi
 
-# Defconfig + patches
 touch "${KERNEL_SRC}/.scmversion"
 
 log "Generating defconfig..."
@@ -51,11 +44,6 @@ log "Syncing config..."
 make "${MAKE_ARGS[@]}" olddefconfig || error "olddefconfig failed!"
 
 log "Applying version patches..."
-# Only patches/required/ — genuinely mandatory, non-feature, correctness-
-# only fixes (e.g. the KaBI patch), applied unconditionally regardless of
-# addon/feature selection. Feature patches (kernel/addons/*, kernel/
-# luminaire/*) apply their own patches/<owner>/ file directly and are not
-# read by this loop, so an unchecked addon toggle actually disables it.
 for patch in "${VERSION_PATCH_DIR}/patches/required/"*.patch; do
     [ -f "$patch" ] || continue
     log "Applying: $(basename "$patch")..."
@@ -69,12 +57,6 @@ for patch in "${VERSION_PATCH_DIR}/patches/required/"*.patch; do
     fi
 done
 
-# Build
-# Timestamp freezing via libfakestat/libfaketimeMT is disabled —
-# the prebuilt .so files are not compatible with the GitHub Actions
-# Ubuntu runner libc and cause segfaults in all spawned processes.
-# ccache-ECS still provides significant cache improvement via
-# CCACHE_IS_KERNEL_COMPILING=true and content-hash validation.
 CC_ARG="${TOOL_CCACHE_WRAPPERS}/clang"
 
 if [ "${DRY_RUN:-false}" = "true" ]; then

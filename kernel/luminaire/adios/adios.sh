@@ -5,15 +5,6 @@
 # by Masahito Suzuki (firelzrd)
 # Repo: https://github.com/firelzrd/adios
 # ======================================================
-# Backport to android14-6.1: elevator_get() instead of elevator_find_get()
-# (doesn't exist on 6.1), mq-deadline preserved as fallback default when
-# ADIOS default is not selected (this tree has no SSG scheduler — see the
-# patch header for how that was confirmed), and a NULL pointer fix in
-# adios_completed_request() for UFS MCQ (rq->elv.priv[0] can be NULL for
-# requests that never went through elevator insert).
-#
-# Always-on Luminaire feature — no user toggle, not part of $ADDONS. See
-# LUMINAIRE_SUPPORTED_VERSIONS in build.sh for version gating.
 
 ADIOS_PATCH="${VERSION_PATCH_DIR}/patches/luminaire/adios-v3.2.0.patch"
 

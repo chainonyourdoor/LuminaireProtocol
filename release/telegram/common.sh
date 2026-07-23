@@ -1,20 +1,5 @@
 #!/usr/bin/env bash
 
-# ======================================================
-# 📡 TELEGRAM — SHARED API CALL HELPER
-# ======================================================
-# Sends one multipart POST to the Telegram Bot API with HTTP-level retry
-# and exponential backoff. This is intentionally separate from retry() in
-# functions.sh: retry() only checks a command's exit code, but curl exits
-# 0 even when Telegram returns 429/5xx in the HTTP body — the retry
-# decision here depends on inspecting the response status itself, so a
-# generic exit-code retry can't express it.
-#
-# Usage: telegram_api_call <method> <response_file> <label> <curl -F args...>
-# On success: returns 0, response body left in <response_file>, and
-#   TG_RESPONSE holds its contents.
-# On failure (retries exhausted or non-retryable status): returns 1.
-
 telegram_api_call() {
     local method="$1" response_file="$2" label="$3"; shift 3
     local err_file http_code curl_err attempt=1 sleep_secs
