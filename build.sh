@@ -41,6 +41,7 @@ main() {
 
     restore_kernel_source
     run_branding
+    mark_stage_ok CHECKPOINT_PRE_VARIANT_OK
     run_variant
     mark_stage_ok CHECKPOINT_VARIANT_OK
     run_core

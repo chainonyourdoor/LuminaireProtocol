@@ -105,6 +105,11 @@ for key in "${COMPONENTS[@]}"; do
         continue
     fi
 
+    if [ "${CHECKPOINT_PRE_VARIANT_OK:-false}" != "true" ]; then
+        log "checkpoint: ${key} candidate ${ref:0:12} left untouched — build failed before run_variant (setup/restore-source/branding), not in run_variant/run_build (kernel ${KERNEL_VERSION})"
+        continue
+    fi
+
     if [ "${CHECKPOINT_VARIANT_OK:-false}" = "true" ] && [ "${CHECKPOINT_ADDONS_OK:-false}" != "true" ]; then
         log "checkpoint: ${key} candidate ${ref:0:12} left untouched — build failed in an unrelated stage (run_core/run_addons), not in run_variant/run_build (kernel ${KERNEL_VERSION})"
         continue
