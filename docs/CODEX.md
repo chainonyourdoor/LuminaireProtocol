@@ -40,6 +40,7 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/addons/registry.sh](#kerneladdonsregistrysh)
 - [kernel/ksu-shared/sukisu/sukisu.sh](#kernelksu-sharedsukisusukisush)
 - [kernel/addons/bbrv3/bbrv3.sh](#kerneladdonsbbrv3bbrv3sh)
+- [kernel/luminaire/registry.sh](#kernelluminaireregistrysh)
 
 ---
 
@@ -1343,3 +1344,34 @@ Doing it kernel-side (rather than a root-manager `service.d` script)
 means it also works on VANILLA builds with no root solution installed at
 all. See `kernel/addons/bbrv3/enforcer.py` in this document for the
 enforcer's own mechanism.
+
+---
+
+## `kernel/luminaire/registry.sh`
+
+**Purpose of this file**: Luminaire feature registry — support map,
+dispatch. Sourced once by `build.sh` (functions become available for the
+rest of the process, same shape as `functions.sh`) so `build.sh` itself
+only ever calls `run_luminaire()` and doesn't need to know any feature
+policy lives here.
+
+These features (currently: ADIOS I/O scheduler, BORE CPU scheduler) are
+structurally parallel to `kernel/addons/`, but never gated by `$ADDONS`
+or a workflow checkbox — they're permanent Luminaire-branded features,
+always applied on every kernel version that has a backport for them,
+exactly the same way a distro ships its own default scheduler choice.
+These used to live in `kernel/addons/` with a toggle in `build.yml`,
+which contradicted the actual intent (source was always patched in
+regardless of the toggle, only the Kconfig enable line and the release
+caption respected it) — hence the split into this separate registry.
+
+**`LUMINAIRE_SUPPORTED_VERSIONS`** — space-separated `KERNEL_VERSION`
+values each feature actually has a patch for today — same shape/purpose
+as `kernel/addons/registry.sh`'s `ADDON_SUPPORTED_VERSIONS`, kept as a
+separate map since these are never addons.
+
+**`run_luminaire()`, `export APPLIED_LUMINAIRE`/`SKIPPED_LUMINAIRE`** —
+not `local`: `telegram.sh` (`run_release` → `telegram.sh`, later in the
+same process) reads these directly to build the release caption. A
+function-local var dies at return, so it would never survive to reach
+`telegram.sh` even though both run in the same bash process.
