@@ -14,9 +14,6 @@ AOSP_URL=$(curl -fsSL https://api.github.com/repos/bachnxuan/aosp_clang_mirror/r
 retry 3 run_quiet curl -fL "$AOSP_URL" -o /tmp/clang.tar.gz \
     || error "AOSP: download failed!"
 
-# Unlike the other variants, this mirror's tarball has no wrapping top-level
-# directory — bin/, lib64/, etc. already sit at archive root (it's a direct
-# repack of the AOSP prebuilt tree), so no --strip-components here.
 tar -xf /tmp/clang.tar.gz -C "$TOOL_CLANG_DIR"
 rm -f /tmp/clang.tar.gz
 log "AOSP Clang downloaded ✅"

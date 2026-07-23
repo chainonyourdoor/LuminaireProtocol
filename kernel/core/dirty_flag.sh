@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-# ======================================================
-# 🧹 CLEAN DIRTY FLAGS
-# ======================================================
-
 sed -i 's/-dirty//' "${KERNEL_SRC}/scripts/setlocalversion"
 
 cd "${KERNEL_SRC}"

@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-# ======================================================
-# 🔤 COMPILER STRING — SANITIZE UTS VERSION
-# ======================================================
-
 MKCOMPILE_H="${KERNEL_SRC}/scripts/mkcompile_h"
 PATCHER="${LUMINAIRE_PATCH_DIR}/kernel/core/compiler_string/patch.py"
 

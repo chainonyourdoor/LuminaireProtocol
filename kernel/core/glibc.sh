@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-# ======================================================
-# 🔧 GLIBC >= 2.38
-# ======================================================
-
 GLIBC_VERSION="$(ldd --version 2>/dev/null | head -n 1 | awk '{print $NF}')"
 if [ "$(printf '%s\n' "2.38" "$GLIBC_VERSION" | sort -V | head -n 1)" = "2.38" ]; then
     log "Applying GLIBC >= 2.38 fix..."

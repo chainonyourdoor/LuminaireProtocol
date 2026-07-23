@@ -60,6 +60,16 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/addons/lz4kd/lz4kd.sh](#kerneladdonslz4kdlz4kdsh)
 - [setup/03_clang.sh](#setup03_clangsh)
 - [kernel/addons/wireguard/wireguard.sh](#kerneladdonswireguardwireguardsh)
+- [kernel/addons/rekernel/rekernel.sh](#kerneladdonsrekernelrekernelsh)
+- [kernel/addons/droidspaces/droidspaces.sh](#kerneladdonsdroidspacesdroidspacessh)
+- [setup/clang/{aosp,cirrus,zyc,weebx,neutron}.sh](#setupclangaospcirruszycweebxneutronsh)
+- [kernel/core/module_bypass/module_bypass.sh](#kernelcoremodule_bypassmodule_bypasssh)
+- [kernel/addons/bbg/bbg.sh](#kerneladdonsbbgbbgsh)
+- [kernel/core/protected_exports.sh](#kernelcoreprotected_exportssh)
+- [kernel/core/glibc.sh](#kernelcoreglibcsh)
+- [kernel/core/dirty_flag.sh](#kernelcoredirty_flagsh)
+- [kernel/core/compiler_string/compiler_string.sh](#kernelcorecompiler_stringcompiler_stringsh)
+- [download/make.sh](#downloadmakesh)
 
 ---
 
@@ -1746,3 +1756,122 @@ Upstream: https://www.wireguard.com/.
 No patch needed — WireGuard has been in mainline Linux since 5.6, so
 `drivers/net/wireguard/` is already present in this GKI tree. This is
 purely a Kconfig flip, same as any other config-only addon here.
+
+---
+
+## `kernel/addons/rekernel/rekernel.sh`
+
+**Purpose of this file**: addon — Re:Kernel (Binder/Signal Netlink
+server). Repo: https://github.com/Sakion-Team/Re-Kernel.
+
+Provides a Netlink server in the kernel that emits binder transaction
+and signal events for frozen procs, enabling tombstone apps (Thanox,
+HASS, Scene) to react to app kills and freezes in real time.
+
+---
+
+## `kernel/addons/droidspaces/droidspaces.sh`
+
+**Purpose of this file**: addon — Droidspaces (LXC container runtime).
+Requires: `001_GKI-below-6_12-fix_sysvipc_kabi_6_7_8.patch`. Docs:
+https://github.com/ravindu644/Droidspaces-OSS. Already minimal — no
+further stripping needed beyond the header banner and generated-config
+comments (which describe sections of `gki_defconfig` itself, not the
+script's own logic).
+
+---
+
+## `setup/clang/{aosp,cirrus,zyc,weebx,neutron}.sh`
+
+**Purpose of these files**: one script per Clang variant, each
+downloading/preparing that toolchain into `$TOOL_CLANG_DIR`.
+
+**`aosp.sh` tarball layout** — unlike the other variants, this mirror's
+(bachnxuan/aosp_clang_mirror) tarball has no wrapping top-level
+directory — `bin/`, `lib64/`, etc. already sit at archive root (it's a
+direct repack of the AOSP prebuilt tree), so no `--strip-components` is
+used here, unlike `cirrus.sh`/`weebx.sh` which both use
+`--strip-components=1`.
+
+**`zyc.sh` dynamic strip-components** — computes `--strip-components`
+dynamically by locating `bin/clang` inside the tarball and counting its
+path depth, since ZyCromerZ's release tarball structure isn't as
+consistently one-level-wrapped as the other variants.
+
+**`neutron.sh`** — uses Neutron-Toolchains' own `antman` tool to sync
+and glibc-patch the toolchain (rather than a plain tarball download like
+the other variants), retrying the glibc patch once if the resulting
+`clang` binary isn't executable afterward.
+
+cirrus/weebx were already minimal (header banner + logic only) and
+needed no further stripping.
+
+---
+
+## `kernel/core/module_bypass/module_bypass.sh`
+
+**Purpose of this file**: module version bypass — patches
+`kernel/module/version.c` to loosen module ABI version checks.
+
+**`MODULE_BYPASS_ENABLED` toggle** — defaults to enabled to preserve
+existing behavior, but is explicit and toggle-able
+(`MODULE_BYPASS_ENABLED=false`) rather than unconditional, so build
+variants can opt out of loosening module ABI version checks.
+
+---
+
+## `kernel/addons/bbg/bbg.sh`
+
+**Purpose of this file**: addon — BBG (Baseband Guard LSM). Repo:
+https://github.com/vc-teahouse/Baseband-guard. Already minimal — no
+further stripping needed.
+
+---
+
+## `kernel/core/protected_exports.sh`
+
+**Purpose of this file**: removes `android/abi_gki_protected_exports_*`
+files from the kernel source, so protected-export ABI checks don't
+block builds that intentionally deviate from the stock GKI ABI.
+
+---
+
+## `kernel/core/glibc.sh`
+
+**Purpose of this file**: GLIBC >= 2.38 compat fix for
+`tools/bpf/resolve_btfids/Makefile`. On newer glibc-based build hosts,
+`resolve_btfids` needs `EXTRA_CFLAGS="$(CFLAGS)"` passed through
+explicitly; this patches the Makefile's recipe line to add it, detects
+if the fix (or an equivalent upstream `HOST_OVERRIDES`-based fix) is
+already present, and warns rather than fails on an unrecognized Makefile
+structure so a future upstream refactor doesn't hard-break the build for
+an optional compat shim.
+
+---
+
+## `kernel/core/dirty_flag.sh`
+
+**Purpose of this file**: cleans the `-dirty` suffix from
+`scripts/setlocalversion`'s output and commits the working tree
+in-place, so the compiled kernel's version string doesn't carry a
+"dirty" marker from this repo's own build-time source modifications
+(patches, config changes, branding).
+
+---
+
+## `kernel/core/compiler_string/compiler_string.sh`
+
+**Purpose of this file**: compiler string — sanitizes the UTS version.
+Calls `kernel/core/compiler_string/patch.py` against `scripts/
+mkcompile_h` to replace the raw compiler/linker version strings with a
+clean, Luminaire-branded compiler string (see `patch.py`'s own entry in
+this document for the CC_VERSION/LD_VERSION mechanics).
+
+---
+
+## `download/make.sh`
+
+**Purpose of this file**: download — make (Git Clone). Restores kernel
+source from cache when available, otherwise clones
+`LuminaireKernel-${KERNEL_VERSION}` at `$KERNEL_BRANCH` and saves the
+result to cache for next time.

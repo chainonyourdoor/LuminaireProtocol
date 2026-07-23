@@ -4,10 +4,7 @@
 # 📦 ADDON — Re:Kernel (Binder/Signal Netlink server)
 # ======================================================
 # Repo: https://github.com/Sakion-Team/Re-Kernel
-# Provides a Netlink server in the kernel that emits
-# binder transaction and signal events for frozen procs,
-# enabling tombstone apps (Thanox, HASS, Scene) to react
-# to app kills and freezes in real time.
+# ======================================================
 
 log "Integrating Re:Kernel..."
 
