@@ -8,7 +8,7 @@
 
 log "Enabling Droidspaces support..."
 
-KABI_PATCH="${VERSION_PATCH_DIR}/patches/required/001_GKI-below-6_12-fix_sysvipc_kabi_6_7_8.patch"
+KABI_PATCH="${PATCHES_DIR}/required/001_GKI-below-6_12-fix_sysvipc_kabi_6_7_8.patch"
 if [ ! -f "$KABI_PATCH" ]; then
     warn "Droidspaces: KaBI patch not found at ${KABI_PATCH} — SYSVIPC may cause KaBI violations on some devices"
 elif patch -p1 --fuzz=3 --dry-run --reverse -d "$KERNEL_SRC" < "$KABI_PATCH" > /dev/null 2>&1; then

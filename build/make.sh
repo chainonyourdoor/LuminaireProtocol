@@ -44,7 +44,7 @@ log "Syncing config..."
 make "${MAKE_ARGS[@]}" olddefconfig || error "olddefconfig failed!"
 
 log "Applying version patches..."
-for patch in "${VERSION_PATCH_DIR}/patches/required/"*.patch; do
+for patch in "${PATCHES_DIR}/required/"*.patch; do
     [ -f "$patch" ] || continue
     log "Applying: $(basename "$patch")..."
     if patch -p1 --fuzz=3 --dry-run --forward -d "$KERNEL_SRC" < "$patch" > /dev/null 2>&1; then

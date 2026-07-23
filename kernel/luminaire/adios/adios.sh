@@ -6,7 +6,7 @@
 # Repo: https://github.com/firelzrd/adios
 # ======================================================
 
-ADIOS_PATCH="${VERSION_PATCH_DIR}/patches/luminaire/adios-v3.2.0.patch"
+ADIOS_PATCH="${PATCHES_DIR}/luminaire/adios-v3.2.0.patch"
 
 log "📦 Applying ADIOS I/O scheduler patch..."
 [ -f "$ADIOS_PATCH" ] || error "ADIOS: not backported for kernel ${KERNEL_VERSION} yet (expected ${ADIOS_PATCH}) — this feature should have been gated out before reaching here (check run_luminaire()'s support map)."

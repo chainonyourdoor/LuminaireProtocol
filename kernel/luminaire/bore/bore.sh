@@ -6,7 +6,7 @@
 # Repo: https://github.com/firelzrd/bore-scheduler
 # ======================================================
 
-BORE_PATCH="${VERSION_PATCH_DIR}/patches/luminaire/bore-v5.3.0.patch"
+BORE_PATCH="${PATCHES_DIR}/luminaire/bore-v5.3.0.patch"
 
 log "🔥 Applying BORE CPU scheduler patch..."
 [ -f "$BORE_PATCH" ] || error "BORE: not backported for kernel ${KERNEL_VERSION} yet (expected ${BORE_PATCH}) — this feature should have been gated out before reaching here (check run_luminaire()'s support map)."

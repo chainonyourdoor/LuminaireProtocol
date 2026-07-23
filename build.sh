@@ -34,8 +34,9 @@ main() {
     wait_for_apt
     echo "::endgroup::"
 
-    [ -d "$VERSION_PATCH_DIR" ] \
-        || error "Kernel version ${KERNEL_VERSION} is not yet supported — missing ${VERSION_PATCH_DIR} (no KSU/patches implemented for this version)"
+    KSU_MANIFEST="${LUMINAIRE_PATCH_DIR}/kernel/ksu/manifests/${ANDROID_VERSION}-${KERNEL_VERSION}.json"
+    [ -f "$KSU_MANIFEST" ] \
+        || error "Kernel version ${KERNEL_VERSION} is not yet supported — missing ${KSU_MANIFEST} (no KSU/patches implemented for this version)"
 
     mkdir -p "$KERNEL_DIR" "$OUT_DIR"
 
