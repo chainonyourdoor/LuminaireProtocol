@@ -1,0 +1,531 @@
+diff --git a/drivers/ufs/core/ufs-sysfs.c b/drivers/ufs/core/ufs-sysfs.c
+index 210ec9639..68317a240 100644
+--- a/drivers/ufs/core/ufs-sysfs.c
++++ b/drivers/ufs/core/ufs-sysfs.c
+@@ -300,6 +300,44 @@ static ssize_t enable_wb_buf_flush_store(struct device *dev,
+ 	return res < 0 ? res : count;
+ }
+ 
++static const char * const wb_resize_en_mode[] = {
++	[WB_RESIZE_EN_IDLE]	= "idle",
++	[WB_RESIZE_EN_DECREASE]	= "decrease",
++	[WB_RESIZE_EN_INCREASE]	= "increase",
++};
++
++static ssize_t wb_resize_enable_store(struct device *dev,
++				struct device_attribute *attr,
++				const char *buf, size_t count)
++{
++	struct ufs_hba *hba = dev_get_drvdata(dev);
++	int mode;
++	ssize_t res;
++
++	if (!ufshcd_is_wb_allowed(hba) || !hba->dev_info.wb_enabled
++		|| !hba->dev_info.b_presrv_uspc_en
++		|| !(hba->dev_info.ext_wb_sup & UFS_DEV_WB_BUF_RESIZE))
++		return -EOPNOTSUPP;
++
++	mode = sysfs_match_string(wb_resize_en_mode, buf);
++	if (mode < 0)
++		return -EINVAL;
++
++	down(&hba->host_sem);
++	if (!ufshcd_is_user_access_allowed(hba)) {
++		res = -EBUSY;
++		goto out;
++	}
++
++	ufshcd_rpm_get_sync(hba);
++	res = ufshcd_wb_set_resize_en(hba, mode);
++	ufshcd_rpm_put_sync(hba);
++
++out:
++	up(&hba->host_sem);
++	return res < 0 ? res : count;
++}
++
+ static DEVICE_ATTR_RW(rpm_lvl);
+ static DEVICE_ATTR_RO(rpm_target_dev_state);
+ static DEVICE_ATTR_RO(rpm_target_link_state);
+@@ -307,8 +345,19 @@ static DEVICE_ATTR_RW(spm_lvl);
+ static DEVICE_ATTR_RO(spm_target_dev_state);
+ static DEVICE_ATTR_RO(spm_target_link_state);
+ static DEVICE_ATTR_RW(auto_hibern8);
++static ssize_t critical_health_show(struct device *dev,
++				    struct device_attribute *attr, char *buf)
++{
++	struct ufs_hba *hba = dev_get_drvdata(dev);
++
++	return sysfs_emit(buf, "%d\n", hba->critical_health_count);
++}
++
++static DEVICE_ATTR_RO(critical_health);
++
+ static DEVICE_ATTR_RW(wb_on);
+ static DEVICE_ATTR_RW(enable_wb_buf_flush);
++static DEVICE_ATTR_WO(wb_resize_enable);
+ 
+ static struct attribute *ufs_sysfs_ufshcd_attrs[] = {
+ 	&dev_attr_rpm_lvl.attr,
+@@ -320,6 +369,8 @@ static struct attribute *ufs_sysfs_ufshcd_attrs[] = {
+ 	&dev_attr_auto_hibern8.attr,
+ 	&dev_attr_wb_on.attr,
+ 	&dev_attr_enable_wb_buf_flush.attr,
++	&dev_attr_wb_resize_enable.attr,
++	&dev_attr_critical_health.attr,
+ 	NULL
+ };
+ 
+@@ -1130,6 +1181,97 @@ static const struct attribute_group ufs_sysfs_flags_group = {
+ 	.attrs = ufs_sysfs_device_flags,
+ };
+ 
++static const char *ufs_wb_resize_hint_to_string(enum wb_resize_hint hint)
++{
++	switch (hint) {
++	case WB_RESIZE_HINT_KEEP:
++		return "keep";
++	case WB_RESIZE_HINT_DECREASE:
++		return "decrease";
++	case WB_RESIZE_HINT_INCREASE:
++		return "increase";
++	default:
++		return "unknown";
++	}
++}
++
++static const char *ufs_wb_resize_status_to_string(enum wb_resize_status status)
++{
++	switch (status) {
++	case WB_RESIZE_STATUS_IDLE:
++		return "idle";
++	case WB_RESIZE_STATUS_IN_PROGRESS:
++		return "in_progress";
++	case WB_RESIZE_STATUS_COMPLETE_SUCCESS:
++		return "complete_success";
++	case WB_RESIZE_STATUS_GENERAL_FAILURE:
++		return "general_failure";
++	default:
++		return "unknown";
++	}
++}
++
++static int wb_read_resize_attrs(struct ufs_hba *hba,
++			enum attr_idn idn, u32 *attr_val)
++{
++	u8 index = 0;
++	int ret;
++
++	if (!ufshcd_is_wb_allowed(hba) || !hba->dev_info.wb_enabled
++		|| !hba->dev_info.b_presrv_uspc_en
++		|| !(hba->dev_info.ext_wb_sup & UFS_DEV_WB_BUF_RESIZE))
++		return -EOPNOTSUPP;
++
++	down(&hba->host_sem);
++	if (!ufshcd_is_user_access_allowed(hba)) {
++		up(&hba->host_sem);
++		return -EBUSY;
++	}
++
++	index = ufshcd_wb_get_query_index(hba);
++	ufshcd_rpm_get_sync(hba);
++	ret = ufshcd_query_attr(hba, UPIU_QUERY_OPCODE_READ_ATTR,
++			idn, index, 0, attr_val);
++	ufshcd_rpm_put_sync(hba);
++
++	up(&hba->host_sem);
++	return ret;
++}
++
++static ssize_t wb_resize_hint_show(struct device *dev,
++				struct device_attribute *attr, char *buf)
++{
++	struct ufs_hba *hba = dev_get_drvdata(dev);
++	int ret;
++	u32 value;
++
++	ret = wb_read_resize_attrs(hba,
++			QUERY_ATTR_IDN_WB_BUF_RESIZE_HINT, &value);
++	if (ret)
++		return ret;
++
++	return sysfs_emit(buf, "%s\n", ufs_wb_resize_hint_to_string(value));
++}
++
++static DEVICE_ATTR_RO(wb_resize_hint);
++
++static ssize_t wb_resize_status_show(struct device *dev,
++				struct device_attribute *attr, char *buf)
++{
++	struct ufs_hba *hba = dev_get_drvdata(dev);
++	int ret;
++	u32 value;
++
++	ret = wb_read_resize_attrs(hba,
++			QUERY_ATTR_IDN_WB_BUF_RESIZE_STATUS, &value);
++	if (ret)
++		return ret;
++
++	return sysfs_emit(buf, "%s\n", ufs_wb_resize_status_to_string(value));
++}
++
++static DEVICE_ATTR_RO(wb_resize_status);
++
+ static inline bool ufshcd_is_wb_attrs(enum attr_idn idn)
+ {
+ 	return idn >= QUERY_ATTR_IDN_WB_FLUSH_STATUS &&
+@@ -1212,6 +1354,8 @@ static struct attribute *ufs_sysfs_attributes[] = {
+ 	&dev_attr_wb_avail_buf.attr,
+ 	&dev_attr_wb_life_time_est.attr,
+ 	&dev_attr_wb_cur_buf.attr,
++	&dev_attr_wb_resize_hint.attr,
++	&dev_attr_wb_resize_status.attr,
+ 	NULL,
+ };
+ 
+diff --git a/drivers/ufs/core/ufshcd.c b/drivers/ufs/core/ufshcd.c
+index 995609860..cbda37461 100644
+--- a/drivers/ufs/core/ufshcd.c
++++ b/drivers/ufs/core/ufshcd.c
+@@ -6090,6 +6090,21 @@ int ufshcd_wb_toggle_buf_flush(struct ufs_hba *hba, bool enable)
+ 	return ret;
+ }
+ 
++int ufshcd_wb_set_resize_en(struct ufs_hba *hba, enum wb_resize_en en_mode)
++{
++	int ret;
++	u8 index;
++
++	index = ufshcd_wb_get_query_index(hba);
++	ret = ufshcd_query_attr_retry(hba, UPIU_QUERY_OPCODE_WRITE_ATTR,
++				QUERY_ATTR_IDN_WB_BUF_RESIZE_EN, index, 0, &en_mode);
++	if (ret)
++		dev_err(hba->dev, "%s: Enable WB buf resize operation failed %d\n",
++			__func__, ret);
++
++	return ret;
++}
++
+ static bool ufshcd_wb_presrv_usrspc_keep_vcc_on(struct ufs_hba *hba,
+ 						u32 avail_buf)
+ {
+@@ -6243,6 +6258,11 @@ static void ufshcd_exception_event_handler(struct work_struct *work)
+ 	if (status & hba->ee_drv_mask & MASK_EE_URGENT_TEMP)
+ 		ufshcd_temp_exception_event_handler(hba, status);
+ 
++	if (status & hba->ee_drv_mask & MASK_EE_HEALTH_CRITICAL) {
++		hba->critical_health_count++;
++		sysfs_notify(&hba->dev->kobj, NULL, "critical_health");
++	}
++
+ 	ufs_debugfs_exception_event(hba, status);
+ out:
+ 	ufshcd_scsi_unblock_requests(hba);
+@@ -8167,6 +8187,9 @@ static void ufshcd_wb_probe(struct ufs_hba *hba, const u8 *desc_buf)
+ 	 */
+ 	dev_info->wb_buffer_type = desc_buf[DEVICE_DESC_PARAM_WB_TYPE];
+ 
++	dev_info->ext_wb_sup =  get_unaligned_be16(desc_buf +
++						DEVICE_DESC_PARAM_EXT_WB_SUP);
++
+ 	dev_info->b_presrv_uspc_en =
+ 		desc_buf[DEVICE_DESC_PARAM_WB_PRESRV_USRSPC_EN];
+ 
+@@ -8348,6 +8371,11 @@ static int ufs_get_device_desc(struct ufs_hba *hba)
+ 
+ 	ufshcd_temp_notif_probe(hba, desc_buf);
+ 
++	if (dev_info->wspecversion >= 0x410) {
++		hba->critical_health_count = 0;
++		ufshcd_enable_ee(hba, MASK_EE_HEALTH_CRITICAL);
++	}
++
+ 	if (hba->ext_iid_sup)
+ 		ufshcd_ext_iid_probe(hba, desc_buf);
+ 
+diff --git a/drivers/ufs/host/ufs-mediatek.c b/drivers/ufs/host/ufs-mediatek.c
+index 0d30452c7..d1741c553 100644
+--- a/drivers/ufs/host/ufs-mediatek.c
++++ b/drivers/ufs/host/ufs-mediatek.c
+@@ -849,6 +849,69 @@ static void ufs_mtk_vreg_fix_vccqx(struct ufs_hba *hba)
+ 	}
+ }
+ 
++static void ufs_mtk_setup_clk_gating(struct ufs_hba *hba)
++{
++	unsigned long flags;
++	u32 ah_ms = 10;
++	u32 ah_scale, ah_timer;
++	u32 scale_us[] = {1, 10, 100, 1000, 10000, 100000};
++
++	if (ufshcd_is_clkgating_allowed(hba)) {
++		if (ufshcd_is_auto_hibern8_supported(hba) && hba->ahit) {
++			ah_scale = FIELD_GET(UFSHCI_AHIBERN8_SCALE_MASK,
++					  hba->ahit);
++			ah_timer = FIELD_GET(UFSHCI_AHIBERN8_TIMER_MASK,
++					  hba->ahit);
++			if (ah_scale <= 5)
++				ah_ms = ah_timer * scale_us[ah_scale] / 1000;
++		}
++
++		spin_lock_irqsave(hba->host->host_lock, flags);
++		hba->clk_gating.delay_ms = max(ah_ms, 10U);
++		spin_unlock_irqrestore(hba->host->host_lock, flags);
++	}
++}
++
++/* Convert microseconds to Auto-Hibernate Idle Timer register value */
++static u32 ufs_mtk_us_to_ahit(unsigned int timer)
++{
++	unsigned int scale;
++
++	for (scale = 0; timer > UFSHCI_AHIBERN8_TIMER_MASK; ++scale)
++		timer /= UFSHCI_AHIBERN8_SCALE_FACTOR;
++
++	return FIELD_PREP(UFSHCI_AHIBERN8_TIMER_MASK, timer) |
++	       FIELD_PREP(UFSHCI_AHIBERN8_SCALE_MASK, scale);
++}
++
++static void ufs_mtk_fix_ahit(struct ufs_hba *hba)
++{
++	unsigned int us;
++
++	if (ufshcd_is_auto_hibern8_supported(hba)) {
++		switch (hba->dev_info.wmanufacturerid) {
++		case UFS_VENDOR_SAMSUNG:
++			/* configure auto-hibern8 timer to 3.5 ms */
++			us = 3500;
++			break;
++
++		case UFS_VENDOR_MICRON:
++			/* configure auto-hibern8 timer to 2 ms */
++			us = 2000;
++			break;
++
++		default:
++			/* configure auto-hibern8 timer to 1 ms */
++			us = 1000;
++			break;
++		}
++
++		hba->ahit = ufs_mtk_us_to_ahit(us);
++	}
++
++	ufs_mtk_setup_clk_gating(hba);
++}
++
+ static void ufs_mtk_init_mcq_irq(struct ufs_hba *hba)
+ {
+ 	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
+@@ -891,6 +954,8 @@ static void ufs_mtk_init_mcq_irq(struct ufs_hba *hba)
+  * Returns -EPROBE_DEFER if binding fails, returns negative error
+  * on phy power up failure and returns zero on success.
+  */
++static void ufs_mtk_dev_vreg_set_lpm(struct ufs_hba *hba, bool lpm);
++
+ static int ufs_mtk_init(struct ufs_hba *hba)
+ {
+ 	const struct of_device_id *id;
+@@ -966,6 +1031,13 @@ static int ufs_mtk_init(struct ufs_hba *hba)
+ 	cpu_latency_qos_add_request(&host->pm_qos_req, PM_QOS_DEFAULT_VALUE);
+ 	host->pm_qos_init = true;
+ 
++	/*
++	 * Because the default power setting of VSx (the upper layer of
++	 * VCCQ/VCCQ2) is HWLP, we need to prevent VCCQ/VCCQ2 from
++	 * entering LPM.
++	 */
++	ufs_mtk_dev_vreg_set_lpm(hba, false);
++
+ 	goto out;
+ 
+ out_variant_clear:
+@@ -991,6 +1063,10 @@ static bool ufs_mtk_pmc_via_fastauto(struct ufs_hba *hba,
+ 	    dev_req_params->gear_rx < UFS_HS_G4)
+ 		return false;
+ 
++	if (dev_req_params->pwr_tx == SLOW_MODE ||
++	    dev_req_params->pwr_rx == SLOW_MODE)
++		return false;
++
+ 	return true;
+ }
+ 
+@@ -1063,9 +1139,16 @@ static int ufs_mtk_pre_pwr_change(struct ufs_hba *hba,
+ 	}
+ 
+ 	if (host->hw_ver.major >= 3) {
+-		ret = ufshcd_dme_configure_adapt(hba,
+-					   dev_req_params->gear_tx,
+-					   PA_INITIAL_ADAPT);
++		if (dev_req_params->pwr_rx == FAST_MODE ||
++		    dev_req_params->pwr_rx == FASTAUTO_MODE) {
++			ret = ufshcd_dme_configure_adapt(hba,
++						   dev_req_params->gear_tx,
++						   PA_INITIAL_ADAPT);
++		} else {
++			ret = ufshcd_dme_configure_adapt(hba,
++						   dev_req_params->gear_tx,
++						   PA_NO_ADAPT);
++		}
+ 	}
+ 
+ 	return ret;
+@@ -1144,32 +1227,10 @@ static int ufs_mtk_pre_link(struct ufs_hba *hba)
+ 
+ 	return ret;
+ }
+-
+-static void ufs_mtk_setup_clk_gating(struct ufs_hba *hba)
+-{
+-	u32 ah_ms;
+-
+-	if (ufshcd_is_clkgating_allowed(hba)) {
+-		if (ufshcd_is_auto_hibern8_supported(hba) && hba->ahit)
+-			ah_ms = FIELD_GET(UFSHCI_AHIBERN8_TIMER_MASK,
+-					  hba->ahit);
+-		else
+-			ah_ms = 10;
+-		ufshcd_clkgate_delay_set(hba->dev, ah_ms + 5);
+-	}
+-}
+-
+ static void ufs_mtk_post_link(struct ufs_hba *hba)
+ {
+ 	/* enable unipro clock gating feature */
+ 	ufs_mtk_cfg_unipro_cg(hba, true);
+-
+-	/* will be configured during probe hba */
+-	if (ufshcd_is_auto_hibern8_supported(hba))
+-		hba->ahit = FIELD_PREP(UFSHCI_AHIBERN8_TIMER_MASK, 10) |
+-			FIELD_PREP(UFSHCI_AHIBERN8_SCALE_MASK, 3);
+-
+-	ufs_mtk_setup_clk_gating(hba);
+ }
+ 
+ static int ufs_mtk_link_startup_notify(struct ufs_hba *hba,
+@@ -1485,6 +1546,7 @@ static void ufs_mtk_fixup_dev_quirks(struct ufs_hba *hba)
+ 
+ 	ufs_mtk_vreg_fix_vcc(hba);
+ 	ufs_mtk_vreg_fix_vccqx(hba);
++	ufs_mtk_fix_ahit(hba);
+ }
+ 
+ static void ufs_mtk_event_notify(struct ufs_hba *hba,
+@@ -1670,6 +1732,7 @@ static int ufs_mtk_config_mcq_irq(struct ufs_hba *hba)
+ 			return ret;
+ 		}
+ 	}
++	host->is_mcq_intr_enabled = true;
+ 
+ 	return 0;
+ }
+@@ -1804,6 +1867,9 @@ static int ufs_mtk_system_suspend(struct device *dev)
+ 	struct ufs_hba *hba = dev_get_drvdata(dev);
+ 	int ret;
+ 
++	if (hba->shutting_down)
++		return -EBUSY;
++
+ 	ret = ufshcd_system_suspend(dev);
+ 	if (ret)
+ 		return ret;
+diff --git a/include/ufs/ufs.h b/include/ufs/ufs.h
+index 8f779c51c..2e76649e3 100644
+--- a/include/ufs/ufs.h
++++ b/include/ufs/ufs.h
+@@ -170,6 +170,9 @@ enum attr_idn {
+ 	QUERY_ATTR_IDN_WB_FLUSH_STATUS	        = 0x1C,
+ 	QUERY_ATTR_IDN_AVAIL_WB_BUFF_SIZE       = 0x1D,
+ 	QUERY_ATTR_IDN_WB_BUFF_LIFE_TIME_EST    = 0x1E,
++	QUERY_ATTR_IDN_WB_BUF_RESIZE_HINT	= 0x3C,
++	QUERY_ATTR_IDN_WB_BUF_RESIZE_EN		= 0x3D,
++	QUERY_ATTR_IDN_WB_BUF_RESIZE_STATUS	= 0x3E,
+ 	QUERY_ATTR_IDN_CURR_WB_BUFF_SIZE        = 0x1F,
+ 	QUERY_ATTR_IDN_EXT_IID_EN		= 0x2A,
+ };
+@@ -280,6 +283,7 @@ enum device_desc_param {
+ 	DEVICE_DESC_PARAM_PRDCT_REV		= 0x2A,
+ 	DEVICE_DESC_PARAM_HPB_VER		= 0x40,
+ 	DEVICE_DESC_PARAM_HPB_CONTROL		= 0x42,
++	DEVICE_DESC_PARAM_EXT_WB_SUP		= 0x4D,
+ 	DEVICE_DESC_PARAM_EXT_UFS_FEATURE_SUP	= 0x4F,
+ 	DEVICE_DESC_PARAM_WB_PRESRV_USRSPC_EN	= 0x53,
+ 	DEVICE_DESC_PARAM_WB_TYPE		= 0x54,
+@@ -374,6 +378,11 @@ enum {
+ 	UFSHCD_AMP		= 3,
+ };
+ 
++/* Possible values for wExtendedWriteBoosterSupport */
++enum {
++	UFS_DEV_WB_BUF_RESIZE	= BIT(0),
++};
++
+ /* Possible values for dExtendedUFSFeaturesSupport */
+ enum {
+ 	UFS_DEV_HIGH_TEMP_NOTIF		= BIT(4),
+@@ -411,6 +420,7 @@ enum {
+ 	MASK_EE_TOO_LOW_TEMP		= BIT(4),
+ 	MASK_EE_WRITEBOOSTER_EVENT	= BIT(5),
+ 	MASK_EE_PERFORMANCE_THROTTLING	= BIT(6),
++	MASK_EE_HEALTH_CRITICAL		= BIT(9),
+ };
+ #define MASK_EE_URGENT_TEMP (MASK_EE_TOO_HIGH_TEMP | MASK_EE_TOO_LOW_TEMP)
+ 
+@@ -445,6 +455,28 @@ enum ufs_ref_clk_freq {
+ 	REF_CLK_FREQ_INVAL	= -1,
+ };
+ 
++/* bWriteBoosterBufferResizeEn attribute */
++enum wb_resize_en {
++	WB_RESIZE_EN_IDLE	= 0,
++	WB_RESIZE_EN_DECREASE	= 1,
++	WB_RESIZE_EN_INCREASE	= 2,
++};
++
++/* bWriteBoosterBufferResizeHint attribute */
++enum wb_resize_hint {
++	WB_RESIZE_HINT_KEEP	= 0,
++	WB_RESIZE_HINT_DECREASE	= 1,
++	WB_RESIZE_HINT_INCREASE	= 2,
++};
++
++/* bWriteBoosterBufferResizeStatus attribute */
++enum wb_resize_status {
++	WB_RESIZE_STATUS_IDLE	= 0,
++	WB_RESIZE_STATUS_IN_PROGRESS	= 1,
++	WB_RESIZE_STATUS_COMPLETE_SUCCESS	= 2,
++	WB_RESIZE_STATUS_GENERAL_FAILURE	= 3,
++};
++
+ /* Query response result code */
+ enum {
+ 	QUERY_RESULT_SUCCESS                    = 0x00,
+@@ -630,6 +662,7 @@ struct ufs_dev_info {
+ 	bool    wb_buf_flush_enabled;
+ 	u8	wb_dedicated_lu;
+ 	u8      wb_buffer_type;
++	u16	ext_wb_sup;
+ 
+ 	bool	b_rpm_dev_flush_capable;
+ 	u8	b_presrv_uspc_en;
+diff --git a/include/ufs/ufshcd.h b/include/ufs/ufshcd.h
+index 275141a1c..4c3c9e08f 100644
+--- a/include/ufs/ufshcd.h
++++ b/include/ufs/ufshcd.h
+@@ -1135,6 +1135,7 @@ struct ufs_hba {
+ 	struct ufs_hw_queue *uhq;
+ 	struct ufs_hw_queue *dev_cmd_queue;
+ 	struct ufshcd_mcq_opr_info_t mcq_opr[OPR_MAX];
++	u32 critical_health_count;
+ 
+ 	ANDROID_OEM_DATA(1);
+ };
+@@ -1472,6 +1473,7 @@ int ufshcd_advanced_rpmb_req_handler(struct ufs_hba *hba, struct utp_upiu_req *r
+ 				     struct scatterlist *sg_list, enum dma_data_direction dir);
+ int ufshcd_wb_toggle(struct ufs_hba *hba, bool enable);
+ int ufshcd_wb_toggle_buf_flush(struct ufs_hba *hba, bool enable);
++int ufshcd_wb_set_resize_en(struct ufs_hba *hba, enum wb_resize_en en_mode);
+ int ufshcd_suspend_prepare(struct device *dev);
+ int __ufshcd_suspend_prepare(struct device *dev, bool rpm_ok_for_spm);
+ void ufshcd_resume_complete(struct device *dev);

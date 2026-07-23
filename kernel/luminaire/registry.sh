@@ -3,12 +3,15 @@
 declare -A LUMINAIRE_SUPPORTED_VERSIONS=(
     [bore]="6.1"
     [adios]="6.1"
+    [workqueue_catchup]="6.1"
+    [schedutil_catchup]="6.1"
+    [ufs_writebooster_catchup]="6.1"
 )
 
 run_luminaire() {
     echo "::group::✨ Luminaire Features"
     export APPLIED_LUMINAIRE="" SKIPPED_LUMINAIRE=""
-    for feature in bore adios; do
+    for feature in bore adios workqueue_catchup schedutil_catchup ufs_writebooster_catchup; do
         local supported="${LUMINAIRE_SUPPORTED_VERSIONS[$feature]:-}"
         if [[ " ${supported} " != *" ${KERNEL_VERSION} "* ]]; then
             warn "Luminaire feature '${feature}' isn't backported for kernel ${KERNEL_VERSION} yet — skipping (always-on, not a user toggle; shows as N/A in the release caption, not a Disable)."

@@ -1,0 +1,34 @@
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 31fabf8aa..c2108f415 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -8368,6 +8368,13 @@ int dl_task_check_affinity(struct task_struct *p, const struct cpumask *mask)
+ 	if (!task_has_dl_policy(p) || !dl_bandwidth_enabled())
+ 		return 0;
+ 
++	/*
++	 * The special/sugov task isn't part of regular bandwidth/admission
++	 * control so let userspace change affinities.
++	 */
++	if (dl_entity_is_special(&p->dl))
++		return 0;
++
+ 	/*
+ 	 * Since bandwidth control happens on root_domain basis,
+ 	 * if admission test is enabled, we only admit -deadline
+diff --git a/kernel/sched/cpufreq_schedutil.c b/kernel/sched/cpufreq_schedutil.c
+index ca4c10692..f98eefa60 100644
+--- a/kernel/sched/cpufreq_schedutil.c
++++ b/kernel/sched/cpufreq_schedutil.c
+@@ -646,7 +646,10 @@ static int sugov_kthread_create(struct sugov_policy *sg_policy)
+ 	}
+ 
+ 	sg_policy->thread = thread;
+-	kthread_bind_mask(thread, policy->related_cpus);
++	if (policy->dvfs_possible_from_any_cpu)
++		set_cpus_allowed_ptr(thread, policy->related_cpus);
++	else
++		kthread_bind_mask(thread, policy->related_cpus);
+ 	init_irq_work(&sg_policy->irq_work, sugov_irq_work);
+ 	mutex_init(&sg_policy->work_lock);
+ 

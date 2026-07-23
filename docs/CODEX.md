@@ -47,6 +47,9 @@ Organized per-path, matching the repo's folder structure.
 - [build/make.sh](#buildmakesh)
 - [release/anykernel.sh](#releaseanykernelsh)
 - [kernel/luminaire/adios/adios.sh](#kernelluminaireadiosadiossh)
+- [kernel/luminaire/workqueue_catchup/workqueue_catchup.sh](#kernelluminaireworkqueue_catchupworkqueue_catchupsh)
+- [kernel/luminaire/schedutil_catchup/schedutil_catchup.sh](#kernelluminaireschedutil_catchupschedutil_catchupsh)
+- [kernel/luminaire/ufs_writebooster_catchup/ufs_writebooster_catchup.sh](#kernelluminaireufs_writebooster_catchupufs_writebooster_catchupsh)
 - [kernel/ksu/registry.sh](#kernelksuregistrysh)
 - [release/telegram/common.sh](#releasetelegramcommonsh)
 - [kernel/luminaire/bore/bore.sh](#kernelluminaireboreboresh)
@@ -1440,11 +1443,12 @@ rest of the process, same shape as `functions.sh`) so `build.sh` itself
 only ever calls `run_luminaire()` and doesn't need to know any feature
 policy lives here.
 
-These features (currently: ADIOS I/O scheduler, BORE CPU scheduler) are
-structurally parallel to `kernel/addons/`, but never gated by `$ADDONS`
-or a workflow checkbox — they're permanent Luminaire-branded features,
-always applied on every kernel version that has a backport for them,
-exactly the same way a distro ships its own default scheduler choice.
+These features (currently: ADIOS I/O scheduler, BORE CPU scheduler,
+workqueue/schedutil/UFS-WriteBooster stable catch-ups) are structurally
+parallel to `kernel/addons/`, but never gated by `$ADDONS` or a workflow
+checkbox — they're permanent Luminaire-branded features, always applied
+on every kernel version that has a backport for them, exactly the same
+way a distro ships its own default scheduler choice.
 These used to live in `kernel/addons/` with a toggle in `build.yml`,
 which contradicted the actual intent (source was always patched in
 regardless of the toggle, only the Kconfig enable line and the release
@@ -1601,6 +1605,96 @@ elevator insert).
 Always-on Luminaire feature — no user toggle, not part of `$ADDONS`. See
 `LUMINAIRE_SUPPORTED_VERSIONS` in `kernel/luminaire/registry.sh` for
 version gating.
+
+---
+
+## `kernel/luminaire/workqueue_catchup/workqueue_catchup.sh`
+
+**Purpose of this file**: stable-tree catch-up for `kernel/workqueue.c`,
+cherry-picked/adapted from linux-6.1.y (gregkh/linux). Same tier as
+BORE/ADIOS — always-on, version-gated via `LUMINAIRE_SUPPORTED_VERSIONS`,
+not a `$ADDONS` toggle. Originally surfaced via a third-party fork's
+public changelog; verified directly against this repo's own kernel
+source (`chainonyourdoor/LuminaireKernel-6.1`) before porting — every
+patch here applies cleanly on the current tree with no already-applied
+overlap.
+
+2 of 5 upstream candidates from this batch applied (adapted to this
+tree's older Workqueue API — `get_work_pool_id()` instead of the newer
+`work_offq_data` struct packer); 3 are not applicable because this tree
+predates the per-CPU `pool_workqueue`-for-unbound refactor
+(`636b927eba5b`) and the BH-workqueue feature both depend on:
+
+- Releases the `PENDING` work bit in `__queue_work()`'s drain/destroy
+  reject path — without this, a rejected work item could leave
+  `PENDING` set with nothing left to ever clear it.
+- Fixes false-positive Workqueue stall reports on weakly-ordered
+  architectures (arm64 named explicitly upstream) — re-reads
+  `watchdog_ts` under `pool->lock` before declaring a real stall.
+  `CONFIG_WQ_WATCHDOG=y` is active in `gki_defconfig`, so this watchdog
+  genuinely runs and false positives would otherwise show up in logs.
+
+---
+
+## `kernel/luminaire/schedutil_catchup/schedutil_catchup.sh`
+
+**Purpose of this file**: stable-tree catch-up for
+`kernel/sched/cpufreq_schedutil.c` + `kernel/sched/core.c`, cherry-
+picked/adapted from linux-6.1.y. Same sourcing/verification note as
+`workqueue_catchup.sh` above.
+
+Only binds the sugov governor kthread to specific CPUs when the cpufreq
+driver actually requires it (`policy->dvfs_possible_from_any_cpu ==
+false`); otherwise lets it run anywhere via `set_cpus_allowed_ptr()`,
+and lets userspace change its affinity freely via a
+`dl_task_check_affinity()` early-out for the sugov task. Matters for
+big.LITTLE: avoids waking a big core just to run the governor kthread
+when a little core could do it just as well.
+
+**Adapted from upstream**: this tree predates the
+`kernel/sched/core.c` → `kernel/sched/syscalls.c` split, so the
+`dl_task_check_affinity()` half of this fix was ported into `core.c`
+directly instead of the newer file location.
+
+Everything else investigated in the same upstream batch needed no
+action on this tree: the thermal `gov_power_allocator.c`
+`divvy_up_power()` fix doesn't apply (older parallel-array design, no
+`struct power_actor` field mix-up possible by construction), the
+thermal `total_weight` caching bug doesn't apply (no cached field
+here), the `cpufreq_schedutil.c` `limits_changed`/`need_freq_update`
+series was already fully present, and the devfreq `mtk-cci-devfreq.c`
+`sram_reg` error-pointer fix was already using `IS_ERR_OR_NULL()`.
+
+---
+
+## `kernel/luminaire/ufs_writebooster_catchup/ufs_writebooster_catchup.sh`
+
+**Purpose of this file**: stable-tree catch-up for the UFS core/
+MediaTek host driver + WriteBooster, cherry-picked/adapted from
+linux-6.1.y. Same sourcing/verification note as `workqueue_catchup.sh`
+above. Touches `drivers/ufs/core/ufs-sysfs.c`, `drivers/ufs/core/
+ufshcd.c`, `drivers/ufs/host/ufs-mediatek.c`, `include/ufs/ufs.h`,
+`include/ufs/ufshcd.h` — no Kconfig changes, all fixes are runtime-
+conditional on hardware actually exercising these paths (safe to carry
+even on devices without UFS 4.x WriteBooster support).
+
+- AHIT (Auto-Hibern8) timer handling moved into the device quirk
+  initialization path.
+- Fixed an unbalanced MCQ IRQ enable/disable path.
+- Prevents suspend operations from racing with UFS host shutdown.
+- UFS PWM power-mode switching fixes; prevents VCCQ/VCCQ2 from entering
+  low-power mode prematurely during device power control.
+- Dynamic WriteBooster buffer resizing support based on JESD220G, plus
+  associated sysfs controls.
+- Fixed the descriptor offset used to detect extended WriteBooster
+  resize support — the old offset could prevent the feature from
+  activating on hardware that otherwise supports it.
+- UFS 4.1 critical health event handling + counting via the UFS sysfs
+  interface.
+- Adapted to the older APIs/attribute structure present in this
+  kernel's UFS stack; upstream fixes that depend on newer UFS core
+  infrastructure not present here were deliberately left out rather
+  than force-fitted.
 
 ---
 
