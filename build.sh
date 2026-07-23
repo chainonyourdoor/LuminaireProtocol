@@ -15,7 +15,7 @@ LUMINAIRE_PATCH_DIR="${ROOT_DIR}"
 
 source "${LUMINAIRE_PATCH_DIR}/kernel/addons/registry.sh"
 source "${LUMINAIRE_PATCH_DIR}/kernel/luminaire/registry.sh"
-source "${LUMINAIRE_PATCH_DIR}/kernel/ksu-shared/registry.sh"
+source "${LUMINAIRE_PATCH_DIR}/kernel/ksu/registry.sh"
 
 main() {
     echo "========================================"
@@ -85,13 +85,13 @@ run_variant() {
     [ "$KERNEL_VARIANT" = "VANILLA" ] && return 0
 
     ksu_variant_supports_kernel_version "${KERNEL_VARIANT,,}" \
-        || error "Root solution '${KERNEL_VARIANT}' is not available for kernel ${KERNEL_VERSION} — not listed in KSU_VARIANT_SUPPORTED_VERSIONS (kernel/ksu-shared/registry.sh)."
-    local script="${LUMINAIRE_PATCH_DIR}/kernel/ksu-shared/${KERNEL_VARIANT,,}/${KERNEL_VARIANT,,}.sh"
+        || error "Root solution '${KERNEL_VARIANT}' is not available for kernel ${KERNEL_VERSION} — not listed in KSU_VARIANT_SUPPORTED_VERSIONS (kernel/ksu/registry.sh)."
+    local script="${LUMINAIRE_PATCH_DIR}/kernel/ksu/variants/${KERNEL_VARIANT,,}/${KERNEL_VARIANT,,}.sh"
     run_step "🍀" "Root Solution (${KERNEL_VARIANT})" "$script" \
-        "Root solution '${KERNEL_VARIANT}' is marked supported for kernel ${KERNEL_VERSION} in KSU_VARIANT_SUPPORTED_VERSIONS but ${script} doesn't exist — the map is out of sync with kernel/ksu-shared/."
+        "Root solution '${KERNEL_VARIANT}' is marked supported for kernel ${KERNEL_VERSION} in KSU_VARIANT_SUPPORTED_VERSIONS but ${script} doesn't exist — the map is out of sync with kernel/ksu/variants/."
 
     [ "$SUSFS_ENABLED" = "true" ] || return 0
-    local susfs_script="${VERSION_PATCH_DIR}/ksu/susfs/susfs.sh"
+    local susfs_script="${LUMINAIRE_PATCH_DIR}/kernel/ksu/susfs/${ANDROID_VERSION}-${KERNEL_VERSION}/susfs.sh"
     run_step "🧬" "SuSFS" "$susfs_script" "SuSFS script not found: $(basename "$susfs_script")"
 }
 

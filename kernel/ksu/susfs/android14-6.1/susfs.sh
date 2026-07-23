@@ -22,7 +22,7 @@ fi
 
 KSU_DIR="${KSU_DIR:-${KERNEL_SRC}/KernelSU}"
 SUSFS_DIR="/tmp/susfs4ksu"
-KSU_SHARED_DIR="${LUMINAIRE_PATCH_DIR}/kernel/ksu-shared"
+KSU_SHARED_DIR="${LUMINAIRE_PATCH_DIR}/kernel/ksu"
 
 log "Cloning SuSFS (${SUSFS_BRANCH})..."
 [ -d "$SUSFS_DIR" ] && rm -rf "$SUSFS_DIR"

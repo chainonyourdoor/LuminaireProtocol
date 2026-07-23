@@ -5,7 +5,7 @@ LUMINAIRE_PATCH_DIR="${LUMINAIRE_PATCH_DIR:-$GITHUB_WORKSPACE}"
 source "${LUMINAIRE_PATCH_DIR}/functions.sh"
 
 [ -n "${KERNEL_VERSION:-}" ] || error "scout: KERNEL_VERSION not set"
-MANIFEST="${LUMINAIRE_PATCH_DIR}/kernel/$(resolve_android_version)-${KERNEL_VERSION}/manifest.json"
+MANIFEST="${LUMINAIRE_PATCH_DIR}/kernel/ksu/manifests/$(resolve_android_version)-${KERNEL_VERSION}.json"
 
 if [ ! -f "$MANIFEST" ]; then
     warn "scout: no manifest yet for kernel ${KERNEL_VERSION} — treating as no pins/candidates yet"

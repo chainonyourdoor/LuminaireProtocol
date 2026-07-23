@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# 🧬 SuSFS — shared apply logic (any KSU fork, android13-5.15)
+# 🧬 SuSFS — shared apply logic (any KSU fork, android12-5.10)
 # ======================================================
 # Repo: https://gitlab.com/simonpunk/susfs4ksu
 
@@ -9,20 +9,20 @@ if [ "$KERNEL_VARIANT" = "SUKISU" ]; then
     SUSFS_REF="${SUSFS_SUKISU_REF:-}"
     [ -n "$SUSFS_REF" ] || warn "SuSFS+SukiSU: no pin resolved — build will likely fail (see wishlist for known-good combos)"
     SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
-    SUSFS_BRANCH="gki-android13-5.15"
+    SUSFS_BRANCH="gki-android12-5.10"
 elif [ "$KERNEL_VARIANT" = "KSUNEXT" ]; then
     SUSFS_REF="${SUSFS_KSUNEXT_REF:-}"
     SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
-    SUSFS_BRANCH="gki-android13-5.15-dev"
+    SUSFS_BRANCH="gki-android12-5.10-dev"
 else
     SUSFS_REF="${SUSFS_RESUKISU_REF:-}"
     SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
-    SUSFS_BRANCH="gki-android13-5.15"
+    SUSFS_BRANCH="gki-android12-5.10"
 fi
 
 KSU_DIR="${KSU_DIR:-${KERNEL_SRC}/KernelSU}"
 SUSFS_DIR="/tmp/susfs4ksu"
-KSU_SHARED_DIR="${LUMINAIRE_PATCH_DIR}/kernel/ksu-shared"
+KSU_SHARED_DIR="${LUMINAIRE_PATCH_DIR}/kernel/ksu"
 
 log "Cloning SuSFS (${SUSFS_BRANCH})..."
 [ -d "$SUSFS_DIR" ] && rm -rf "$SUSFS_DIR"
@@ -57,7 +57,7 @@ cp "${SUSFS_DIR}/kernel_patches/include/linux/susfs_def.h"   "${KERNEL_SRC}/incl
 log "SuSFS source files copied ✅"
 
 log "Applying SuSFS kernel patch..."
-KERNEL_PATCH="${SUSFS_DIR}/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
+KERNEL_PATCH="${SUSFS_DIR}/kernel_patches/50_add_susfs_in_gki-android12-5.10.patch"
 if [ ! -f "$KERNEL_PATCH" ]; then
     warn "SuSFS kernel patch not found at ${KERNEL_PATCH} — skipping patch step, continuing with Kconfig/config setup"
 elif patch -p1 --fuzz=3 --dry-run --reverse -d "$KERNEL_SRC" < "$KERNEL_PATCH" > /dev/null 2>&1; then

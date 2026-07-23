@@ -13,13 +13,13 @@ Organized per-path, matching the repo's folder structure.
 
 - [build.sh](#buildsh)
 - [functions.sh](#functionssh)
-- [kernel/checkpoint/scout.sh](#kernelcheckpointscoutsh)
-- [kernel/checkpoint/engine.sh](#kernelcheckpointenginesh)
+- [kernel/ksu/checkpoint/scout.sh](#kernelksucheckpointscoutsh)
+- [kernel/ksu/checkpoint/engine.sh](#kernelksucheckpointenginesh)
 - [release/telegram/caption.py](#releasetelegramcaptionpy)
 - [release/telegram/channel_post.sh](#releasetelegramchannel_postsh)
 - [release/telegram/telegram.sh](#releasetelegramtelegramsh)
 - [kernel/config/defconfig.sh](#kernelconfigdefconfigsh)
-- [kernel/ksu-shared/fix_namespace.py](#kernelksu-sharedfix_namespacepy)
+- [kernel/ksu/fix_namespace.py](#kernelksufix_namespacepy)
 - [kernel/addons/zeromount/inject_namei.py](#kerneladdonszeromountinject_nameipy)
 - [kernel/addons/zeromount/inject_readdir.py](#kerneladdonszeromountinject_readdirpy)
 - [kernel/addons/zeromount/strip_namei_hunk.py](#kerneladdonszeromountstrip_namei_hunkpy)
@@ -29,16 +29,16 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/addons/bbrv3/enforcer.py](#kerneladdonsbbrv3enforcerpy)
 - [kernel/core/compiler_string/patch.py](#kernelcorecompiler_stringpatchpy)
 - [kernel/core/openssl3_compat/patch.py](#kernelcoreopenssl3_compatpatchpy)
-- [kernel/ksu-shared/ksunext/branding.py](#kernelksu-sharedksunextbrandingpy)
+- [kernel/ksu/variants/ksunext/branding.py](#kernelksuvariantsksunextbrandingpy)
 - [release/telegram/telegraph_page.py](#releasetelegramtelegraph_pagepy)
 - [kernel/addons/lz4zstd/lz4zstd.sh](#kerneladdonslz4zstdlz4zstdsh)
 - [kernel/{android12-5.10,android13-5.15,android14-6.1}/ksu/susfs/susfs.sh](#kernelandroid12-510android13-515android14-61ksususfssusfssh)
-- [kernel/ksu-shared/ksunext/ksunext.sh](#kernelksu-sharedksunextksunextsh)
+- [kernel/ksu/variants/ksunext/ksunext.sh](#kernelksuvariantsksunextksunextsh)
 - [kernel/addons/kasumi/kasumi.sh](#kerneladdonskasumikasumish)
 - [kernel/addons/kasumi/postbuild.sh](#kerneladdonskasumipostbuildsh)
-- [kernel/ksu-shared/resukisu/resukisu.sh](#kernelksu-sharedresukisuresukisush)
+- [kernel/ksu/variants/resukisu/resukisu.sh](#kernelksuvariantsresukisuresukisush)
 - [kernel/addons/registry.sh](#kerneladdonsregistrysh)
-- [kernel/ksu-shared/sukisu/sukisu.sh](#kernelksu-sharedsukisusukisush)
+- [kernel/ksu/variants/sukisu/sukisu.sh](#kernelksuvariantssukisusukisush)
 - [kernel/addons/bbrv3/bbrv3.sh](#kerneladdonsbbrv3bbrv3sh)
 - [kernel/luminaire/registry.sh](#kernelluminaireregistrysh)
 - [setup/02_ccache.sh](#setup02_ccachesh)
@@ -47,7 +47,7 @@ Organized per-path, matching the repo's folder structure.
 - [build/make.sh](#buildmakesh)
 - [release/anykernel.sh](#releaseanykernelsh)
 - [kernel/luminaire/adios/adios.sh](#kernelluminaireadiosadiossh)
-- [kernel/ksu-shared/registry.sh](#kernelksu-sharedregistrysh)
+- [kernel/ksu/registry.sh](#kernelksuregistrysh)
 - [release/telegram/common.sh](#releasetelegramcommonsh)
 - [kernel/luminaire/bore/bore.sh](#kernelluminaireboreboresh)
 - [setup/00_paths.sh](#setup00_pathssh)
@@ -88,7 +88,7 @@ of the pipeline can be tested quickly after a refactor. Derived in
 `build.yml` from `RUN_MODE=="Dry Run"`, so it can never go out of sync with
 `RUN_MODE` by the time it reaches here.
 
-**Registry sourcing at the top (`kernel/{addons,luminaire,ksu-shared}/registry.sh`)**
+**Registry sourcing at the top (`kernel/{addons,luminaire,ksu}/registry.sh`)**
 — defines `run_addons()`/`run_luminaire()` (plus their respective
 version-support maps) here, not inside `main()`, so it's just a regular
 function call in `main()` like everything else, and `build.sh` doesn't
@@ -147,7 +147,7 @@ success". The same pattern is reused in `retry()`.
 
 **`mark_stage_ok()`** — called right after each `build.sh` stage finishes
 (see `main()`). Thanks to `set -e`, a failing stage exits before it gets a
-chance to call its own `mark_stage_ok` — so `kernel/checkpoint/engine.sh`
+chance to call its own `mark_stage_ok` — so `kernel/ksu/checkpoint/engine.sh`
 can tell which stage failed just by checking which markers made it into
 that job's env. This is what keeps `engine.sh` from wrongly blaming a
 KSU-fork/SuSFS candidate for a failure that actually happened in a
@@ -210,7 +210,7 @@ here would silently break those comparisons.
 
 ---
 
-## `kernel/checkpoint/scout.sh`
+## `kernel/ksu/checkpoint/scout.sh`
 
 **Purpose of this file**: determine the git ref (commit SHA) that each
 tracked upstream component (ReSukiSU, SukiSU-Ultra, SuSFS) should use for
@@ -220,7 +220,7 @@ this build.
   Never queries upstream, never builds an untested candidate.
 - `RUN_MODE=Build/Warm Run`: queries the latest upstream commit. If it
   differs from the pin and isn't known-bad, it becomes a candidate for
-  this run — `kernel/checkpoint/engine.sh` decides after the build whether
+  this run — `kernel/ksu/checkpoint/engine.sh` decides after the build whether
   to promote or blacklist it.
 - **Exception (deadlock-breaking retest)**: if there's no known-good pin
   at all AND the latest upstream commit is already blacklisted, there's no
@@ -302,7 +302,7 @@ semantics as non-SUSFS SukiSU-Ultra) — matched here too.
 
 ---
 
-## `kernel/checkpoint/engine.sh`
+## `kernel/ksu/checkpoint/engine.sh`
 
 **Purpose of this file**: runs after the build step (always, even on
 failure).
@@ -692,7 +692,7 @@ here because `.config` is not available yet when `bbg.sh` runs (before
 
 ---
 
-## `kernel/ksu-shared/fix_namespace.py`
+## `kernel/ksu/fix_namespace.py`
 
 **Idempotency check** — both markers present means either the main patch
 applied hunk #1 successfully (after `blk.h` pre-patch removal in
@@ -962,7 +962,7 @@ patch touches it.
 
 ---
 
-## `kernel/ksu-shared/ksunext/branding.py`
+## `kernel/ksu/variants/ksunext/branding.py`
 
 **Purpose of this file**: injects Luminaire branding into KernelSU-Next's
 Kbuild version tag.
@@ -1105,11 +1105,11 @@ swap per version); documented once here.
 **SuSFS pin resolution** — SukiSU-Ultra needs an exact commit paired with
 a matching susfs4ksu commit (community-verified combo, not just "old
 enough"). ReSukiSU is generally compatible with SuSFS's branch tip, so
-it isn't pinned as tightly. `kernel/checkpoint/scout.sh` exports the
+it isn't pinned as tightly. `kernel/ksu/checkpoint/scout.sh` exports the
 right `*_REF` beforehand.
 
 **KernelSU-Next (KSUNEXT) pairing** — uses pershoot's KernelSU-Next fork
-(dev-susfs branch, see `kernel/ksu-shared/ksunext/ksunext.sh` — shared
+(dev-susfs branch, see `kernel/ksu/variants/ksunext/ksunext.sh` — shared
 across all kernel versions) for its own SUSFS-compatible hooks, but the
 SuSFS *source* itself comes from simonpunk/susfs4ksu's own `-dev` branch
 — verified directly against source that every `susfs_*` symbol
@@ -1157,7 +1157,7 @@ still accurate.
 
 ---
 
-## `kernel/ksu-shared/ksunext/ksunext.sh`
+## `kernel/ksu/variants/ksunext/ksunext.sh`
 
 **Purpose of this file**: root solution — KernelSU-Next. Repo:
 https://github.com/KernelSU-Next/KernelSU-Next.
@@ -1172,7 +1172,7 @@ for this reason.
 hook API on its dev branch (see `susfs.sh`) — pershoot's fork keeps a
 dev-susfs branch that does, paired with their own susfs4ksu fork. The
 maintainer flags this fork as not production-ready; tracked like any
-other candidate via `kernel/checkpoint/scout.sh`.
+other candidate via `kernel/ksu/checkpoint/scout.sh`.
 
 **Version string computation** — official KernelSU-Next's Kbuild:
 `KSU_VERSION = 30000 + rev-list --count HEAD`, `KSU_VERSION_TAG = git
@@ -1248,7 +1248,7 @@ module against the kernel tree `run_build()` just finished producing
 
 ---
 
-## `kernel/ksu-shared/resukisu/resukisu.sh`
+## `kernel/ksu/variants/resukisu/resukisu.sh`
 
 **Purpose of this file**: root solution — ReSukiSU. Repo:
 https://github.com/ReSukiSU/ReSukiSU.
@@ -1328,7 +1328,7 @@ same process to build the release caption.
 
 ---
 
-## `kernel/ksu-shared/sukisu/sukisu.sh`
+## `kernel/ksu/variants/sukisu/sukisu.sh`
 
 **Purpose of this file**: root solution — SukiSU-Ultra. Repo:
 https://github.com/SukiSU-Ultra/SukiSU-Ultra.
@@ -1336,7 +1336,7 @@ https://github.com/SukiSU-Ultra/SukiSU-Ultra.
 **Builtin-branch pin** — with SuSFS enabled, the `"builtin"` branch
 (SukiSU-Ultra's own SUSFS-integrated line) is needed, resolved separately
 from the plain main/tag pin used otherwise — see
-`kernel/checkpoint/scout.sh`.
+`kernel/ksu/checkpoint/scout.sh`.
 
 **Branding target** — the builtin branch (SUSFS-integrated) restructured
 `kernel/` entirely — no `Kbuild` file, but `kernel/Makefile` has the
@@ -1589,14 +1589,14 @@ version gating.
 
 ---
 
-## `kernel/ksu-shared/registry.sh`
+## `kernel/ksu/registry.sh`
 
 **Purpose of this file**: KSU root-solution support map — single source
 of truth. Same shape/purpose as `kernel/addons/registry.sh`'s
 `ADDON_SUPPORTED_VERSIONS` and `kernel/luminaire/registry.sh`'s
 `LUMINAIRE_SUPPORTED_VERSIONS`. This is the ONLY compatibility signal
 for root solutions now — `resukisu.sh`/`sukisu.sh`/`ksunext.sh` live
-once under `kernel/ksu-shared/` (they have no real per-kernel-version
+once under `kernel/ksu/` (they have no real per-kernel-version
 logic; each fork's own `setup.sh` handles GKI version detection
 upstream), so "does `kernel/<ver>/ksu/<variant>/` exist" is no longer a
 meaningful question to ask.
