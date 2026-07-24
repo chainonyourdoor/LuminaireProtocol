@@ -1741,12 +1741,41 @@ returns 1.
 Response Enhancer), CPU scheduler by Masahito Suzuki (firelzrd). Repo:
 https://github.com/firelzrd/bore-scheduler.
 
+**⚠️ Currently testing v6.8.0-rc1, not the proven v5.3.0** —
+`BORE_PATCH` in this script points at
+`kernel/patches/android14-6.1/luminaire/bore-v6.8.0-rc1.patch` for a
+device boot-test. `bore-v5.3.0.patch` is kept in the same directory,
+untouched, as the fallback: if v6.8.0-rc1 fails to boot, point
+`BORE_PATCH` back at it. Do not delete `bore-v5.3.0.patch`. Once
+v6.8.0-rc1 is confirmed booting reliably, this note should be resolved
+(either promote it to the permanent default, or revert to v5.3.0 —
+don't leave this warning stale either way).
+
+`bore-v6.8.0-rc1.patch` is a **partial** backport (~88% by feature, per
+manual review — CFS still doesn't have EEVDF's fields to hook into, so
+anything strictly tied to `pick_eevdf()`/`se->deadline` couldn't be
+ported; everything model-independent — burst penalty calc, tunable
+defaults, thread-group cache, futex boost — was ported). Same
+KABI-safety approach as v5.3.0 below. Provenance: originated as the
+repo owner's own v6.6.3 WIP patch (built successfully, but caused a
+kernel panic on device flash that was never debugged — hence `From:
+chainonyourdoor` in the patch header, not a spoofed identity), picked
+up and iterated on by a third party (Andrews571/SAGA-Build fork) up to
+v6.8.0-rc1. Verified independently before adoption: applies cleanly
+against `chainonyourdoor/LuminaireKernel-6.1` (android14-6.1-live) with
+ADIOS + the three `*_catchup` features stacked on top, no conflicts.
+Clean patch application was verified this way — actual boot stability
+on hardware has not been independently confirmed by this document's
+maintainer as of this writing, which is the whole point of the current
+test.
+
 KABI-safe backport to v5.3.0-equivalent for android14-6.1: all BORE
 fields live inside `struct sched_entity`'s existing
 `ANDROID_KABI_RESERVE(1-4)` slots (`ANDROID_KABI_USE`/
 `_ANDROID_KABI_REPLACE`), so `sizeof(struct sched_entity)` and every
 field offset after it stays identical to a non-BORE GKI build — no
-vendor-module KABI break.
+vendor-module KABI break. (This description applies to both patch
+versions — v6.8.0-rc1 keeps the same KABI-safety approach.)
 
 Always-on Luminaire feature — no user toggle, not part of `$ADDONS`. See
 `LUMINAIRE_SUPPORTED_VERSIONS` in `kernel/luminaire/registry.sh` for

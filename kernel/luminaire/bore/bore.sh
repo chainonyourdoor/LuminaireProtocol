@@ -4,9 +4,15 @@
 # ✨ LUMINAIRE FEATURE — BORE (Burst-Oriented Response Enhancer)
 # CPU scheduler by Masahito Suzuki (firelzrd)
 # Repo: https://github.com/firelzrd/bore-scheduler
+#
+# ⚠️ TESTING: temporarily pointed at the v6.8.0-rc1 partial backport
+# (see docs/CODEX.md for provenance/status) instead of the proven
+# v5.3.0 patch, to boot-test on real hardware. v5.3.0 is kept in
+# kernel/patches/android14-6.1/luminaire/bore-v5.3.0.patch — revert
+# BORE_PATCH below to it if v6.8.0-rc1 fails to boot.
 # ======================================================
 
-BORE_PATCH="${PATCHES_DIR}/luminaire/bore-v5.3.0.patch"
+BORE_PATCH="${PATCHES_DIR}/luminaire/bore-v6.8.0-rc1.patch"
 
 log "🔥 Applying BORE CPU scheduler patch..."
 [ -f "$BORE_PATCH" ] || error "BORE: not backported for kernel ${KERNEL_VERSION} yet (expected ${BORE_PATCH}) — this feature should have been gated out before reaching here (check run_luminaire()'s support map)."
