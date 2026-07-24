@@ -244,7 +244,13 @@ def build_blocks(env):
     skipped_tokens = [t for t in env.get("SKIPPED_ADDONS", "").split(",") if t]
     mountless = mdv2_code_escape(resolve_mountless_engine(env))
     toggle_order = toggle_addon_order(env)
-    addon_name_width = max((len(addon_display_name(t)) for t in toggle_order), default=16) + 1
+    # +1 for the trailing space before ":". "Mountless Engine" is
+    # included here too since it shares this column via the hardcoded
+    # line below — otherwise its colon drifts out of alignment
+    # whenever every addon's display name is shorter than 16 chars.
+    addon_name_width = max(
+        [len(addon_display_name(t)) for t in toggle_order] + [len("Mountless Engine")]
+    ) + 1
     addon_status_lines = []
     for token in toggle_order:
         name = addon_display_name(token)
@@ -301,7 +307,7 @@ def build_blocks(env):
     block_root = f"```{variant_label}\n" + "\n".join(root_lines) + "```"
     block_addons = (
         "```Add-ons\n"
-        f"Mountless Engine : {mountless}\n"
+        f"{'Mountless Engine'.ljust(addon_name_width)}: {mountless}\n"
         + "\n".join(addon_status_lines) +
         "```"
     )
