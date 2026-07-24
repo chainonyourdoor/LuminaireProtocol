@@ -80,6 +80,23 @@ def addon_display_name(token):
     return " ".join(w.capitalize() for w in token.split("_"))
 
 
+def resolve_mountless_engine(env):
+    """Which mountless-engine addon (if any) is active this build, as
+    its display name, or 'None'. Shared by build_blocks() (group
+    caption's dedicated "Mountless Engine" line) and
+    build_telegraph_content() (same info, as a row in the Optional
+    Add-ons table — see that function for why it needs its own row
+    instead of relying on toggle_addon_order(), which deliberately
+    excludes mountless tokens from the regular Enable/Disable rows)."""
+    addon_tokens = [t for t in env.get("ADDONS", "").split(",") if t]
+    skipped_tokens = [t for t in env.get("SKIPPED_ADDONS", "").split(",") if t]
+    mountless_tokens = addon_mountless_tokens(env)
+    for token in addon_tokens:
+        if token in mountless_tokens and token not in skipped_tokens:
+            return addon_display_name(token)
+    return "None"
+
+
 CORE_PATCH_DISPLAY_NAMES = {
     "bore":                     "BORE",
     "adios":                    "ADIOS",
@@ -225,13 +242,7 @@ def build_blocks(env):
     susfs_ver       = mdv2_code_escape(env.get("SUSFS_VER", "N/A"))
     addon_tokens = [t for t in env.get("ADDONS", "").split(",") if t]
     skipped_tokens = [t for t in env.get("SKIPPED_ADDONS", "").split(",") if t]
-    mountless_tokens = addon_mountless_tokens(env)
-    mountless = "None"
-    for token in addon_tokens:
-        if token in mountless_tokens and token not in skipped_tokens:
-            mountless = addon_display_name(token)
-            break
-    mountless = mdv2_code_escape(mountless)
+    mountless = mdv2_code_escape(resolve_mountless_engine(env))
     toggle_order = toggle_addon_order(env)
     addon_name_width = max((len(addon_display_name(t)) for t in toggle_order), default=16) + 1
     addon_status_lines = []
@@ -389,6 +400,17 @@ def build_telegraph_content(env):
         (addon_display_name(token), addon_status_icon(token))
         for token in toggle_addon_order(env)
     ]
+    # toggle_addon_order() deliberately excludes nomount/zeromount (see
+    # its docstring) since they're mutually-exclusive variants of one
+    # choice, not independent toggles — but that choice still needs to
+    # be visible somewhere on this page, or a build with e.g. ZeroMount
+    # active would show literally no trace of it here. Appended as its
+    # own row (status is a name, not an icon, same precedent as the
+    # Luminaire Features table's version strings above) rather than
+    # showing nomount/zeromount as two more icon rows, since "which one
+    # of these two mutually-exclusive options is active" reads clearer
+    # as one line than as a ✅/❌ pair.
+    addon_rows.append(("Mountless Engine", resolve_mountless_engine(env)))
     content.append({"tag": "h3", "children": ["Optional Add-ons"]})
     content.append(make_status_table(addon_rows))
     return content

@@ -504,13 +504,19 @@ caption-time, not worth threading through env just to unify). Used by both
 `build_blocks()` (zip caption) and `build_telegraph_content()` (Telegraph
 Overview) so the two never drift apart from each other at least.
 
-**`build_blocks()`, mountless-engine resolution** — only three possible
-values here: `None` (user didn't pick a mountless engine), or the display
-name of whichever one they picked. Unlike the `toggle_addon_order()`
-lines below, there's no N/A state to show — an unsupported-for-this-kernel-
-version mountless addon just falls back to "None" the same as never
-having been selected, since the mountless engine is a single either/or
-choice, not an availability flag.
+**`resolve_mountless_engine()`** — only three possible return values:
+`"None"` (user didn't pick a mountless engine), or the display name of
+whichever one they picked. No N/A state — an unsupported-for-this-
+kernel-version mountless addon just falls back to `"None"` the same as
+never having been selected, since the mountless engine is a single
+either/or choice, not an availability flag. Shared by `build_blocks()`
+(group caption's dedicated "Mountless Engine" line) and
+`build_telegraph_content()` (a `("Mountless Engine", ...)` row appended
+to the addon table — added after noticing `toggle_addon_order()`
+deliberately excludes `nomount`/`zeromount` from that table, which
+meant the Telegraph page previously showed *no trace at all* of an
+active mountless engine — not even a bare addon row — unlike the group
+caption which always had its own explicit line for it).
 
 **`build_blocks()`, toggle addon status** — `"N/A"` means not backported
 for this kernel version yet, distinct from a user's own `"Disable"`.
@@ -546,11 +552,14 @@ https://telegra.ph/api#Content-format). Three sections:
   backport, minus-sign (not X) if not, since there's no user Disable
   state for these, only a per-version rollout gap.
 - "Optional Add-ons": every `toggle_addon_order()` entry as a single
-  monospace Feature/Status table (check/X) reflecting *this* build. A
-  real HTML `<table>` isn't an option — Telegraph's allowed tag set has no
-  table/tr/td, so this is a `<pre><code>` block with manually
-  column-aligned text instead, replacing the old enabled/disabled two-list
-  split.
+  monospace Feature/Status table (check/X) reflecting *this* build,
+  plus one more row appended at the end — `("Mountless Engine",
+  resolve_mountless_engine(env))` — since `toggle_addon_order()`
+  excludes `nomount`/`zeromount` and they'd otherwise have no
+  representation on this page at all. A real HTML `<table>` isn't an
+  option — Telegraph's allowed tag set has no table/tr/td, so this is a
+  `<pre><code>` block with manually column-aligned text instead,
+  replacing the old enabled/disabled two-list split.
 
 Returns a plain Python list (`json.dumps`'d by the caller), not a JSON
 string itself.
