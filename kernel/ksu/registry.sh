@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 declare -A KSU_VARIANT_SUPPORTED_VERSIONS=(
-    [resukisu]="5.10 5.15 6.1"
-    [sukisu]="5.10 5.15 6.1"
-    [ksunext]="5.10 5.15 6.1"
+    [resukisu]="5.10 5.15 6.1 6.6"
+    [sukisu]="5.10 5.15 6.1 6.6"
+    [ksunext]="5.10 5.15 6.1 6.6"
 )
 
 ksu_variant_supports_kernel_version() {
