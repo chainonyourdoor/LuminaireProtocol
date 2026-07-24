@@ -41,10 +41,43 @@ ADDON_DISPLAY_NAMES = {
 }
 
 
-MOUNTLESS_ADDON_TOKENS = ("nomount", "zeromount")
+def addon_order(env):
+    """Full addon catalog (toggle + mountless-engine addons together),
+    read from ADDON_ORDER — exported by kernel/addons/registry.sh so
+    this list never needs editing here just because an addon was
+    added/removed there. See core_patch_order() above for the same
+    pattern applied to kernel/luminaire/ features."""
+    raw = env.get("ADDON_ORDER", "")
+    order = [t for t in raw.split(",") if t]
+    if order:
+        return order
+    # Fallback if ADDON_ORDER wasn't exported (older workflow run):
+    # degrades gracefully to only the addons actually touched this
+    # build — addons the user didn't select at all won't show as an
+    # explicit "Disable" line, unlike the normal path.
+    applied = [t for t in env.get("APPLIED_ADDONS", "").split(",") if t]
+    skipped = [t for t in env.get("SKIPPED_ADDONS", "").split(",") if t]
+    return applied + skipped
 
 
-TOGGLE_ADDON_ORDER = ["rekernel", "bbrv3", "bbg", "droidspaces", "ntsync", "wireguard", "lz4zstd", "lz4kd", "kasumi"]
+def addon_mountless_tokens(env):
+    raw = env.get("ADDON_MOUNTLESS_TOKENS", "")
+    tokens = [t for t in raw.split(",") if t]
+    return tuple(tokens) if tokens else ("nomount", "zeromount")
+
+
+def toggle_addon_order(env):
+    """addon_order() minus the mountless-engine addons, which are
+    shown as a single 'Mountless Engine' line instead of their own
+    Enable/Disable row."""
+    mountless = set(addon_mountless_tokens(env))
+    return [t for t in addon_order(env) if t not in mountless]
+
+
+def addon_display_name(token):
+    if token in ADDON_DISPLAY_NAMES:
+        return ADDON_DISPLAY_NAMES[token]
+    return " ".join(w.capitalize() for w in token.split("_"))
 
 
 CORE_PATCH_DISPLAY_NAMES = {
@@ -192,22 +225,25 @@ def build_blocks(env):
     susfs_ver       = mdv2_code_escape(env.get("SUSFS_VER", "N/A"))
     addon_tokens = [t for t in env.get("ADDONS", "").split(",") if t]
     skipped_tokens = [t for t in env.get("SKIPPED_ADDONS", "").split(",") if t]
+    mountless_tokens = addon_mountless_tokens(env)
     mountless = "None"
     for token in addon_tokens:
-        if token in MOUNTLESS_ADDON_TOKENS and token not in skipped_tokens:
-            mountless = ADDON_DISPLAY_NAMES.get(token, token)
+        if token in mountless_tokens and token not in skipped_tokens:
+            mountless = addon_display_name(token)
             break
     mountless = mdv2_code_escape(mountless)
+    toggle_order = toggle_addon_order(env)
+    addon_name_width = max((len(addon_display_name(t)) for t in toggle_order), default=16) + 1
     addon_status_lines = []
-    for token in TOGGLE_ADDON_ORDER:
-        name = ADDON_DISPLAY_NAMES.get(token, token)
+    for token in toggle_order:
+        name = addon_display_name(token)
         if token in skipped_tokens:
             status = "N/A"
         elif token in addon_tokens:
             status = "Enable"
         else:
             status = "Disable"
-        addon_status_lines.append(f"{name.ljust(16)} : {mdv2_code_escape(status)}")
+        addon_status_lines.append(f"{name.ljust(addon_name_width)}: {mdv2_code_escape(status)}")
     core_patch_tokens = [t for t in env.get("APPLIED_LUMINAIRE", "").split(",") if t]
     core_patch_skipped_tokens = [t for t in env.get("SKIPPED_LUMINAIRE", "").split(",") if t]
     core_patch_order_list = core_patch_order(env)
@@ -350,8 +386,8 @@ def build_telegraph_content(env):
     content.append({"tag": "p", "children": ["Always-on, no toggle — active whenever this kernel version has the backport."]})
     content.append(make_status_table(core_patch_rows))
     addon_rows = [
-        (ADDON_DISPLAY_NAMES.get(token, token), addon_status_icon(token))
-        for token in TOGGLE_ADDON_ORDER
+        (addon_display_name(token), addon_status_icon(token))
+        for token in toggle_addon_order(env)
     ]
     content.append({"tag": "h3", "children": ["Optional Add-ons"]})
     content.append(make_status_table(addon_rows))

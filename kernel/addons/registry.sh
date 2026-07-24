@@ -14,6 +14,22 @@ declare -A ADDON_SUPPORTED_VERSIONS=(
     [zeromount]="5.10 6.1"
 )
 
+# Canonical display order for the full addon catalog. Same reasoning
+# as LUMINAIRE_FEATURE_ORDER in kernel/luminaire/registry.sh: bash
+# associative array key order is unspecified, so this can't be derived
+# from ADDON_SUPPORTED_VERSIONS above — keep both in sync by hand when
+# adding/removing an addon. Exported so release/telegram/caption.py can
+# build its full addon table (including addons NOT selected in
+# $ADDONS, shown as Disable) from this instead of hardcoding its own
+# duplicate list.
+ADDON_ORDER=(rekernel bbrv3 bbg droidspaces ntsync wireguard lz4zstd lz4kd kasumi nomount zeromount)
+
+# Addons that are mutually-exclusive variants of one logical choice
+# ("Mountless Engine"), shown as a single line in the release caption
+# instead of individual Enable/Disable rows. Display-grouping metadata
+# only — actual mutual-exclusivity is enforced in run_addons() below.
+ADDON_MOUNTLESS_TOKENS=(nomount zeromount)
+
 addon_supports_kernel_version() {
     local addon="$1"
     local supported="${ADDON_SUPPORTED_VERSIONS[$addon]:-}"
@@ -22,6 +38,9 @@ addon_supports_kernel_version() {
 }
 
 run_addons() {
+    IFS=, ; echo "ADDON_ORDER=${ADDON_ORDER[*]}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
+    echo "ADDON_MOUNTLESS_TOKENS=${ADDON_MOUNTLESS_TOKENS[*]}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
+    unset IFS
     [ -z "${ADDONS:-}" ] && return 0
     ADDONS="${ADDONS// /}"
     ADDONS="$(echo "$ADDONS" | sed 's/^,*//;s/,*$//;s/,,*/,/g')"

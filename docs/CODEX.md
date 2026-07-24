@@ -410,23 +410,33 @@ state.
 separate from `CAPTION_LIMIT` (1024) which is the `sendDocument`/
 `sendPhoto` caption limit used everywhere else in this file.
 
-**`ADDON_DISPLAY_NAMES`** — single source of truth for addon display
-names, shared by `build_blocks()` (per-build group caption) and
-`build_channel_caption()` (channel post). Adding a new addon only means
-adding an entry here (plus `TOGGLE_ADDON_ORDER` below if it should show as
-an explicit Enable/Disable line in the group caption's Add-ons block).
+**`ADDON_DISPLAY_NAMES`** — display-name overrides only (acronyms like
+BBRv3/BBG/NTSync that `addon_display_name()`'s auto-generated
+snake_case→Title Case fallback wouldn't get right). Shared by
+`build_blocks()` (per-build group caption) and `build_channel_caption()`
+(channel post). The *set and order* of addons is not hardcoded here —
+see `addon_order()` below.
 
-**`MOUNTLESS_ADDON_TOKENS`** — mountless-engine addons are mutually
-exclusive (only one, or none, active per build) and shown as a single
-"Mountless Engine" line rather than their own Enable/Disable row.
-
-**`TOGGLE_ADDON_ORDER`** — toggle-style addons shown as explicit
-Enable/Disable lines in the group caption, in display order.
+**`addon_order()` / `addon_mountless_tokens()` / `toggle_addon_order()`**
+— read `ADDON_ORDER`/`ADDON_MOUNTLESS_TOKENS` from the env, exported by
+`kernel/addons/registry.sh` itself (same `ADDON_ORDER`/
+`ADDON_MOUNTLESS_TOKENS` bash arrays that file uses internally — see
+its CODEX section). `toggle_addon_order()` is `addon_order()` minus the
+mountless ones, i.e. the addons shown as their own explicit
+Enable/Disable line rather than folded into the single "Mountless
+Engine" line. Adding an addon to `kernel/addons/registry.sh` makes it
+show up here automatically — `ADDON_DISPLAY_NAMES` only needs a new
+entry if the auto-generated fallback name isn't good enough. Falls back
+to reconstructing from `APPLIED_ADDONS`+`SKIPPED_ADDONS` if `ADDON_ORDER`
+wasn't exported (older workflow run) — degrades gracefully but addons
+the user didn't select at all won't show an explicit "Disable" line in
+that fallback path, since there's no third source listing the full
+catalog to fall back on.
 
 **`CORE_PATCH_DISPLAY_NAMES` / `core_patch_order()`** — always-on
 Luminaire features (`kernel/luminaire/*`, see `build.sh`'s
 `run_luminaire()`) — structurally separate from
-`ADDON_DISPLAY_NAMES`/`TOGGLE_ADDON_ORDER` since these have no
+`ADDON_DISPLAY_NAMES`/`addon_order()` since these have no
 Enable/Disable toggle at all; a build either has the feature (kernel
 version supports it) or shows N/A (not backported yet), never a
 user-chosen Disable. Named `CORE_PATCH_*` (not `LUMINAIRE_*`) to match
@@ -496,8 +506,8 @@ Overview) so the two never drift apart from each other at least.
 
 **`build_blocks()`, mountless-engine resolution** — only three possible
 values here: `None` (user didn't pick a mountless engine), or the display
-name of whichever one they picked. Unlike the `TOGGLE_ADDON_ORDER` lines
-below, there's no N/A state to show — an unsupported-for-this-kernel-
+name of whichever one they picked. Unlike the `toggle_addon_order()`
+lines below, there's no N/A state to show — an unsupported-for-this-kernel-
 version mountless addon just falls back to "None" the same as never
 having been selected, since the mountless engine is a single either/or
 choice, not an availability flag.
@@ -529,11 +539,13 @@ https://telegra.ph/api#Content-format). Three sections:
   verified against `build.yml` before relying on that, not assumed.
 - "Core Features": `FRAGMENT_FEATURES`, grouped exactly like the dict's
   categories, always-on regardless of build.
-- "Luminaire Features": every `CORE_PATCH_ORDER` entry (ADIOS, BORE) —
-  always-on, no toggle; check-mark if this kernel version has the
+- "Luminaire Features": every `core_patch_order()` entry (BORE, ADIOS,
+  and the `*_catchup` features) — always-on, no toggle; check-mark (plus
+  the active version string, when the feature exported one — see
+  `core_patch_status_display()`) if this kernel version has the
   backport, minus-sign (not X) if not, since there's no user Disable
   state for these, only a per-version rollout gap.
-- "Optional Add-ons": every `TOGGLE_ADDON_ORDER` entry as a single
+- "Optional Add-ons": every `toggle_addon_order()` entry as a single
   monospace Feature/Status table (check/X) reflecting *this* build. A
   real HTML `<table>` isn't an option — Telegraph's allowed tag set has no
   table/tr/td, so this is a `<pre><code>` block with manually
@@ -1357,8 +1369,31 @@ one.
 **`addon_supports_kernel_version()`** — unknown addon name → treat as
 unsupported rather than silently letting it through;
 `ADDON_SUPPORTED_VERSIONS` should be kept in sync with
-`kernel/addons/*/*.sh` (same list `release/telegram/caption.py`'s
-`TOGGLE_ADDON_ORDER` tracks).
+`kernel/addons/*/*.sh` (same list `ADDON_ORDER` below tracks).
+
+**`ADDON_ORDER`** — the actual display/iteration order, as a bash
+indexed array. Deliberately separate from `ADDON_SUPPORTED_VERSIONS`
+above rather than derived from it — bash associative array key order
+(`${!arr[@]}`) is unspecified, so it can't be relied on for anything
+display-order-sensitive (same reasoning as
+`LUMINAIRE_FEATURE_ORDER` in `kernel/luminaire/registry.sh`). Keep both
+in sync by hand when adding/removing an addon. Exported (comma-joined)
+to `GITHUB_ENV` unconditionally at the top of `run_addons()` — before
+the `[ -z "${ADDONS:-}" ] && return 0` early-out — specifically so it's
+still available even on a build with zero addons selected;
+`release/telegram/caption.py`'s `addon_order()` needs the full catalog
+regardless of what (if anything) this particular build touched, to show
+untouched addons as an explicit "Disable" line rather than omitting
+them.
+
+**`ADDON_MOUNTLESS_TOKENS`** — which `ADDON_ORDER` entries are
+mutually-exclusive variants of the single "Mountless Engine" choice
+(folded into one caption line instead of their own Enable/Disable row)
+— display-grouping metadata only, consumed by
+`release/telegram/caption.py`'s `addon_mountless_tokens()`/
+`toggle_addon_order()`. The actual mutual-exclusivity enforcement is
+the nomount/zeromount conflict check in `run_addons()` below, unrelated
+to this array.
 
 **`run_addons()`, ADDONS normalization** — strips whitespace, leading/
 trailing commas, and duplicate commas.
