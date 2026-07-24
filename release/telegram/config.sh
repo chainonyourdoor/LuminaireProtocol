@@ -11,6 +11,7 @@ declare -A TELEGRAM_THREAD_ID_BUILD_BY_VERSION=(
     ["5.15"]="606"
     ["6.1"]="626"
     ["6.6"]="751"
+    ["6.12"]="755"
 )
 
 TELEGRAM_THREAD_ID_RELEASE="84"
