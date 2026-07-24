@@ -36,4 +36,11 @@ EOF
     log "BORE: CONFIG_SCHED_BORE enabled ✅"
 fi
 
+# Derived from the patch filename (bore-<version>.patch) rather than a
+# separate hardcoded string, so it can't drift from BORE_PATCH above.
+# Consumed by release/telegram/caption.py to show the active version
+# in release notes instead of a generic "Active".
+BORE_VERSION="$(basename "$BORE_PATCH" .patch | sed 's/^bore-//')"
+echo "BORE_VERSION=${BORE_VERSION}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
+
 log "BORE CPU scheduler integrated ✅"

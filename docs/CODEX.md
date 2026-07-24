@@ -423,15 +423,43 @@ exclusive (only one, or none, active per build) and shown as a single
 **`TOGGLE_ADDON_ORDER`** — toggle-style addons shown as explicit
 Enable/Disable lines in the group caption, in display order.
 
-**`CORE_PATCH_DISPLAY_NAMES` / `CORE_PATCH_ORDER`** — always-on Luminaire
-features (`kernel/luminaire/*`, see `build.sh`'s `run_luminaire()`) —
-structurally separate from `ADDON_DISPLAY_NAMES`/`TOGGLE_ADDON_ORDER`
-since these have no Enable/Disable toggle at all; a build either has the
-feature (kernel version supports it) or shows N/A (not backported yet),
-never a user-chosen Disable. Named `CORE_PATCH_*` (not `LUMINAIRE_*`) to
-match the "Core-Patch" caption label and avoid confusion with
+**`CORE_PATCH_DISPLAY_NAMES` / `core_patch_order()`** — always-on
+Luminaire features (`kernel/luminaire/*`, see `build.sh`'s
+`run_luminaire()`) — structurally separate from
+`ADDON_DISPLAY_NAMES`/`TOGGLE_ADDON_ORDER` since these have no
+Enable/Disable toggle at all; a build either has the feature (kernel
+version supports it) or shows N/A (not backported yet), never a
+user-chosen Disable. Named `CORE_PATCH_*` (not `LUMINAIRE_*`) to match
+the "Core-Patch" caption label and avoid confusion with
 `block_luminaire` (the unrelated Kernel/Source/Toolchain overview block
 further down).
+
+Unlike `ADDON_DISPLAY_NAMES`, the *set and order* of features is not
+hardcoded here — `core_patch_order()` reads it from the
+`LUMINAIRE_FEATURE_ORDER` env var, exported by
+`kernel/luminaire/registry.sh` itself (falls back to reconstructing
+from `APPLIED_LUMINAIRE`+`SKIPPED_LUMINAIRE` if that env var is
+missing, e.g. an older workflow run). This means adding a feature to
+`kernel/luminaire/registry.sh` makes it show up here automatically —
+`CORE_PATCH_DISPLAY_NAMES` only needs a new entry if the
+auto-generated fallback name (`core_patch_display_name()`: snake_case
+→ Title Case) isn't good enough (it never is for acronyms — BORE,
+ADIOS, UFS — hence they're always explicitly listed).
+
+Status text is version-aware, not just Active/N/A:
+`core_patch_status_plain()`/`core_patch_status_display()` read
+`f"{TOKEN}_VERSION"` from the env (e.g. `BORE_VERSION`,
+`ADIOS_VERSION` — exported by that feature's own `.sh` script, derived
+from its active patch filename so it can't drift out of sync — see
+`kernel/luminaire/bore/bore.sh`) and show that instead of a generic
+"Active" when present. This matters specifically for BORE, which
+currently has two patch files (`bore-v5.3.0.patch`, the proven
+default, and `bore-v6.8.0-rc1.patch`, currently swapped in for testing
+— see that file's CODEX section) — the version string is the only way
+a release caption tells a reader which one is actually running.
+Features without a `_VERSION` env var (the three `*_catchup` features,
+which only ever have one patch file each) fall back to a plain
+"Active"/✅.
 
 **`FRAGMENT_FEATURES`** — human-readable summary of
 `kernel/config/luminaire.fragment`, the always-on feature set baked into
@@ -1459,6 +1487,17 @@ values each feature actually has a patch for today — same shape/purpose
 as `kernel/addons/registry.sh`'s `ADDON_SUPPORTED_VERSIONS`, kept as a
 separate map since these are never addons.
 
+**`LUMINAIRE_FEATURE_ORDER`** — the actual iteration/display order, as
+a bash indexed array. Deliberately separate from
+`LUMINAIRE_SUPPORTED_VERSIONS` above rather than derived from it —
+bash associative array key order (`${!arr[@]}`) is unspecified, so it
+can't be relied on for anything display-order-sensitive. Keep both in
+sync by hand when adding/removing a feature (one new key in the map,
+one new entry in this array). Exported (comma-joined) to `GITHUB_ENV`
+so `release/telegram/caption.py`'s `core_patch_order()` can build its
+feature table from this directly instead of hardcoding its own
+duplicate list — see that file's CODEX section.
+
 **`run_luminaire()`, `export APPLIED_LUMINAIRE`/`SKIPPED_LUMINAIRE`** —
 not `local`: `telegram.sh` (`run_release` → `telegram.sh`, later in the
 same process) reads these directly to build the release caption. A
@@ -1605,6 +1644,12 @@ elevator insert).
 Always-on Luminaire feature — no user toggle, not part of `$ADDONS`. See
 `LUMINAIRE_SUPPORTED_VERSIONS` in `kernel/luminaire/registry.sh` for
 version gating.
+
+Exports `ADIOS_VERSION` (derived from `$ADIOS_PATCH`'s filename) for
+`release/telegram/caption.py` to show in release captions — see
+`CORE_PATCH_DISPLAY_NAMES` / `core_patch_order()` in that file's CODEX
+section. Only one ADIOS patch version exists right now, so this is
+mostly future-proofing/consistency with `BORE_VERSION` in `bore.sh`.
 
 ---
 

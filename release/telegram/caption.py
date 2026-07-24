@@ -48,10 +48,48 @@ TOGGLE_ADDON_ORDER = ["rekernel", "bbrv3", "bbg", "droidspaces", "ntsync", "wire
 
 
 CORE_PATCH_DISPLAY_NAMES = {
-    "bore":  "BORE",
-    "adios": "ADIOS",
+    "bore":                     "BORE",
+    "adios":                    "ADIOS",
+    "workqueue_catchup":        "Workqueue Catch-up",
+    "schedutil_catchup":        "Schedutil Catch-up",
+    "ufs_writebooster_catchup": "UFS WriteBooster Catch-up",
 }
-CORE_PATCH_ORDER = ["bore", "adios"]
+
+
+def core_patch_order(env):
+    """The full set+order of kernel/luminaire/ features (applied AND
+    skipped this build), read from LUMINAIRE_FEATURE_ORDER — exported
+    by kernel/luminaire/registry.sh so this list never needs editing
+    here just because a feature was added/removed there."""
+    raw = env.get("LUMINAIRE_FEATURE_ORDER", "")
+    order = [t for t in raw.split(",") if t]
+    if order:
+        return order
+    # Fallback if LUMINAIRE_FEATURE_ORDER wasn't exported (older
+    # workflow run, or manual/local testing): best-effort reconstruct
+    # from the two lists that are always present.
+    applied = [t for t in env.get("APPLIED_LUMINAIRE", "").split(",") if t]
+    skipped = [t for t in env.get("SKIPPED_LUMINAIRE", "").split(",") if t]
+    return applied + skipped
+
+
+def core_patch_display_name(token):
+    if token in CORE_PATCH_DISPLAY_NAMES:
+        return CORE_PATCH_DISPLAY_NAMES[token]
+    return " ".join(w.capitalize() for w in token.split("_"))
+
+
+def core_patch_status_plain(env, token, skipped_tokens):
+    """Plain-text status for the Markdown code-block caption. Shows the
+    active patch version (e.g. 'v6.8.0-rc1') when the feature's .sh
+    script exported one via f"{TOKEN}_VERSION" (see BORE_VERSION in
+    kernel/luminaire/bore/bore.sh) instead of a generic 'Active', since
+    for versioned features like BORE which version is running is the
+    actually useful information."""
+    if token in skipped_tokens:
+        return "N/A"
+    version = env.get(f"{token.upper()}_VERSION", "").strip()
+    return version if version else "Active"
 
 
 FRAGMENT_FEATURES = {
@@ -172,11 +210,16 @@ def build_blocks(env):
         addon_status_lines.append(f"{name.ljust(16)} : {mdv2_code_escape(status)}")
     core_patch_tokens = [t for t in env.get("APPLIED_LUMINAIRE", "").split(",") if t]
     core_patch_skipped_tokens = [t for t in env.get("SKIPPED_LUMINAIRE", "").split(",") if t]
+    core_patch_order_list = core_patch_order(env)
+    # Separate width from the addons block's fixed 16 — core patch
+    # names (e.g. "UFS WriteBooster Catch-up") can run longer than any
+    # addon name, and a shared fixed width would misalign the colons.
+    core_patch_name_width = max((len(core_patch_display_name(t)) for t in core_patch_order_list), default=16) + 1
     core_patch_status_lines = []
-    for token in CORE_PATCH_ORDER:
-        name = CORE_PATCH_DISPLAY_NAMES.get(token, token)
-        status = "N/A" if token in core_patch_skipped_tokens else "Active"
-        core_patch_status_lines.append(f"{name.ljust(16)} : {mdv2_code_escape(status)}")
+    for token in core_patch_order_list:
+        name = core_patch_display_name(token)
+        status = core_patch_status_plain(env, token, core_patch_skipped_tokens)
+        core_patch_status_lines.append(f"{name.ljust(core_patch_name_width)}: {mdv2_code_escape(status)}")
     commit_short    = env.get("GITHUB_SHA", "")[:7]
     commit_url      = "{}/{}/commit/{}".format(
                         env.get("GITHUB_SERVER_URL", ""),
@@ -215,7 +258,7 @@ def build_blocks(env):
         + "\n".join(addon_status_lines) +
         "```"
     )
-    has_active_core_patch = any(t not in core_patch_skipped_tokens for t in CORE_PATCH_ORDER)
+    has_active_core_patch = any(t not in core_patch_skipped_tokens for t in core_patch_order_list)
     if has_active_core_patch:
         block_core_patch = (
             "```Core-Patch\n"
@@ -281,8 +324,14 @@ def build_telegraph_content(env):
         if token in skipped_tokens:
             return "\u2796"
         return "\u2705" if token in addon_tokens else "\u274c"
-    def core_patch_status_icon(token):
-        return "\u2796" if token in core_patch_skipped_tokens else "\u2705"
+    def core_patch_status_display(token):
+        """Same version-aware status as core_patch_status_plain, but
+        prefixed with the check/dash icon to match this table's style
+        (see make_status_table below, shared with the addons table)."""
+        if token in core_patch_skipped_tokens:
+            return "\u2796 N/A"
+        version = env.get(f"{token.upper()}_VERSION", "").strip()
+        return f"\u2705 {version}" if version else "\u2705"
     def make_status_table(rows):
         name_width = max(len(name) for name, _ in rows) + 2
         lines = [f"{'Feature'.ljust(name_width)}Status"]
@@ -294,8 +343,8 @@ def build_telegraph_content(env):
             children.append(line)
         return {"tag": "pre", "children": [{"tag": "code", "children": children}]}
     core_patch_rows = [
-        (CORE_PATCH_DISPLAY_NAMES.get(token, token), core_patch_status_icon(token))
-        for token in CORE_PATCH_ORDER
+        (core_patch_display_name(token), core_patch_status_display(token))
+        for token in core_patch_order(env)
     ]
     content.append({"tag": "h3", "children": ["Luminaire Features"]})
     content.append({"tag": "p", "children": ["Always-on, no toggle — active whenever this kernel version has the backport."]})

@@ -31,4 +31,8 @@ EOF
     log "ADIOS: CONFIG_MQ_IOSCHED_ADIOS + DEFAULT_ADIOS enabled ✅"
 fi
 
+# See BORE_VERSION in bore.sh for why this is derived, not hardcoded.
+ADIOS_VERSION="$(basename "$ADIOS_PATCH" .patch | sed 's/^adios-//')"
+echo "ADIOS_VERSION=${ADIOS_VERSION}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
+
 log "ADIOS I/O scheduler integrated ✅"
