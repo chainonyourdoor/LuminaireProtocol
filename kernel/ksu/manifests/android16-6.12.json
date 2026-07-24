@@ -1,0 +1,34 @@
+{
+  "resukisu": {
+    "good": "",
+    "bad": []
+  },
+  "susfs_resukisu": {
+    "good": "",
+    "bad": []
+  },
+  "sukisu": {
+    "good": "",
+    "bad": []
+  },
+  "sukisu_builtin": {
+    "good": "",
+    "bad": []
+  },
+  "susfs_sukisu": {
+    "good": "",
+    "bad": []
+  },
+  "ksunext": {
+    "good": "",
+    "bad": []
+  },
+  "ksunext_susfs_fork": {
+    "good": "",
+    "bad": []
+  },
+  "susfs_ksunext": {
+    "good": "",
+    "bad": []
+  }
+}
