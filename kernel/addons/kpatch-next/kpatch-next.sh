@@ -8,15 +8,21 @@
 
 KPATCH_NEXT_REPO="https://github.com/KernelSU-Next/KPatch-Next.git"
 KPATCH_NEXT_SRC_DIR="${WORKSPACE_DIR}/kpatch-next"
+KPATCH_NEXT_SRC_CACHE_DIR="${HOME}/kpatch-next-src-cache"
 
 log "🩹 Fetching KPatch-Next source..."
 
-if [ -d "${KPATCH_NEXT_SRC_DIR}/.git" ]; then
-    log "KPatch-Next: source already present, skipping clone."
+if [ -d "${KPATCH_NEXT_SRC_CACHE_DIR}/.git" ]; then
+    log "KPatch-Next: restoring source from cache..."
+    rm -rf "${KPATCH_NEXT_SRC_DIR}"
+    cp -a "${KPATCH_NEXT_SRC_CACHE_DIR}" "${KPATCH_NEXT_SRC_DIR}"
 else
     rm -rf "${KPATCH_NEXT_SRC_DIR}"
     retry 3 run_quiet git clone -q --depth=1 "${KPATCH_NEXT_REPO}" "${KPATCH_NEXT_SRC_DIR}" \
         || error "KPatch-Next: failed to clone source!"
+    log "KPatch-Next: saving source to cache..."
+    mkdir -p "${KPATCH_NEXT_SRC_CACHE_DIR}"
+    cp -a "${KPATCH_NEXT_SRC_DIR}/." "${KPATCH_NEXT_SRC_CACHE_DIR}/"
 fi
 
 [ -d "${KPATCH_NEXT_SRC_DIR}/kernel" ] && [ -d "${KPATCH_NEXT_SRC_DIR}/tools" ] && [ -d "${KPATCH_NEXT_SRC_DIR}/user" ] \

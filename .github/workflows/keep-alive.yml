@@ -7,7 +7,7 @@ on:
 
 jobs:
   # ======================================================
-  # LIST — enumerate every arsenal-*/clang-* cache that actually exists
+  # LIST — enumerate every arsenal-*/clang-*/kpatch-next-* cache that exists
   # ======================================================
   # A plain `restore-keys: arsenal-` only restores (and thus only refreshes
   # the last-accessed time of) the single most recent matching cache, not
@@ -23,13 +23,13 @@ jobs:
     outputs:
       keys: ${{ steps.list.outputs.keys }}
     steps:
-      - name: "List arsenal-*/clang-* cache keys"
+      - name: "List arsenal-*/clang-*/kpatch-next-* cache keys"
         id: list
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           KEYS=$(gh api "/repos/${{ github.repository }}/actions/caches?per_page=100" --paginate \
-            | jq -s '[.[].actions_caches[]?.key] | map(select(startswith("arsenal-") or startswith("clang-"))) | unique')
+            | jq -s '[.[].actions_caches[]?.key] | map(select(startswith("arsenal-") or startswith("clang-") or startswith("kpatch-next-"))) | unique')
           echo "Found $(echo "$KEYS" | jq 'length') cache(s) to keep alive:"
           echo "$KEYS" | jq -r '.[]'
           echo "keys=$(echo "$KEYS" | jq -c .)" >> "$GITHUB_OUTPUT"
