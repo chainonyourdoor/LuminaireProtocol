@@ -62,46 +62,45 @@ fi
 
 # ---------------------------------------------------------
 # Android NDK (required to build kpatch, the userspace binary
-# that runs on-device). GitHub-hosted ubuntu-latest runners DO
-# ship a preinstalled NDK, but ANDROID_NDK_LATEST_HOME/ANDROID_NDK_HOME/
-# ANDROID_NDK_ROOT are only written to /etc/environment by the runner
-# image's installer script, which job steps don't inherit — so those
-# vars are usually empty here even though the NDK is on disk. Fall
-# back to scanning where it actually lives, then to installing one
-# via sdkmanager (already licensed on the image) as a last resort.
+# that runs on-device).
+#
+# Tried relying on the runner's preinstalled NDK first (env vars,
+# then scanning ${ANDROID_SDK_ROOT}/ndk, then sdkmanager) — all three
+# failed in CI (see docs/CODEX.md / commit history for that attempt).
+# Root cause unconfirmed (possibly ANDROID_SDK_ROOT/ANDROID_HOME
+# themselves aren't set on this runner, or the image dropped the SDK
+# for this runner class). Rather than keep guessing at runner
+# internals, download a pinned NDK ourselves — same approach already
+# used for the aarch64-none-elf toolchain above, so this addon no
+# longer depends on runner-image assumptions at all.
 # ---------------------------------------------------------
 
-KPATCH_NDK_DIR=""
-for _ndk_var in ANDROID_NDK_LATEST_HOME ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK; do
-    _ndk_val="${!_ndk_var:-}"
-    if [ -n "$_ndk_val" ] && [ -d "$_ndk_val" ]; then
-        KPATCH_NDK_DIR="$_ndk_val"
-        log "KPatch-Next: found NDK via \$${_ndk_var}"
-        break
-    fi
-done
+KPATCH_NDK_VERSION="r27c"
+KPATCH_NDK_CACHE_DIR="${HOME}/kpatch-ndk-cache"
+KPATCH_NDK_URL="https://dl.google.com/android/repository/android-ndk-${KPATCH_NDK_VERSION}-linux.zip"
 
-if [ -z "$KPATCH_NDK_DIR" ]; then
-    for _sdk_base in "${ANDROID_SDK_ROOT:-}" "${ANDROID_HOME:-}" "/usr/local/lib/android/sdk"; do
-        [ -n "$_sdk_base" ] && [ -d "${_sdk_base}/ndk" ] || continue
-        KPATCH_NDK_DIR=$(find "${_sdk_base}/ndk" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -V | tail -1)
-        [ -n "$KPATCH_NDK_DIR" ] && { log "KPatch-Next: found NDK under ${_sdk_base}/ndk"; break; }
-    done
+if [ -f "${KPATCH_NDK_CACHE_DIR}/build/cmake/android.toolchain.cmake" ]; then
+    log "KPatch-Next: restoring Android NDK ${KPATCH_NDK_VERSION} from cache..."
+    KPATCH_NDK_DIR="$KPATCH_NDK_CACHE_DIR"
+else
+    log "KPatch-Next: downloading Android NDK ${KPATCH_NDK_VERSION} (~700MB, one-time this run)..."
+    retry 3 run_quiet curl -LSs --fail --connect-timeout 30 -o /tmp/kpatch-ndk.zip "$KPATCH_NDK_URL" \
+        || error "KPatch-Next: failed to download Android NDK ${KPATCH_NDK_VERSION}!"
+    rm -rf /tmp/kpatch-ndk-extract
+    mkdir -p /tmp/kpatch-ndk-extract "$KPATCH_NDK_CACHE_DIR"
+    unzip -q /tmp/kpatch-ndk.zip -d /tmp/kpatch-ndk-extract \
+        || error "KPatch-Next: failed to extract Android NDK zip!"
+    rm -f /tmp/kpatch-ndk.zip
+    KPATCH_NDK_EXTRACTED=$(find /tmp/kpatch-ndk-extract -mindepth 1 -maxdepth 1 -type d | head -1)
+    [ -n "$KPATCH_NDK_EXTRACTED" ] || error "KPatch-Next: NDK zip extracted but no top-level dir found!"
+    mv "${KPATCH_NDK_EXTRACTED}"/* "$KPATCH_NDK_CACHE_DIR"/
+    rm -rf /tmp/kpatch-ndk-extract
+    log "KPatch-Next: NDK downloaded and cached ✅"
+    KPATCH_NDK_DIR="$KPATCH_NDK_CACHE_DIR"
 fi
 
-if [ -z "$KPATCH_NDK_DIR" ]; then
-    KPATCH_SDKMANAGER=$(command -v sdkmanager 2>/dev/null || true)
-    [ -z "$KPATCH_SDKMANAGER" ] && KPATCH_SDKMANAGER=$(find "${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}" -type f -name "sdkmanager" 2>/dev/null | head -1)
-    if [ -n "$KPATCH_SDKMANAGER" ]; then
-        warn "KPatch-Next: no preinstalled NDK found — installing ndk;27.3.13750724 via sdkmanager (one-time, will slow this run down)..."
-        KPATCH_SDK_BASE="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
-        yes | "$KPATCH_SDKMANAGER" --sdk_root="$KPATCH_SDK_BASE" "ndk;27.3.13750724" > /dev/null 2>&1
-        [ -d "${KPATCH_SDK_BASE}/ndk/27.3.13750724" ] && KPATCH_NDK_DIR="${KPATCH_SDK_BASE}/ndk/27.3.13750724"
-    fi
-fi
-
-[ -n "$KPATCH_NDK_DIR" ] && [ -d "$KPATCH_NDK_DIR" ] \
-    || error "KPatch-Next: Android NDK not found — checked ANDROID_NDK_LATEST_HOME/ANDROID_NDK_HOME/ANDROID_NDK_ROOT/ANDROID_NDK, scanned \${ANDROID_SDK_ROOT}/ndk and \${ANDROID_HOME}/ndk, and the sdkmanager install fallback also failed. Runner image may have changed layout."
+[ -f "${KPATCH_NDK_DIR}/build/cmake/android.toolchain.cmake" ] \
+    || error "KPatch-Next: NDK dir at ${KPATCH_NDK_DIR} doesn't contain build/cmake/android.toolchain.cmake — download/extract may be corrupt."
 
 log "KPatch-Next: using NDK at ${KPATCH_NDK_DIR}"
 
