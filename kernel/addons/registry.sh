@@ -1,28 +1,17 @@
 #!/usr/bin/env bash
 
 declare -A ADDON_SUPPORTED_VERSIONS=(
-    # rekernel: EXPERIMENTAL widen (5.10/5.15/6.6/6.12 untested) — inject.py
-    # was built/verified against android14-6.1 specifically (see docs/CODEX.md).
-    # Its multi-anchor fallback in binder.c/binder_alloc.c/signal.c gives some
-    # cross-tree robustness, but that's not the same as verified compat with
-    # other kernel versions' source layout. Kept because inject.py hard-fails
-    # (sys.exit(1) -> build error) if no anchor matches, so a bad version just
-    # fails CI loudly instead of shipping a silently-broken kernel. If a
-    # version in this list turns out to fail in CI, remove that version here.
     [rekernel]="5.10 5.15 6.1 6.6 6.12"
     [bbrv3]="5.10 5.15 6.1 6.6"
     [bbg]="5.10 5.15 6.1 6.6 6.12"
     [droidspaces]="5.10 5.15 6.1 6.6 6.12"
-    [ntsync]="5.10 5.15 6.1 6.6 6.12"
+    [ntsync]="5.10 5.15 6.1 6.6"
     [wireguard]="5.10 5.15 6.1 6.6 6.12"
     [lz4zstd]="6.1"
     [lz4kd]="5.10 5.15 6.1 6.6"
     [kasumi]="5.10 5.15 6.1 6.6 6.12"
     [nomount]="5.10 5.15 6.1 6.6 6.12"
     [zeromount]="5.10 5.15 6.1 6.6 6.12"
-    # kpatch-next: upstream claims 3.18-6.12 "theoretically", arm64 only.
-    # Listed for all versions we build; if a version fails in CI, narrow
-    # this down rather than assuming the whole addon is broken.
     [kpatch-next]="5.10 5.15 6.1 6.6 6.12"
 )
 
