@@ -309,7 +309,7 @@ jobs:
           path: |
             ~/kpatch-toolchain-cache
             ~/kpatch-ndk-cache
-          key: kpatch-next-toolchains-v1
+          key: kpatch-next-toolchains
 
       - name: "Scout Upstream Refs"  # decides pinned vs candidate ref for KSU fork / SuSFS
         if: matrix.kernel_variant != 'VANILLA'
