@@ -14,7 +14,7 @@ ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LUMINAIRE_PATCH_DIR="${ROOT_DIR}"
 
 source "${LUMINAIRE_PATCH_DIR}/kernel/addons/registry.sh"
-source "${LUMINAIRE_PATCH_DIR}/kernel/luminaire/registry.sh"
+source "${LUMINAIRE_PATCH_DIR}/kernel/tuning/registry.sh"
 source "${LUMINAIRE_PATCH_DIR}/kernel/ksu/registry.sh"
 
 main() {
@@ -46,7 +46,7 @@ main() {
     run_variant
     mark_stage_ok CHECKPOINT_VARIANT_OK
     run_core
-    run_luminaire
+    run_tuning
     run_addons
     mark_stage_ok CHECKPOINT_ADDONS_OK
     run_build

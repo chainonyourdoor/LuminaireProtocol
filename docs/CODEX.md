@@ -41,19 +41,19 @@ Organized per-path, matching the repo's folder structure.
 - [kernel/addons/registry.sh](#kerneladdonsregistrysh)
 - [kernel/ksu/variants/sukisu/sukisu.sh](#kernelksuvariantssukisusukisush)
 - [kernel/addons/bbrv3/bbrv3.sh](#kerneladdonsbbrv3bbrv3sh)
-- [kernel/luminaire/registry.sh](#kernelluminaireregistrysh)
+- [kernel/tuning/registry.sh](#kerneltuningregistrysh)
 - [setup/02_ccache.sh](#setup02_ccachesh)
 - [arsenal.sh](#arsenalsh)
 - [kernel/addons/zeromount/zeromount.sh](#kerneladdonszeromountzeromountsh)
 - [build/make.sh](#buildmakesh)
 - [release/anykernel.sh](#releaseanykernelsh)
-- [kernel/luminaire/adios/adios.sh](#kernelluminaireadiosadiossh)
-- [kernel/luminaire/workqueue_catchup/workqueue_catchup.sh](#kernelluminaireworkqueue_catchupworkqueue_catchupsh)
-- [kernel/luminaire/schedutil_catchup/schedutil_catchup.sh](#kernelluminaireschedutil_catchupschedutil_catchupsh)
-- [kernel/luminaire/ufs_writebooster_catchup/ufs_writebooster_catchup.sh](#kernelluminaireufs_writebooster_catchupufs_writebooster_catchupsh)
+- [kernel/tuning/adios/adios.sh](#kerneltuningadiosadiossh)
+- [kernel/tuning/workqueue_catchup/workqueue_catchup.sh](#kerneltuningworkqueue_catchupworkqueue_catchupsh)
+- [kernel/tuning/schedutil_catchup/schedutil_catchup.sh](#kerneltuningschedutil_catchupschedutil_catchupsh)
+- [kernel/tuning/ufs_writebooster_catchup/ufs_writebooster_catchup.sh](#kerneltuningufs_writebooster_catchupufs_writebooster_catchupsh)
 - [kernel/ksu/registry.sh](#kernelksuregistrysh)
 - [release/telegram/common.sh](#releasetelegramcommonsh)
-- [kernel/luminaire/bore/bore.sh](#kernelluminaireboreboresh)
+- [kernel/tuning/bore/bore.sh](#kerneltuningboreboresh)
 - [setup/00_paths.sh](#setup00_pathssh)
 - [release/telegram/config.sh](#releasetelegramconfigsh)
 - [kernel/branding.sh](#kernelbrandingsh)
@@ -92,11 +92,11 @@ of the pipeline can be tested quickly after a refactor. Derived in
 `build.yml` from `RUN_MODE=="Dry Run"`, so it can never go out of sync with
 `RUN_MODE` by the time it reaches here.
 
-**Registry sourcing at the top (`kernel/{addons,luminaire,ksu}/registry.sh`)**
-— defines `run_addons()`/`run_luminaire()` (plus their respective
+**Registry sourcing at the top (`kernel/{addons,tuning,ksu}/registry.sh`)**
+— defines `run_addons()`/`run_tuning()` (plus their respective
 version-support maps) here, not inside `main()`, so it's just a regular
 function call in `main()` like everything else, and `build.sh` doesn't
-need to know any addon/luminaire policy at all.
+need to know any addon/tuning policy at all.
 
 **`wait_for_apt` in `main()`** — waits for the background `apt install`
 (started in `01_deps.sh`) to finish — `02_ccache.sh` (cmake/ninja/g++) and
@@ -128,9 +128,9 @@ the build failing outright and explicitly.
 **`run_core()`** — an explicit list of scripts (not a glob of every `.sh`
 in the folder) so no accidental sourcing of temp/irrelevant files.
 
-**Why `run_luminaire()`/`run_addons()` aren't defined in `build.sh`** —
+**Why `run_tuning()`/`run_addons()` aren't defined in `build.sh`** —
 both (plus the version-support map & addon conflict matrix) live in
-`kernel/luminaire/registry.sh` and `kernel/addons/registry.sh`, sourced
+`kernel/tuning/registry.sh` and `kernel/addons/registry.sh`, sourced
 near the top of this file. Deliberately kept out of `build.sh` so this
 file stays the orchestrator (deciding WHEN something runs) rather than
 also owning WHAT is supported.
@@ -434,35 +434,34 @@ the user didn't select at all won't show an explicit "Disable" line in
 that fallback path, since there's no third source listing the full
 catalog to fall back on.
 
-**`CORE_PATCH_DISPLAY_NAMES` / `core_patch_order()`** — always-on
-Luminaire features (`kernel/luminaire/*`, see `build.sh`'s
-`run_luminaire()`) — structurally separate from
+**`TUNING_DISPLAY_NAMES` / `tuning_order()`** — always-on
+Tuning features (`kernel/tuning/*`, see `build.sh`'s
+`run_tuning()`) — structurally separate from
 `ADDON_DISPLAY_NAMES`/`addon_order()` since these have no
 Enable/Disable toggle at all; a build either has the feature (kernel
 version supports it) or shows N/A (not backported yet), never a
-user-chosen Disable. Named `CORE_PATCH_*` (not `LUMINAIRE_*`) to match
-the "Core-Patch" caption label and avoid confusion with
-`block_luminaire` (the unrelated Kernel/Source/Toolchain overview block
-further down).
+user-chosen Disable. Named `TUNING_*` to match the "Tuning" caption
+label and avoid confusion with `block_luminaire` (the unrelated
+Kernel/Source/Toolchain overview block further down).
 
 Unlike `ADDON_DISPLAY_NAMES`, the *set and order* of features is not
-hardcoded here — `core_patch_order()` reads it from the
-`LUMINAIRE_FEATURE_ORDER` env var, exported by
-`kernel/luminaire/registry.sh` itself (falls back to reconstructing
-from `APPLIED_LUMINAIRE`+`SKIPPED_LUMINAIRE` if that env var is
+hardcoded here — `tuning_order()` reads it from the
+`TUNING_FEATURE_ORDER` env var, exported by
+`kernel/tuning/registry.sh` itself (falls back to reconstructing
+from `APPLIED_TUNING`+`SKIPPED_TUNING` if that env var is
 missing, e.g. an older workflow run). This means adding a feature to
-`kernel/luminaire/registry.sh` makes it show up here automatically —
-`CORE_PATCH_DISPLAY_NAMES` only needs a new entry if the
-auto-generated fallback name (`core_patch_display_name()`: snake_case
+`kernel/tuning/registry.sh` makes it show up here automatically —
+`TUNING_DISPLAY_NAMES` only needs a new entry if the
+auto-generated fallback name (`tuning_display_name()`: snake_case
 → Title Case) isn't good enough (it never is for acronyms — BORE,
 ADIOS, UFS — hence they're always explicitly listed).
 
 Status text is version-aware, not just Active/N/A:
-`core_patch_status_plain()`/`core_patch_status_display()` read
+`tuning_status_plain()`/`tuning_status_display()` read
 `f"{TOKEN}_VERSION"` from the env (e.g. `BORE_VERSION`,
 `ADIOS_VERSION` — exported by that feature's own `.sh` script, derived
 from its active patch filename so it can't drift out of sync — see
-`kernel/luminaire/bore/bore.sh`) and show that instead of a generic
+`kernel/tuning/bore/bore.sh`) and show that instead of a generic
 "Active" when present. This matters specifically for BORE, which
 currently has two patch files (`bore-v5.3.0.patch`, the proven
 default, and `bore-v6.8.0-rc1.patch`, currently swapped in for testing
@@ -522,12 +521,12 @@ caption which always had its own explicit line for it).
 **`build_blocks()`, toggle addon status** — `"N/A"` means not backported
 for this kernel version yet, distinct from a user's own `"Disable"`.
 
-**`build_blocks()`, core-patch status** — no Disable state here: these are
+**`build_blocks()`, tuning status** — no Disable state here: these are
 never user-toggled, only `"Active"` (this kernel version has the backport)
 or `"N/A"` (it doesn't yet).
 
-**`build_blocks()`, `block_core_patch`** — the whole block is omitted when
-nothing in it is Active — an all-N/A Core-Patch section (e.g. neither BORE
+**`build_blocks()`, `block_tuning`** — the whole block is omitted when
+nothing in it is Active — an all-N/A Tuning section (e.g. neither BORE
 nor ADIOS backported yet for this kernel version) isn't useful
 information, just noise. `main()`'s `caption_group` join already drops
 `None` blocks.
@@ -546,10 +545,10 @@ https://telegra.ph/api#Content-format). Three sections:
   verified against `build.yml` before relying on that, not assumed.
 - "Core Features": `FRAGMENT_FEATURES`, grouped exactly like the dict's
   categories, always-on regardless of build.
-- "Luminaire Features": every `core_patch_order()` entry (BORE, ADIOS,
+- "Luminaire Tuning": every `tuning_order()` entry (BORE, ADIOS,
   and the `*_catchup` features) — always-on, no toggle; check-mark (plus
   the active version string, when the feature exported one — see
-  `core_patch_status_display()`) if this kernel version has the
+  `tuning_status_display()`) if this kernel version has the
   backport, minus-sign (not X) if not, since there's no user Disable
   state for these, only a per-version rollout gap.
 - "Optional Add-ons": every `toggle_addon_order()` entry as a single
@@ -1431,7 +1430,7 @@ indexed array. Deliberately separate from `ADDON_SUPPORTED_VERSIONS`
 above rather than derived from it — bash associative array key order
 (`${!arr[@]}`) is unspecified, so it can't be relied on for anything
 display-order-sensitive (same reasoning as
-`LUMINAIRE_FEATURE_ORDER` in `kernel/luminaire/registry.sh`). Keep both
+`TUNING_FEATURE_ORDER` in `kernel/tuning/registry.sh`). Keep both
 in sync by hand when adding/removing an addon. Exported (comma-joined)
 to `GITHUB_ENV` unconditionally at the top of `run_addons()` — before
 the `[ -z "${ADDONS:-}" ] && return 0` early-out — specifically so it's
@@ -1458,8 +1457,8 @@ kernel subsystems and cannot be safely combined. Checked up front so a
 bad combo fails fast instead of leaving a half-patched tree mid-build.
 
 **`run_addons()`, `export APPLIED_ADDONS`** — not `local` — same reason
-as `APPLIED_LUMINAIRE`/`SKIPPED_LUMINAIRE` in
-`kernel/luminaire/registry.sh`: `telegram.sh` reads these later in the
+as `APPLIED_TUNING`/`SKIPPED_TUNING` in
+`kernel/tuning/registry.sh`: `telegram.sh` reads these later in the
 same process to build the release caption.
 
 ---
@@ -1553,12 +1552,12 @@ enforcer's own mechanism.
 
 ---
 
-## `kernel/luminaire/registry.sh`
+## `kernel/tuning/registry.sh`
 
-**Purpose of this file**: Luminaire feature registry — support map,
+**Purpose of this file**: Tuning feature registry — support map,
 dispatch. Sourced once by `build.sh` (functions become available for the
 rest of the process, same shape as `functions.sh`) so `build.sh` itself
-only ever calls `run_luminaire()` and doesn't need to know any feature
+only ever calls `run_tuning()` and doesn't need to know any feature
 policy lives here.
 
 These features (currently: ADIOS I/O scheduler, BORE CPU scheduler,
@@ -1572,23 +1571,23 @@ which contradicted the actual intent (source was always patched in
 regardless of the toggle, only the Kconfig enable line and the release
 caption respected it) — hence the split into this separate registry.
 
-**`LUMINAIRE_SUPPORTED_VERSIONS`** — space-separated `KERNEL_VERSION`
+**`TUNING_SUPPORTED_VERSIONS`** — space-separated `KERNEL_VERSION`
 values each feature actually has a patch for today — same shape/purpose
 as `kernel/addons/registry.sh`'s `ADDON_SUPPORTED_VERSIONS`, kept as a
 separate map since these are never addons.
 
-**`LUMINAIRE_FEATURE_ORDER`** — the actual iteration/display order, as
+**`TUNING_FEATURE_ORDER`** — the actual iteration/display order, as
 a bash indexed array. Deliberately separate from
-`LUMINAIRE_SUPPORTED_VERSIONS` above rather than derived from it —
+`TUNING_SUPPORTED_VERSIONS` above rather than derived from it —
 bash associative array key order (`${!arr[@]}`) is unspecified, so it
 can't be relied on for anything display-order-sensitive. Keep both in
 sync by hand when adding/removing a feature (one new key in the map,
 one new entry in this array). Exported (comma-joined) to `GITHUB_ENV`
-so `release/telegram/caption.py`'s `core_patch_order()` can build its
+so `release/telegram/caption.py`'s `tuning_order()` can build its
 feature table from this directly instead of hardcoding its own
 duplicate list — see that file's CODEX section.
 
-**`run_luminaire()`, `export APPLIED_LUMINAIRE`/`SKIPPED_LUMINAIRE`** —
+**`run_tuning()`, `export APPLIED_TUNING`/`SKIPPED_TUNING`** —
 not `local`: `telegram.sh` (`run_release` → `telegram.sh`, later in the
 same process) reads these directly to build the release caption. A
 function-local var dies at return, so it would never survive to reach
@@ -1717,9 +1716,9 @@ rebuild+fastboot-flash path exists, if ever.
 
 ---
 
-## `kernel/luminaire/adios/adios.sh`
+## `kernel/tuning/adios/adios.sh`
 
-**Purpose of this file**: Luminaire feature — ADIOS (Adaptive Deadline
+**Purpose of this file**: Tuning feature — ADIOS (Adaptive Deadline
 I/O Scheduler), by Masahito Suzuki (firelzrd). Repo:
 https://github.com/firelzrd/adios.
 
@@ -1731,23 +1730,31 @@ NULL pointer fix in `adios_completed_request()` for UFS MCQ
 (`rq->elv.priv[0]` can be NULL for requests that never went through
 elevator insert).
 
-Always-on Luminaire feature — no user toggle, not part of `$ADDONS`. See
-`LUMINAIRE_SUPPORTED_VERSIONS` in `kernel/luminaire/registry.sh` for
+Always-on tuning feature — no user toggle, not part of `$ADDONS`. See
+`TUNING_SUPPORTED_VERSIONS` in `kernel/tuning/registry.sh` for
 version gating.
 
-Exports `ADIOS_VERSION` (derived from `$ADIOS_PATCH`'s filename) for
-`release/telegram/caption.py` to show in release captions — see
-`CORE_PATCH_DISPLAY_NAMES` / `core_patch_order()` in that file's CODEX
-section. Only one ADIOS patch version exists right now, so this is
-mostly future-proofing/consistency with `BORE_VERSION` in `bore.sh`.
+`CONFIG_MQ_IOSCHED_ADIOS=y` is compiled in as a selectable option only —
+deliberately does NOT set `CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y`. This
+project adds scheduler choices, it doesn't force one on the user;
+mq-deadline remains the default (see the backport note above for why
+that fallback is preserved on this tree). Users who want ADIOS select it
+themselves via `/sys/block/*/queue/scheduler`.
+
+Exports `ADIOS_VERSION` (derived from `$ADIOS_PATCH`'s filename, so it
+can't drift from `ADIOS_PATCH` above) for `release/telegram/caption.py`
+to show in release captions — see `TUNING_DISPLAY_NAMES` /
+`tuning_order()` in that file's CODEX section. Only one ADIOS patch
+version exists right now, so this is mostly future-proofing/consistency
+with `BORE_VERSION` in `bore.sh`.
 
 ---
 
-## `kernel/luminaire/workqueue_catchup/workqueue_catchup.sh`
+## `kernel/tuning/workqueue_catchup/workqueue_catchup.sh`
 
 **Purpose of this file**: stable-tree catch-up for `kernel/workqueue.c`,
 cherry-picked/adapted from linux-6.1.y (gregkh/linux). Same tier as
-BORE/ADIOS — always-on, version-gated via `LUMINAIRE_SUPPORTED_VERSIONS`,
+BORE/ADIOS — always-on, version-gated via `TUNING_SUPPORTED_VERSIONS`,
 not a `$ADDONS` toggle. Originally surfaced via a third-party fork's
 public changelog; verified directly against this repo's own kernel
 source (`chainonyourdoor/LuminaireKernel-6.1`) before porting — every
@@ -1771,7 +1778,7 @@ predates the per-CPU `pool_workqueue`-for-unbound refactor
 
 ---
 
-## `kernel/luminaire/schedutil_catchup/schedutil_catchup.sh`
+## `kernel/tuning/schedutil_catchup/schedutil_catchup.sh`
 
 **Purpose of this file**: stable-tree catch-up for
 `kernel/sched/cpufreq_schedutil.c` + `kernel/sched/core.c`, cherry-
@@ -1802,7 +1809,7 @@ series was already fully present, and the devfreq `mtk-cci-devfreq.c`
 
 ---
 
-## `kernel/luminaire/ufs_writebooster_catchup/ufs_writebooster_catchup.sh`
+## `kernel/tuning/ufs_writebooster_catchup/ufs_writebooster_catchup.sh`
 
 **Purpose of this file**: stable-tree catch-up for the UFS core/
 MediaTek host driver + WriteBooster, cherry-picked/adapted from
@@ -1837,8 +1844,8 @@ even on devices without UFS 4.x WriteBooster support).
 
 **Purpose of this file**: KSU root-solution support map — single source
 of truth. Same shape/purpose as `kernel/addons/registry.sh`'s
-`ADDON_SUPPORTED_VERSIONS` and `kernel/luminaire/registry.sh`'s
-`LUMINAIRE_SUPPORTED_VERSIONS`. This is the ONLY compatibility signal
+`ADDON_SUPPORTED_VERSIONS` and `kernel/tuning/registry.sh`'s
+`TUNING_SUPPORTED_VERSIONS`. This is the ONLY compatibility signal
 for root solutions now — `resukisu.sh`/`sukisu.sh`/`ksunext.sh` live
 once under `kernel/ksu/` (they have no real per-kernel-version
 logic; each fork's own `setup.sh` handles GKI version detection
@@ -1870,9 +1877,9 @@ returns 1.
 
 ---
 
-## `kernel/luminaire/bore/bore.sh`
+## `kernel/tuning/bore/bore.sh`
 
-**Purpose of this file**: Luminaire feature — BORE (Burst-Oriented
+**Purpose of this file**: Tuning feature — BORE (Burst-Oriented
 Response Enhancer), CPU scheduler by Masahito Suzuki (firelzrd). Repo:
 https://github.com/firelzrd/bore-scheduler.
 
@@ -1912,8 +1919,8 @@ field offset after it stays identical to a non-BORE GKI build — no
 vendor-module KABI break. (This description applies to both patch
 versions — v6.8.0-rc1 keeps the same KABI-safety approach.)
 
-Always-on Luminaire feature — no user toggle, not part of `$ADDONS`. See
-`LUMINAIRE_SUPPORTED_VERSIONS` in `kernel/luminaire/registry.sh` for
+Always-on tuning feature — no user toggle, not part of `$ADDONS`. See
+`TUNING_SUPPORTED_VERSIONS` in `kernel/tuning/registry.sh` for
 version gating.
 
 ---

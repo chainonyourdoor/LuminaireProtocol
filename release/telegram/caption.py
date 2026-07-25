@@ -46,8 +46,8 @@ def addon_order(env):
     """Full addon catalog (toggle + mountless-engine addons together),
     read from ADDON_ORDER — exported by kernel/addons/registry.sh so
     this list never needs editing here just because an addon was
-    added/removed there. See core_patch_order() above for the same
-    pattern applied to kernel/luminaire/ features."""
+    added/removed there. See tuning_order() above for the same
+    pattern applied to kernel/tuning/ features."""
     raw = env.get("ADDON_ORDER", "")
     order = [t for t in raw.split(",") if t]
     if order:
@@ -98,7 +98,7 @@ def resolve_mountless_engine(env):
     return "None"
 
 
-CORE_PATCH_DISPLAY_NAMES = {
+TUNING_DISPLAY_NAMES = {
     "bore":                     "BORE",
     "adios":                    "ADIOS",
     "workqueue_catchup":        "Workqueue Catch-up",
@@ -107,34 +107,34 @@ CORE_PATCH_DISPLAY_NAMES = {
 }
 
 
-def core_patch_order(env):
-    """The full set+order of kernel/luminaire/ features (applied AND
-    skipped this build), read from LUMINAIRE_FEATURE_ORDER — exported
-    by kernel/luminaire/registry.sh so this list never needs editing
+def tuning_order(env):
+    """The full set+order of kernel/tuning/ features (applied AND
+    skipped this build), read from TUNING_FEATURE_ORDER — exported
+    by kernel/tuning/registry.sh so this list never needs editing
     here just because a feature was added/removed there."""
-    raw = env.get("LUMINAIRE_FEATURE_ORDER", "")
+    raw = env.get("TUNING_FEATURE_ORDER", "")
     order = [t for t in raw.split(",") if t]
     if order:
         return order
-    # Fallback if LUMINAIRE_FEATURE_ORDER wasn't exported (older
+    # Fallback if TUNING_FEATURE_ORDER wasn't exported (older
     # workflow run, or manual/local testing): best-effort reconstruct
     # from the two lists that are always present.
-    applied = [t for t in env.get("APPLIED_LUMINAIRE", "").split(",") if t]
-    skipped = [t for t in env.get("SKIPPED_LUMINAIRE", "").split(",") if t]
+    applied = [t for t in env.get("APPLIED_TUNING", "").split(",") if t]
+    skipped = [t for t in env.get("SKIPPED_TUNING", "").split(",") if t]
     return applied + skipped
 
 
-def core_patch_display_name(token):
-    if token in CORE_PATCH_DISPLAY_NAMES:
-        return CORE_PATCH_DISPLAY_NAMES[token]
+def tuning_display_name(token):
+    if token in TUNING_DISPLAY_NAMES:
+        return TUNING_DISPLAY_NAMES[token]
     return " ".join(w.capitalize() for w in token.split("_"))
 
 
-def core_patch_status_plain(env, token, skipped_tokens):
+def tuning_status_plain(env, token, skipped_tokens):
     """Plain-text status for the Markdown code-block caption. Shows the
     active patch version (e.g. 'v6.8.0-rc1') when the feature's .sh
     script exported one via f"{TOKEN}_VERSION" (see BORE_VERSION in
-    kernel/luminaire/bore/bore.sh) instead of a generic 'Active', since
+    kernel/tuning/bore/bore.sh) instead of a generic 'Active', since
     for versioned features like BORE which version is running is the
     actually useful information."""
     if token in skipped_tokens:
@@ -262,18 +262,18 @@ def build_blocks(env):
         else:
             status = "Disable"
         addon_status_lines.append(f"{name.ljust(addon_name_width)}: {mdv2_code_escape(status)}")
-    core_patch_tokens = [t for t in env.get("APPLIED_LUMINAIRE", "").split(",") if t]
-    core_patch_skipped_tokens = [t for t in env.get("SKIPPED_LUMINAIRE", "").split(",") if t]
-    core_patch_order_list = core_patch_order(env)
+    tuning_tokens = [t for t in env.get("APPLIED_TUNING", "").split(",") if t]
+    tuning_skipped_tokens = [t for t in env.get("SKIPPED_TUNING", "").split(",") if t]
+    tuning_order_list = tuning_order(env)
     # Separate width from the addons block's fixed 16 — core patch
     # names (e.g. "UFS WriteBooster Catch-up") can run longer than any
     # addon name, and a shared fixed width would misalign the colons.
-    core_patch_name_width = max((len(core_patch_display_name(t)) for t in core_patch_order_list), default=16) + 1
-    core_patch_status_lines = []
-    for token in core_patch_order_list:
-        name = core_patch_display_name(token)
-        status = core_patch_status_plain(env, token, core_patch_skipped_tokens)
-        core_patch_status_lines.append(f"{name.ljust(core_patch_name_width)}: {mdv2_code_escape(status)}")
+    tuning_name_width = max((len(tuning_display_name(t)) for t in tuning_order_list), default=16) + 1
+    tuning_status_lines = []
+    for token in tuning_order_list:
+        name = tuning_display_name(token)
+        status = tuning_status_plain(env, token, tuning_skipped_tokens)
+        tuning_status_lines.append(f"{name.ljust(tuning_name_width)}: {mdv2_code_escape(status)}")
     commit_short    = env.get("GITHUB_SHA", "")[:7]
     commit_url      = "{}/{}/commit/{}".format(
                         env.get("GITHUB_SERVER_URL", ""),
@@ -312,29 +312,29 @@ def build_blocks(env):
         + "\n".join(addon_status_lines) +
         "```"
     )
-    has_active_core_patch = any(t not in core_patch_skipped_tokens for t in core_patch_order_list)
-    if has_active_core_patch:
-        block_core_patch = (
-            "```Core-Patch\n"
-            + "\n".join(core_patch_status_lines) +
+    has_active_tuning = any(t not in tuning_skipped_tokens for t in tuning_order_list)
+    if has_active_tuning:
+        block_tuning = (
+            "```Tuning\n"
+            + "\n".join(tuning_status_lines) +
             "```"
         )
     else:
-        block_core_patch = None
+        block_tuning = None
     footer = "[{}]({}) \\| [Run \\#{}]({})".format(
         mdv2_escape(commit_short),
         mdv2_escape_url(commit_url),
         mdv2_escape(run_id),
         mdv2_escape_url(run_url),
     )
-    return block_luminaire, block_root, block_core_patch, block_addons, footer
+    return block_luminaire, block_root, block_tuning, block_addons, footer
 
 
 def build_telegraph_content(env):
     addon_tokens = [t for t in env.get("ADDONS", "").split(",") if t]
     skipped_tokens = [t for t in env.get("SKIPPED_ADDONS", "").split(",") if t]
-    core_patch_tokens = [t for t in env.get("APPLIED_LUMINAIRE", "").split(",") if t]
-    core_patch_skipped_tokens = [t for t in env.get("SKIPPED_LUMINAIRE", "").split(",") if t]
+    tuning_tokens = [t for t in env.get("APPLIED_TUNING", "").split(",") if t]
+    tuning_skipped_tokens = [t for t in env.get("SKIPPED_TUNING", "").split(",") if t]
     kernel_ver  = env.get("KERNEL_VERSION", "")
     linux_ver   = env.get("LINUX_VER", "N/A")
     source_str  = kernel_source_repo(kernel_ver)
@@ -378,11 +378,11 @@ def build_telegraph_content(env):
         if token in skipped_tokens:
             return "\u2796"
         return "\u2705" if token in addon_tokens else "\u274c"
-    def core_patch_status_display(token):
-        """Same version-aware status as core_patch_status_plain, but
+    def tuning_status_display(token):
+        """Same version-aware status as tuning_status_plain, but
         prefixed with the check/dash icon to match this table's style
         (see make_status_table below, shared with the addons table)."""
-        if token in core_patch_skipped_tokens:
+        if token in tuning_skipped_tokens:
             return "\u2796 N/A"
         version = env.get(f"{token.upper()}_VERSION", "").strip()
         return f"\u2705 {version}" if version else "\u2705"
@@ -396,13 +396,13 @@ def build_telegraph_content(env):
                 children.append({"tag": "br"})
             children.append(line)
         return {"tag": "pre", "children": [{"tag": "code", "children": children}]}
-    core_patch_rows = [
-        (core_patch_display_name(token), core_patch_status_display(token))
-        for token in core_patch_order(env)
+    tuning_rows = [
+        (tuning_display_name(token), tuning_status_display(token))
+        for token in tuning_order(env)
     ]
-    content.append({"tag": "h3", "children": ["Luminaire Features"]})
+    content.append({"tag": "h3", "children": ["Luminaire Tuning"]})
     content.append({"tag": "p", "children": ["Always-on, no toggle — active whenever this kernel version has the backport."]})
-    content.append(make_status_table(core_patch_rows))
+    content.append(make_status_table(tuning_rows))
     addon_rows = [
         (addon_display_name(token), addon_status_icon(token))
         for token in toggle_addon_order(env)
@@ -413,7 +413,7 @@ def build_telegraph_content(env):
     # be visible somewhere on this page, or a build with e.g. ZeroMount
     # active would show literally no trace of it here. Appended as its
     # own row (status is a name, not an icon, same precedent as the
-    # Luminaire Features table's version strings above) rather than
+    # Luminaire Tuning table's version strings above) rather than
     # showing nomount/zeromount as two more icon rows, since "which one
     # of these two mutually-exclusive options is active" reads clearer
     # as one line than as a ✅/❌ pair.
@@ -534,9 +534,9 @@ def main():
     out_group   = sys.argv[1]
     out_channel = sys.argv[2]
     env = os.environ
-    block_luminaire, block_root, block_core_patch, block_addons, footer = build_blocks(env)
+    block_luminaire, block_root, block_tuning, block_addons, footer = build_blocks(env)
     caption_group = "\n".join(
-        b for b in [block_luminaire, block_root, block_core_patch, block_addons, footer] if b is not None
+        b for b in [block_luminaire, block_root, block_tuning, block_addons, footer] if b is not None
     )
     caption_group = truncate(caption_group, CAPTION_LIMIT)
     variant_links_json = env.get("VARIANT_LINKS_JSON", "")

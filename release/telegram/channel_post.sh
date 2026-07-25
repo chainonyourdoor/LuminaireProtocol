@@ -56,8 +56,8 @@ lto_mode = ''
 addons = ''
 addon_order = ''
 skipped_addons = ''
-applied_luminaire = ''
-skipped_luminaire = ''
+applied_tuning = ''
+skipped_tuning = ''
 for f in sorted(glob.glob(links_dir + '/*.json')):
     try:
         data = json.load(open(f))
@@ -74,11 +74,11 @@ for f in sorted(glob.glob(links_dir + '/*.json')):
         if not addons: addons = data.get('addons','')
         if not addon_order: addon_order = data.get('addon_order','')
         if not skipped_addons: skipped_addons = data.get('skipped_addons','')
-        if not applied_luminaire: applied_luminaire = data.get('applied_luminaire','')
-        if not skipped_luminaire: skipped_luminaire = data.get('skipped_luminaire','')
+        if not applied_tuning: applied_tuning = data.get('applied_tuning','')
+        if not skipped_tuning: skipped_tuning = data.get('skipped_tuning','')
     except Exception as e:
         print('[warn] ' + str(e), file=sys.stderr)
-print(json.dumps({'links':result,'versions':versions,'linux_ver':linux_ver,'kernel_version':kernel_version,'compiler_string':compiler_string,'lto_mode':lto_mode,'addons':addons,'addon_order':addon_order,'skipped_addons':skipped_addons,'applied_luminaire':applied_luminaire,'skipped_luminaire':skipped_luminaire}))
+print(json.dumps({'links':result,'versions':versions,'linux_ver':linux_ver,'kernel_version':kernel_version,'compiler_string':compiler_string,'lto_mode':lto_mode,'addons':addons,'addon_order':addon_order,'skipped_addons':skipped_addons,'applied_tuning':applied_tuning,'skipped_tuning':skipped_tuning}))
 ")
 
 VARIANT_LINKS_JSON=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['links']))")
@@ -90,9 +90,9 @@ LTO_MODE=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.load(s
 ADDONS=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.load(sys.stdin)['addons'])")
 ADDON_ORDER=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.load(sys.stdin)['addon_order'])")
 SKIPPED_ADDONS=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.load(sys.stdin)['skipped_addons'])")
-APPLIED_LUMINAIRE=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.load(sys.stdin)['applied_luminaire'])")
-SKIPPED_LUMINAIRE=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.load(sys.stdin)['skipped_luminaire'])")
-export LINUX_VER KERNEL_VERSION COMPILER_STRING LTO_MODE ADDONS ADDON_ORDER SKIPPED_ADDONS APPLIED_LUMINAIRE SKIPPED_LUMINAIRE
+APPLIED_TUNING=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.load(sys.stdin)['applied_tuning'])")
+SKIPPED_TUNING=$(echo "$LINKS_PARSED" | python3 -c "import json,sys; print(json.load(sys.stdin)['skipped_tuning'])")
+export LINUX_VER KERNEL_VERSION COMPILER_STRING LTO_MODE ADDONS ADDON_ORDER SKIPPED_ADDONS APPLIED_TUNING SKIPPED_TUNING
 
 if [ "$VARIANT_LINKS_JSON" = "{}" ] || [ -z "$VARIANT_LINKS_JSON" ]; then
     warn "Skipping channel post: no valid variant links found"
@@ -133,8 +133,8 @@ FEATURES_URL=$(
     ADDONS="${ADDONS:-}" \
     ADDON_ORDER="${ADDON_ORDER:-}" \
     SKIPPED_ADDONS="${SKIPPED_ADDONS:-}" \
-    APPLIED_LUMINAIRE="${APPLIED_LUMINAIRE:-}" \
-    SKIPPED_LUMINAIRE="${SKIPPED_LUMINAIRE:-}" \
+    APPLIED_TUNING="${APPLIED_TUNING:-}" \
+    SKIPPED_TUNING="${SKIPPED_TUNING:-}" \
     COMPILER_STRING="${COMPILER_STRING:-}" \
     LTO_MODE="${LTO_MODE:-}" \
     TELEGRAPH_TOKEN="${TELEGRAPH_TOKEN:-}" \

@@ -1,14 +1,9 @@
 #!/usr/bin/env bash
 
-# ======================================================
-# ✨ LUMINAIRE FEATURE — Workqueue stable catch-up
-# Cherry-picked/adapted from linux-6.1.y (gregkh/linux)
-# ======================================================
-
-WORKQUEUE_CATCHUP_PATCH="${PATCHES_DIR}/luminaire/workqueue_catchup.patch"
+WORKQUEUE_CATCHUP_PATCH="${PATCHES_DIR}/tuning/workqueue_catchup.patch"
 
 log "🩹 Applying Workqueue stable catch-up..."
-[ -f "$WORKQUEUE_CATCHUP_PATCH" ] || error "Workqueue catch-up: not backported for kernel ${KERNEL_VERSION} yet (expected ${WORKQUEUE_CATCHUP_PATCH}) — this feature should have been gated out before reaching here (check run_luminaire()'s support map)."
+[ -f "$WORKQUEUE_CATCHUP_PATCH" ] || error "Workqueue catch-up: not backported for kernel ${KERNEL_VERSION} yet (expected ${WORKQUEUE_CATCHUP_PATCH}) — this feature should have been gated out before reaching here (check run_tuning()'s support map)."
 
 if patch -p1 --fuzz=3 --dry-run --reverse -d "$KERNEL_SRC" < "$WORKQUEUE_CATCHUP_PATCH" > /dev/null 2>&1; then
     log "Workqueue catch-up: patch already applied, skipping."
