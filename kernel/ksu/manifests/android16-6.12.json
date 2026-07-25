@@ -13,15 +13,11 @@
   },
   "sukisu_builtin": {
     "good": "",
-    "bad": [
-      "b1d534bc41941b2c818d7a1a1dac341e4aabfc2d"
-    ]
+    "bad": []
   },
   "susfs_sukisu": {
     "good": "",
-    "bad": [
-      "0e43d12a6cb5e6b2814c8214466784285d64ebec"
-    ]
+    "bad": []
   },
   "ksunext": {
     "good": "",
