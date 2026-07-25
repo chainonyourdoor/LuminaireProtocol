@@ -78,3 +78,11 @@ CONFIG_IP_NF_TARGET_TTL=y
 CONFIG_UBSAN=n
 CONFIG_PAGE_OWNER=n
 CONFIG_RCU_TRACE=n
+
+# Disable BTF generation: apt's pahole (dwarves) on the CI runner emits
+# BTF_KIND_ENUM64 records that this kernel tree's resolve_btfids can't parse
+# ("FAILED: load BTF from vmlinux: Invalid argument") since scripts/pahole-flags.sh
+# (which would auto-skip enum64 encoding for incompatible pahole versions) isn't
+# present in this tree. No addon here needs BTF, so skip the step entirely rather
+# than depend on pinning a specific pahole version.
+CONFIG_DEBUG_INFO_BTF=n
