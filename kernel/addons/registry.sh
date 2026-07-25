@@ -14,20 +14,8 @@ declare -A ADDON_SUPPORTED_VERSIONS=(
     [zeromount]="5.10 6.1"
 )
 
-# Canonical display order for the full addon catalog. Same reasoning
-# as LUMINAIRE_FEATURE_ORDER in kernel/luminaire/registry.sh: bash
-# associative array key order is unspecified, so this can't be derived
-# from ADDON_SUPPORTED_VERSIONS above — keep both in sync by hand when
-# adding/removing an addon. Exported so release/telegram/caption.py can
-# build its full addon table (including addons NOT selected in
-# $ADDONS, shown as Disable) from this instead of hardcoding its own
-# duplicate list.
 ADDON_ORDER=(rekernel bbrv3 bbg droidspaces ntsync wireguard lz4zstd lz4kd kasumi nomount zeromount)
 
-# Addons that are mutually-exclusive variants of one logical choice
-# ("Mountless Engine"), shown as a single line in the release caption
-# instead of individual Enable/Disable rows. Display-grouping metadata
-# only — actual mutual-exclusivity is enforced in run_addons() below.
 ADDON_MOUNTLESS_TOKENS=(nomount zeromount)
 
 addon_supports_kernel_version() {
@@ -38,21 +26,7 @@ addon_supports_kernel_version() {
 }
 
 run_addons() {
-    # Exported as real shell env vars (not just written to $GITHUB_ENV)
-    # because caption.py is invoked later in this SAME step/process
-    # (build.sh -> run_release() -> telegram.sh -> caption.py), and
-    # $GITHUB_ENV only takes effect starting the *next* Actions step —
-    # a same-step child process never sees it. Still also written to
-    # $GITHUB_ENV below for completeness/future steps.
     IFS=, ; ADDON_ORDER_STR="${ADDON_ORDER[*]}"; ADDON_MOUNTLESS_TOKENS_STR="${ADDON_MOUNTLESS_TOKENS[*]}"; unset IFS
-    # ADDON_ORDER/ADDON_MOUNTLESS_TOKENS are declared as indexed arrays
-    # at the top of this file (global scope) — `export NAME=string` on
-    # an existing array only overwrites element [0], it does NOT convert
-    # it to a scalar, so a subprocess (python3 caption.py) would still
-    # see nothing usable. Must unset the array first so the name is free
-    # to become a plain exported string. Nothing else in this script
-    # reads the ADDON_ORDER/ADDON_MOUNTLESS_TOKENS arrays after this
-    # point (verified: only referenced here in the whole repo).
     unset ADDON_ORDER ADDON_MOUNTLESS_TOKENS
     export ADDON_ORDER="${ADDON_ORDER_STR}" ADDON_MOUNTLESS_TOKENS="${ADDON_MOUNTLESS_TOKENS_STR}"
     echo "ADDON_ORDER=${ADDON_ORDER_STR}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
