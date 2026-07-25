@@ -72,27 +72,27 @@ on:
         type: boolean
         default: true
       ntsync:
-        description: "NTSync (Wine/Winlator compat)"
+        description: "NTSync"
         type: boolean
         default: true
       wireguard:
-        description: "WireGuard (kernel-level VPN)"
+        description: "WireGuard"
         type: boolean
         default: true
       lz4zstd:
-        description: "LZ4 1.10.0 + ZSTD 1.5.7 (ZRAM compression bump)"
+        description: "LZ4 1.10.0 + ZSTD 1.5.7"
         type: boolean
         default: true
       lz4kd:
-        description: "LZ4KD (ZRAM compression optimization)"
+        description: "LZ4KD"
+        type: boolean
+        default: true
+      kpatch_next:
+        description: "KPatch-Next"
         type: boolean
         default: true
       kasumi:
         description: "Kasumi (Experimental)"
-        type: boolean
-        default: false
-      kpatch_next:
-        description: "KPatch-Next (Experimental)"
         type: boolean
         default: false
       lto_mode:
