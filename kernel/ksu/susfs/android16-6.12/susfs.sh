@@ -87,6 +87,11 @@ python3 "${KSU_SHARED_DIR}/fix_namespace.py" "${KERNEL_SRC}/fs/namespace.c" \
     || error "SuSFS: namespace.c fix failed!"
 log "namespace.c fixed ✅"
 
+log "Fixing task_mmu.c SUS_MAP guard placement (safety fallback for vma_pages/vma_data_pages rename)..."
+python3 "${KSU_SHARED_DIR}/fix_task_mmu_sus_map.py" "${KERNEL_SRC}/fs/proc/task_mmu.c" \
+    || error "SuSFS: task_mmu.c SUS_MAP fix failed!"
+log "task_mmu.c fixed ✅"
+
 if [ "$KERNEL_VARIANT" = "KSUNEXT" ]; then
     SELINUX_HIDE_C="${KSU_DIR}/kernel/feature/selinux_hide.c"
     if [ -f "$SELINUX_HIDE_C" ]; then
