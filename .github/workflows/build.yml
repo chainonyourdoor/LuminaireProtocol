@@ -7,7 +7,7 @@ on:
       build_system:
         description: "Build System"
         type: choice
-        default: "Make - Neutron"
+        default: "Make - Cirrus"
         options:
           - "Make - AOSP"
           - "Make - Cirrus"
@@ -98,7 +98,7 @@ on:
       lto_mode:
         description: "LTO"
         type: choice
-        default: "THIN"
+        default: "NONE"
         options:
           - "NONE"
           - "THIN"
@@ -106,7 +106,7 @@ on:
       run_mode:
         description: "Run Mode"
         type: choice
-        default: "Warm Run"
+        default: "Build"
         options:
           - "Dry Run"
           - "Warm Run"
