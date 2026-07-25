@@ -24,11 +24,15 @@ fi
 DEFCONFIG_FILE="${KERNEL_SRC}/arch/arm64/configs/gki_defconfig"
 if ! grep -q "^CONFIG_MQ_IOSCHED_ADIOS=y" "$DEFCONFIG_FILE"; then
     cat >> "$DEFCONFIG_FILE" << 'EOF'
-# ADIOS I/O scheduler (Luminaire)
+# ADIOS I/O scheduler (Luminaire) — compiled in as a selectable option
+# only. Deliberately NOT setting CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y here:
+# this project adds scheduler choices, it doesn't force one on the user.
+# mq-deadline remains the default (see this file's CODEX.md entry for
+# why the backport preserves that fallback). Users who want ADIOS can
+# select it themselves via /sys/block/*/queue/scheduler.
 CONFIG_MQ_IOSCHED_ADIOS=y
-CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y
 EOF
-    log "ADIOS: CONFIG_MQ_IOSCHED_ADIOS + DEFAULT_ADIOS enabled ✅"
+    log "ADIOS: CONFIG_MQ_IOSCHED_ADIOS enabled (not set as default) ✅"
 fi
 
 # See BORE_VERSION in bore.sh for why this is derived, not hardcoded.
