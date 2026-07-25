@@ -62,13 +62,46 @@ fi
 
 # ---------------------------------------------------------
 # Android NDK (required to build kpatch, the userspace binary
-# that runs on-device — GitHub-hosted ubuntu-latest runners ship
-# a preinstalled NDK; we just need to locate it)
+# that runs on-device). GitHub-hosted ubuntu-latest runners DO
+# ship a preinstalled NDK, but ANDROID_NDK_LATEST_HOME/ANDROID_NDK_HOME/
+# ANDROID_NDK_ROOT are only written to /etc/environment by the runner
+# image's installer script, which job steps don't inherit — so those
+# vars are usually empty here even though the NDK is on disk. Fall
+# back to scanning where it actually lives, then to installing one
+# via sdkmanager (already licensed on the image) as a last resort.
 # ---------------------------------------------------------
 
-KPATCH_NDK_DIR="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}}"
+KPATCH_NDK_DIR=""
+for _ndk_var in ANDROID_NDK_LATEST_HOME ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK; do
+    _ndk_val="${!_ndk_var:-}"
+    if [ -n "$_ndk_val" ] && [ -d "$_ndk_val" ]; then
+        KPATCH_NDK_DIR="$_ndk_val"
+        log "KPatch-Next: found NDK via \$${_ndk_var}"
+        break
+    fi
+done
+
+if [ -z "$KPATCH_NDK_DIR" ]; then
+    for _sdk_base in "${ANDROID_SDK_ROOT:-}" "${ANDROID_HOME:-}" "/usr/local/lib/android/sdk"; do
+        [ -n "$_sdk_base" ] && [ -d "${_sdk_base}/ndk" ] || continue
+        KPATCH_NDK_DIR=$(find "${_sdk_base}/ndk" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -V | tail -1)
+        [ -n "$KPATCH_NDK_DIR" ] && { log "KPatch-Next: found NDK under ${_sdk_base}/ndk"; break; }
+    done
+fi
+
+if [ -z "$KPATCH_NDK_DIR" ]; then
+    KPATCH_SDKMANAGER=$(command -v sdkmanager 2>/dev/null || true)
+    [ -z "$KPATCH_SDKMANAGER" ] && KPATCH_SDKMANAGER=$(find "${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}" -type f -name "sdkmanager" 2>/dev/null | head -1)
+    if [ -n "$KPATCH_SDKMANAGER" ]; then
+        warn "KPatch-Next: no preinstalled NDK found — installing ndk;27.3.13750724 via sdkmanager (one-time, will slow this run down)..."
+        KPATCH_SDK_BASE="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+        yes | "$KPATCH_SDKMANAGER" --sdk_root="$KPATCH_SDK_BASE" "ndk;27.3.13750724" > /dev/null 2>&1
+        [ -d "${KPATCH_SDK_BASE}/ndk/27.3.13750724" ] && KPATCH_NDK_DIR="${KPATCH_SDK_BASE}/ndk/27.3.13750724"
+    fi
+fi
+
 [ -n "$KPATCH_NDK_DIR" ] && [ -d "$KPATCH_NDK_DIR" ] \
-    || error "KPatch-Next: Android NDK not found (checked ANDROID_NDK_LATEST_HOME / ANDROID_NDK_HOME / ANDROID_NDK_ROOT) — runner image may not provide it under these names anymore."
+    || error "KPatch-Next: Android NDK not found — checked ANDROID_NDK_LATEST_HOME/ANDROID_NDK_HOME/ANDROID_NDK_ROOT/ANDROID_NDK, scanned \${ANDROID_SDK_ROOT}/ndk and \${ANDROID_HOME}/ndk, and the sdkmanager install fallback also failed. Runner image may have changed layout."
 
 log "KPatch-Next: using NDK at ${KPATCH_NDK_DIR}"
 
