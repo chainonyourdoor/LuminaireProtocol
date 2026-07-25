@@ -156,7 +156,7 @@ FRAGMENT_FEATURES = {
     "CPU & Scheduler": [
         "Ondemand Governor (included)",
         "Frame Warning Disabled",
-        "MQ-Deadline I/O Scheduler",
+        "I/O Scheduler (MQ-Deadline, Kyber)",
     ],
     "Network": [
         "TCP Congestion Control (BBR, BIC, CUBIC, Westwood, HTCP)",
