@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 PKGS=(git curl wget zip patch rsync python3 ca-certificates aria2 pigz cpio g++ libzstd-dev \
-      bc bison flex libssl-dev libelf-dev dwarves cmake ninja-build gcc-arm-linux-gnueabi)
+      bc bison flex libssl-dev libelf-dev libdw-dev dwarves cmake ninja-build gcc-arm-linux-gnueabi)
 
 MISSING=()
 for pkg in "${PKGS[@]}"; do
