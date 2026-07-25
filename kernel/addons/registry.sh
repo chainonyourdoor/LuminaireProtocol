@@ -20,9 +20,13 @@ declare -A ADDON_SUPPORTED_VERSIONS=(
     [kasumi]="5.10 5.15 6.1 6.6 6.12"
     [nomount]="5.10 5.15 6.1 6.6 6.12"
     [zeromount]="5.10 5.15 6.1 6.6 6.12"
+    # kpatch-next: upstream claims 3.18-6.12 "theoretically", arm64 only.
+    # Listed for all versions we build; if a version fails in CI, narrow
+    # this down rather than assuming the whole addon is broken.
+    [kpatch-next]="5.10 5.15 6.1 6.6 6.12"
 )
 
-ADDON_ORDER=(rekernel bbrv3 bbg droidspaces ntsync wireguard lz4zstd lz4kd kasumi nomount zeromount)
+ADDON_ORDER=(rekernel bbrv3 bbg droidspaces ntsync wireguard lz4zstd lz4kd kasumi nomount zeromount kpatch-next)
 
 ADDON_MOUNTLESS_TOKENS=(nomount zeromount)
 
