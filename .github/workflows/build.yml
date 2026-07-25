@@ -302,6 +302,15 @@ jobs:
       - name: "Disk Usage"
         run: df -h && du -sh ~/kernel-cache/ 2>/dev/null || true
 
+      - name: "Cache KPatch-Next Toolchains"  # aarch64-none-elf + Android NDK — restores if present; auto-saves at end of job if it was missing
+        if: contains(needs.prepare-matrix.outputs.addons, 'kpatch-next')
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/kpatch-toolchain-cache
+            ~/kpatch-ndk-cache
+          key: kpatch-next-toolchains-v1
+
       - name: "Scout Upstream Refs"  # decides pinned vs candidate ref for KSU fork / SuSFS
         if: matrix.kernel_variant != 'VANILLA'
         run: bash kernel/ksu/checkpoint/scout.sh

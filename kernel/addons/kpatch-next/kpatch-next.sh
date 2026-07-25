@@ -26,6 +26,10 @@ fi
 # Bare-metal aarch64-none-elf toolchain (required for kpimg —
 # aarch64-linux-gnu- from TOOL_CROSS_COMPILE will NOT work here,
 # kpimg is a freestanding ELF, not a userspace/kernel-module binary)
+#
+# This cache dir + the NDK one below are restored/saved by the
+# "Cache KPatch-Next Toolchains" actions/cache step in build.yml —
+# this script only needs to check whether they're already populated.
 # ---------------------------------------------------------
 
 KPATCH_TOOLCHAIN_DIR="${ROOT_DIR}/kpatch-toolchain"
