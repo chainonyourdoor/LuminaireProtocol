@@ -4,10 +4,8 @@
     "bad": []
   },
   "susfs_resukisu": {
-    "good": "",
-    "bad": [
-      "0e43d12a6cb5e6b2814c8214466784285d64ebec"
-    ]
+    "good": "0e43d12a6cb5e6b2814c8214466784285d64ebec",
+    "bad": []
   },
   "sukisu": {
     "good": "",
