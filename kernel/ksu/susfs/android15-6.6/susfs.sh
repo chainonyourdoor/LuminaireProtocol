@@ -87,6 +87,15 @@ python3 "${KSU_SHARED_DIR}/fix_namespace.py" "${KERNEL_SRC}/fs/namespace.c" \
     || error "SuSFS: namespace.c fix failed!"
 log "namespace.c fixed ✅"
 
+if [ "$KERNEL_VARIANT" = "KSUNEXT" ]; then
+    SELINUX_HIDE_C="${KSU_DIR}/kernel/feature/selinux_hide.c"
+    if [ -f "$SELINUX_HIDE_C" ]; then
+        log "Fixing KernelSU-Next with_policy static/extern linkage (kernel >=6.6 only, safety fallback)..."
+        python3 "${KSU_SHARED_DIR}/fix_ksunext_with_policy_linkage.py" "$SELINUX_HIDE_C" \
+            || error "SuSFS: KernelSU-Next with_policy linkage fix failed!"
+    fi
+fi
+
 rm -rf "$SUSFS_DIR"
 
 log "Ensuring KSU_SUSFS Kconfig declarations exist..."
