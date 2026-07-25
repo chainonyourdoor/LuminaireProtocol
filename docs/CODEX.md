@@ -33,6 +33,7 @@ Organized per-path, matching the repo's folder structure.
 - [release/telegram/telegraph_page.py](#releasetelegramtelegraph_pagepy)
 - [kernel/addons/lz4zstd/lz4zstd.sh](#kerneladdonslz4zstdlz4zstdsh)
 - [kernel/ksu/susfs/{android12-5.10,android13-5.15,android14-6.1}/susfs.sh](#kernelksususfsandroid12-510android13-515android14-61susfssh)
+- [kernel/ksu/susfs/{android15-6.6,android16-6.12}/susfs.sh](#kernelksususfsandroid15-66android16-612susfssh)
 - [kernel/ksu/variants/ksunext/ksunext.sh](#kernelksuvariantsksunextksunextsh)
 - [kernel/addons/kasumi/kasumi.sh](#kerneladdonskasumikasumish)
 - [kernel/addons/kasumi/postbuild.sh](#kerneladdonskasumipostbuildsh)
@@ -1221,6 +1222,51 @@ dmesg shows the integration's sucompat log line firing at runtime. If
 pershoot's fork restructures again and SuSFS stops working on KSUNEXT,
 check `kernel_patches/` in that fork first before assuming this note is
 still accurate.
+
+---
+
+## `kernel/ksu/susfs/{android15-6.6,android16-6.12}/susfs.sh`
+
+**Purpose of these files**: same shared SuSFS apply logic as the
+`{android12-5.10,android13-5.15,android14-6.1}/susfs.sh` group above —
+everything in that section (pin resolution, SuSFS source pairing for
+KSUNEXT, missing-kernel-patch guard) applies here too. Documented
+separately only because of one KSUNEXT-specific divergence below; there
+is no `blk.h` workaround or `60_scope-minimized_manual_hooks.patch`
+history in these two (both are android15/16-only, post-date that
+history).
+
+**KSUNEXT `with_policy` static/extern linkage fix (added 2026-07-25,
+run 81660820843)** — pershoot/KernelSU-Next@dev-susfs's
+`kernel/feature/selinux_hide.c` forward-declares
+`security_context_to_sid_with_policy` / `security_sid_to_context_with_policy`
+/ `security_compute_av_user_with_policy` as `static` inside
+`#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)`, even though the
+actual definitions further down the same file omit `static`. C fixes
+linkage from the *first* declaration seen in a translation unit, so
+these three stay internal-linkage for the whole file regardless of the
+later definitions. `security/selinux/hooks.c` and `selinuxfs.c` (patched
+in by the standard susfs4ksu kernel patch, same as the group above) call
+them via `extern`, expecting external linkage — so on android15-6.6 and
+android16-6.12 specifically, KSUNEXT+SUSFS fails at link time with
+`undefined symbol: security_context_to_sid_with_policy` (and the other
+two). Kernels <6.6 take a different `#else` branch in that same file and
+never hit this — confirmed this is why the group above has never needed
+it (verified directly against the fork's source, both branch paths).
+
+susfs4ksu ships a real fix for this upstream —
+`kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch` — but it targets
+vanilla KernelSU-Next and most of its hunks fail (`patch --dry-run`
+confirmed) against this fork's source, since the fork already carries
+most of that patch's other changes natively. Rather than force that
+patch, `kernel/ksu/fix_ksunext_with_policy_linkage.py` targets just the
+3 offending forward declarations directly (same
+find-anchor-or-warn-and-skip idempotent style as `fix_namespace.py`),
+called from `susfs.sh` right after the namespace.c fix, gated to
+`KERNEL_VARIANT = KSUNEXT`. If pershoot's fork fixes this upstream, the
+script's anchor won't match and it silently no-ops rather than erroring
+— don't assume this note is still accurate without checking
+`selinux_hide.c` first.
 
 ---
 
