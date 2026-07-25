@@ -9,8 +9,8 @@ else
     KERNEL_REPO_URL="https://github.com/chainonyourdoor/LuminaireKernel-${KERNEL_VERSION}"
     log "Source: ${KERNEL_REPO_URL} @ ${KERNEL_BRANCH}"
     git config --global http.connectTimeout 30
-    git config --global http.lowSpeedLimit 1000
-    git config --global http.lowSpeedTime 30
+    git config --global http.lowSpeedLimit 100
+    git config --global http.lowSpeedTime 300
     retry 3 run_quiet git clone -q --depth=1 \
         -b "$KERNEL_BRANCH" \
         "$KERNEL_REPO_URL" \
