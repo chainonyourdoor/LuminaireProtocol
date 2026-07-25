@@ -23,7 +23,9 @@
   },
   "susfs_sukisu": {
     "good": "",
-    "bad": []
+    "bad": [
+      "0e43d12a6cb5e6b2814c8214466784285d64ebec"
+    ]
   },
   "ksunext": {
     "good": "",
