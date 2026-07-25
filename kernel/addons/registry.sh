@@ -38,9 +38,25 @@ addon_supports_kernel_version() {
 }
 
 run_addons() {
-    IFS=, ; echo "ADDON_ORDER=${ADDON_ORDER[*]}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
-    echo "ADDON_MOUNTLESS_TOKENS=${ADDON_MOUNTLESS_TOKENS[*]}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
-    unset IFS
+    # Exported as real shell env vars (not just written to $GITHUB_ENV)
+    # because caption.py is invoked later in this SAME step/process
+    # (build.sh -> run_release() -> telegram.sh -> caption.py), and
+    # $GITHUB_ENV only takes effect starting the *next* Actions step —
+    # a same-step child process never sees it. Still also written to
+    # $GITHUB_ENV below for completeness/future steps.
+    IFS=, ; ADDON_ORDER_STR="${ADDON_ORDER[*]}"; ADDON_MOUNTLESS_TOKENS_STR="${ADDON_MOUNTLESS_TOKENS[*]}"; unset IFS
+    # ADDON_ORDER/ADDON_MOUNTLESS_TOKENS are declared as indexed arrays
+    # at the top of this file (global scope) — `export NAME=string` on
+    # an existing array only overwrites element [0], it does NOT convert
+    # it to a scalar, so a subprocess (python3 caption.py) would still
+    # see nothing usable. Must unset the array first so the name is free
+    # to become a plain exported string. Nothing else in this script
+    # reads the ADDON_ORDER/ADDON_MOUNTLESS_TOKENS arrays after this
+    # point (verified: only referenced here in the whole repo).
+    unset ADDON_ORDER ADDON_MOUNTLESS_TOKENS
+    export ADDON_ORDER="${ADDON_ORDER_STR}" ADDON_MOUNTLESS_TOKENS="${ADDON_MOUNTLESS_TOKENS_STR}"
+    echo "ADDON_ORDER=${ADDON_ORDER_STR}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
+    echo "ADDON_MOUNTLESS_TOKENS=${ADDON_MOUNTLESS_TOKENS_STR}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
     [ -z "${ADDONS:-}" ] && return 0
     ADDONS="${ADDONS// /}"
     ADDONS="$(echo "$ADDONS" | sed 's/^,*//;s/,*$//;s/,,*/,/g')"

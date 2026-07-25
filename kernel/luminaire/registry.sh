@@ -18,7 +18,9 @@ LUMINAIRE_FEATURE_ORDER=(bore adios workqueue_catchup schedutil_catchup ufs_writ
 run_luminaire() {
     echo "::group::✨ Luminaire Features"
     export APPLIED_LUMINAIRE="" SKIPPED_LUMINAIRE=""
-    IFS=, ; echo "LUMINAIRE_FEATURE_ORDER=${LUMINAIRE_FEATURE_ORDER[*]}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true; unset IFS
+    local _lfo_csv
+    IFS=, ; _lfo_csv="${LUMINAIRE_FEATURE_ORDER[*]}"; unset IFS
+    echo "LUMINAIRE_FEATURE_ORDER=${_lfo_csv}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
     for feature in "${LUMINAIRE_FEATURE_ORDER[@]}"; do
         local supported="${LUMINAIRE_SUPPORTED_VERSIONS[$feature]:-}"
         if [[ " ${supported} " != *" ${KERNEL_VERSION} "* ]]; then
@@ -31,6 +33,23 @@ run_luminaire() {
         source "$script" || error "Luminaire feature failed: ${feature}"
         APPLIED_LUMINAIRE="${APPLIED_LUMINAIRE:+${APPLIED_LUMINAIRE},}${feature}"
     done
+    # Exported as a real shell env var here — AFTER the array-form loop
+    # above is done with it, since this reuses the LUMINAIRE_FEATURE_ORDER
+    # name as a plain string, which would break the loop if done earlier
+    # — because caption.py runs later in this SAME step/process (build.sh
+    # -> run_release() -> telegram.sh -> caption.py). $GITHUB_ENV (written
+    # above) only takes effect starting the *next* Actions step, so a
+    # same-step child process would never see it otherwise (see matching
+    # fix in kernel/addons/registry.sh's run_addons() for the addon-side
+    # bug this was copied from).
+    # LUMINAIRE_FEATURE_ORDER is declared as an indexed array at the top
+    # of this file (global scope) — `export NAME=string` on an existing
+    # array only overwrites element [0], it does NOT convert it to a
+    # scalar, so a subprocess (python3 caption.py) would still see
+    # nothing usable. Must unset the array first (safe here: the loop
+    # above is the only place in this script that needs it as an array).
+    unset LUMINAIRE_FEATURE_ORDER
+    export LUMINAIRE_FEATURE_ORDER="${_lfo_csv}"
     echo "APPLIED_LUMINAIRE=${APPLIED_LUMINAIRE}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
     echo "SKIPPED_LUMINAIRE=${SKIPPED_LUMINAIRE}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
     echo "::endgroup::"
