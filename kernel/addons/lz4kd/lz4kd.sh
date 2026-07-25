@@ -36,8 +36,13 @@ for f in "${LZ4KD_FILES[@]}"; do
 done
 log "LZ4KD source files staged ✅"
 
+case "${KERNEL_VERSION}" in
+    5.10|5.15|6.1|6.6) : ;;
+    *) error "LZ4KD: no known SukiSU_patch zram_patch/ for kernel ${KERNEL_VERSION} yet — this addon should have been gated out before reaching here (check registry.sh's ADDON_SUPPORTED_VERSIONS)." ;;
+esac
+
 LZ4KD_PATCH=$(curl -LSs --fail --retry 3 --retry-all-errors --connect-timeout 30 \
-    "${LZ4KD_RAW_BASE}/zram_patch/6.1/lz4kd.patch") \
+    "${LZ4KD_RAW_BASE}/zram_patch/${KERNEL_VERSION}/lz4kd.patch") \
     || error "LZ4KD: failed to download lz4kd.patch!"
 [ -n "$LZ4KD_PATCH" ] || error "LZ4KD: downloaded patch is empty!"
 

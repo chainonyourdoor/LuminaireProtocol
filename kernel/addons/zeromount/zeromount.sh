@@ -8,9 +8,12 @@
 # ======================================================
 
 case "${KERNEL_VERSION}" in
-    6.1)  ZEROMOUNT_TAG="android14-6.1" ;;
-    5.10) ZEROMOUNT_TAG="android12-5.10" ;;
-    *)    error "ZeroMount: no known Enginex0/Super-Builders patch for kernel ${KERNEL_VERSION} yet — this addon should have been gated out before reaching here (check run_addons()'s support map)." ;;
+    5.10)  ZEROMOUNT_TAG="android12-5.10" ;;
+    5.15)  ZEROMOUNT_TAG="android13-5.15" ;;
+    6.1)   ZEROMOUNT_TAG="android14-6.1"  ;;
+    6.6)   ZEROMOUNT_TAG="android15-6.6"  ;;
+    6.12)  ZEROMOUNT_TAG="android16-6.12" ;;
+    *)     error "ZeroMount: no known Enginex0/Super-Builders patch for kernel ${KERNEL_VERSION} yet — this addon should have been gated out before reaching here (check run_addons()'s support map)." ;;
 esac
 ZEROMOUNT_PATCH_URL="https://raw.githubusercontent.com/Enginex0/Super-Builders/main/${ZEROMOUNT_TAG}/ReSukiSU/patches/60_zeromount-${ZEROMOUNT_TAG}.patch"
 ZEROMOUNT_PATCH="/tmp/60_zeromount-${ZEROMOUNT_TAG}.patch"
