@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 
 declare -A ADDON_SUPPORTED_VERSIONS=(
-    [rekernel]="6.1"
+    # rekernel: EXPERIMENTAL widen (5.10/5.15/6.6/6.12 untested) — inject.py
+    # was built/verified against android14-6.1 specifically (see docs/CODEX.md).
+    # Its multi-anchor fallback in binder.c/binder_alloc.c/signal.c gives some
+    # cross-tree robustness, but that's not the same as verified compat with
+    # other kernel versions' source layout. Kept because inject.py hard-fails
+    # (sys.exit(1) -> build error) if no anchor matches, so a bad version just
+    # fails CI loudly instead of shipping a silently-broken kernel. If a
+    # version in this list turns out to fail in CI, remove that version here.
+    [rekernel]="5.10 5.15 6.1 6.6 6.12"
     [bbrv3]="5.10 5.15 6.1 6.6"
     [bbg]="5.10 5.15 6.1 6.6 6.12"
     [droidspaces]="5.10 5.15 6.1 6.6 6.12"
