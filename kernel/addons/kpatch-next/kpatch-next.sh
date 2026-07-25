@@ -133,6 +133,12 @@ log "🩹 Building kptools..."
 (
     cd "${KPATCH_NEXT_SRC_DIR}/tools"
     make clean > /dev/null 2>&1 || true
+    # tools/Makefile's `clean` target does `rm -rf preset.h`, but preset.h
+    # is only ever placed here as a side effect of the kernel/ build
+    # (kernel/Makefile: `cp -f include/preset.h ../tools/`). Nothing
+    # re-copies it before `make` runs here, so kptools.c fails to find it
+    # after a clean. Restore it explicitly before building.
+    cp -f "${KPATCH_NEXT_SRC_DIR}/kernel/include/preset.h" .
     make
 ) || error "KPatch-Next: kptools build failed!"
 
