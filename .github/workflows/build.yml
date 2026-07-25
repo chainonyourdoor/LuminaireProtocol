@@ -7,7 +7,7 @@ on:
       build_system:
         description: "Build System"
         type: choice
-        default: "Make - Cirrus"
+        default: ""
         options:
           - "Make - AOSP"
           - "Make - Cirrus"
@@ -17,7 +17,7 @@ on:
       kernel_version:
         description: "Kernel Version"
         type: choice
-        default: "6.1"
+        default: ""
         options:
           - "5.10"
           - "5.15"
