@@ -298,15 +298,11 @@ jobs:
           susfs:          ${{ matrix.susfs }}
           lto-mode:     ${{ inputs.lto_mode }}
           gh-token:       ${{ secrets.PERSONAL_TOKEN }}
+          update-arsenal: ${{ inputs.update_arsenal }}
+          kpatch-next-selected: ${{ contains(needs.prepare-matrix.outputs.addons, 'kpatch-next') }}
 
       - name: "Disk Usage"
         run: df -h && du -sh ~/kernel-cache/ 2>/dev/null || true
-
-      - name: "Force Refresh (KPatch-Next Cache)"  # keeps this addon's cache honoring the same force-refresh toggle as arsenal/clang
-        if: inputs.update_arsenal == 'yes' && contains(needs.prepare-matrix.outputs.addons, 'kpatch-next')
-        env:
-          GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
-        run: gh cache delete "kpatch-next-cache" -R "${{ github.repository }}" 2>/dev/null || true
 
       - name: "Cache KPatch-Next"  # source clone + aarch64-none-elf toolchain + Android NDK — restores if present; auto-saves at end of job if it was missing
         if: contains(needs.prepare-matrix.outputs.addons, 'kpatch-next')
