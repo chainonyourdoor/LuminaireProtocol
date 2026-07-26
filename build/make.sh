@@ -19,17 +19,31 @@ MAKE_ARGS=(
 
 mkdir -p "$LTO_CACHE_DIR"
 
+# ld.lld's own worker pool (codegen/writing) scales with nproc regardless of
+# LTO mode. Left unbounded, the final vmlinux link can spike past available
+# RAM+swap on runners with many cores, since this is one big single-process
+# link (non-LTO/FULL) or a wide ThinLTO backend fan-out — not something
+# `make -j` throttling touches. Bound it to half the cores for every mode so
+# NONE/FULL don't OOM the same way THIN already avoided doing.
+LD_JOBS=$(( $(nproc --all) / 2 ))
+[ "$LD_JOBS" -ge 1 ] || LD_JOBS=1
+
+LD_WRAPPER="${KERNEL_SRC}/ld-wrapper"
+{
+    echo '#!/usr/bin/env bash'
+    if [ "${LTO_MODE}" = "THIN" ]; then
+        echo "exec ld.lld \"\$@\" --thinlto-cache-dir=/dev/shm/ldcache --thinlto-jobs=${LD_JOBS} --threads=${LD_JOBS}"
+    else
+        echo "exec ld.lld \"\$@\" --threads=${LD_JOBS}"
+    fi
+} > "$LD_WRAPPER"
+chmod +x "$LD_WRAPPER"
+MAKE_ARGS+=(LD="$LD_WRAPPER" HOSTLD="$LD_WRAPPER")
+
 if [ "${LTO_MODE}" = "THIN" ]; then
-    LD_WRAPPER="${KERNEL_SRC}/ld-wrapper"
-    cat > "$LD_WRAPPER" << 'WRAPPER_EOF'
-#!/usr/bin/env bash
-exec ld.lld "$@" \
-    --thinlto-cache-dir=/dev/shm/ldcache \
-    --thinlto-jobs=$(( $(nproc --all) / 2 ))
-WRAPPER_EOF
-    chmod +x "$LD_WRAPPER"
-    MAKE_ARGS+=(LD="$LD_WRAPPER" HOSTLD="$LD_WRAPPER")
-    log "ThinLTO ld-wrapper enabled (cache: /dev/shm/ldcache) ✅"
+    log "ThinLTO ld-wrapper enabled (cache: /dev/shm/ldcache, jobs/threads: ${LD_JOBS}) ✅"
+else
+    log "ld-wrapper enabled for LTO_MODE=${LTO_MODE} (threads: ${LD_JOBS}, memory-bounded link) ✅"
 fi
 
 touch "${KERNEL_SRC}/.scmversion"
