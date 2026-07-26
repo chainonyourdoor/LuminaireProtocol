@@ -285,7 +285,10 @@ jobs:
       - name: "Setup Swap Space"
         uses: thejerrybao/setup-swap-space@v1
         with:
-          swap-size-gb: 12
+          swap-size-gb: 24
+
+      - name: "Tune Swappiness"  # push pages to swap earlier, before the OOM killer
+        run: sudo sysctl -w vm.swappiness=80
 
       - name: "Setup Build Environment"  # restore-only: clang, arsenal, ccache, lto
         id: setup-build-env

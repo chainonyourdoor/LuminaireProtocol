@@ -28,13 +28,20 @@ mkdir -p "$LTO_CACHE_DIR"
 LD_JOBS=$(( $(nproc --all) / 2 ))
 [ "$LD_JOBS" -ge 1 ] || LD_JOBS=1
 
+# NONE/FULL do one single monolithic link with no ThinLTO partitioning to
+# fall back on, so they're pushed to 1 thread — slower, but the biggest
+# lever we have over this link's peak memory (measured: still OOM'd at 2
+# threads even with the wrapper, on a 5.10 build with a full addon load).
+LD_THREADS="$LD_JOBS"
+[ "${LTO_MODE}" = "THIN" ] || LD_THREADS=1
+
 LD_WRAPPER="${KERNEL_SRC}/ld-wrapper"
 {
     echo '#!/usr/bin/env bash'
     if [ "${LTO_MODE}" = "THIN" ]; then
         echo "exec ld.lld \"\$@\" --thinlto-cache-dir=/dev/shm/ldcache --thinlto-jobs=${LD_JOBS} --threads=${LD_JOBS}"
     else
-        echo "exec ld.lld \"\$@\" --threads=${LD_JOBS}"
+        echo "exec ld.lld \"\$@\" --threads=${LD_THREADS}"
     fi
 } > "$LD_WRAPPER"
 chmod +x "$LD_WRAPPER"
@@ -43,7 +50,7 @@ MAKE_ARGS+=(LD="$LD_WRAPPER" HOSTLD="$LD_WRAPPER")
 if [ "${LTO_MODE}" = "THIN" ]; then
     log "ThinLTO ld-wrapper enabled (cache: /dev/shm/ldcache, jobs/threads: ${LD_JOBS}) ✅"
 else
-    log "ld-wrapper enabled for LTO_MODE=${LTO_MODE} (threads: ${LD_JOBS}, memory-bounded link) ✅"
+    log "ld-wrapper enabled for LTO_MODE=${LTO_MODE} (threads: ${LD_THREADS}, memory-bounded link) ✅"
 fi
 
 touch "${KERNEL_SRC}/.scmversion"
