@@ -1,21 +1,6 @@
 import sys
 
-# susfs4ksu's kernel_patches/50_add_susfs_in_gki-android16-6.12.patch inserts a
-# CONFIG_KSU_SUSFS_SUS_MAP guard into show_smap() right after
-# `struct mem_size_stats mss = {};`, anchored on the context line
-# `if (!vma_pages(vma))`. Newer gki-android16-6.12 sublevels renamed that
-# function to `vma_data_pages()` (and added VMA-padding helpers around it),
-# so the context line no longer matches. `patch --fuzz=3` still "succeeds"
-# but anchors on the nearest similar-looking context instead, which lands
-# the guard mid-argument-list inside the unrelated SEQ_PUT_DEC(...) call for
-# SwapPss in __show_smap(), producing a syntax error ("expected expression").
-#
-# Rather than depend on the upstream patch being fixed, detect that specific
-# mis-landing, remove it, and re-insert the guard where it actually belongs:
-# right after `struct mem_size_stats mss = {};` inside show_smap() itself.
-# This is independent of whatever the following line is named
-# (vma_pages/vma_data_pages), so it stays correct even if that helper is
-# renamed again later.
+# Fixes a mis-landed SUSFS patch hunk in show_smap()/task_mmu.c. See CODEX.md.
 
 SUS_MAP_GUARD = (
     "#ifdef CONFIG_KSU_SUSFS_SUS_MAP\n"

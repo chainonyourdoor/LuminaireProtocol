@@ -28,15 +28,7 @@ fi
 [ -d "${KPATCH_NEXT_SRC_DIR}/kernel" ] && [ -d "${KPATCH_NEXT_SRC_DIR}/tools" ] && [ -d "${KPATCH_NEXT_SRC_DIR}/user" ] \
     || error "KPatch-Next: cloned repo missing kernel/tools/user — layout may have changed upstream!"
 
-# ---------------------------------------------------------
-# Bare-metal aarch64-none-elf toolchain (required for kpimg —
-# aarch64-linux-gnu- from TOOL_CROSS_COMPILE will NOT work here,
-# kpimg is a freestanding ELF, not a userspace/kernel-module binary)
-#
-# This cache dir + the NDK one below are restored/saved by the
-# "Cache KPatch-Next Toolchains" actions/cache step in build.yml —
-# this script only needs to check whether they're already populated.
-# ---------------------------------------------------------
+# Bare-metal aarch64-none-elf toolchain, required for kpimg. See CODEX.md.
 
 KPATCH_TOOLCHAIN_DIR="${ROOT_DIR}/kpatch-toolchain"
 KPATCH_TOOLCHAIN_CACHE_DIR="${HOME}/kpatch-toolchain-cache"
@@ -70,20 +62,7 @@ fi
 [ -x "${KPATCH_TOOLCHAIN_DIR}/bin/aarch64-none-elf-gcc" ] \
     || error "KPatch-Next: aarch64-none-elf-gcc not found after toolchain setup!"
 
-# ---------------------------------------------------------
-# Android NDK (required to build kpatch, the userspace binary
-# that runs on-device).
-#
-# Tried relying on the runner's preinstalled NDK first (env vars,
-# then scanning ${ANDROID_SDK_ROOT}/ndk, then sdkmanager) — all three
-# failed in CI (see docs/CODEX.md / commit history for that attempt).
-# Root cause unconfirmed (possibly ANDROID_SDK_ROOT/ANDROID_HOME
-# themselves aren't set on this runner, or the image dropped the SDK
-# for this runner class). Rather than keep guessing at runner
-# internals, download a pinned NDK ourselves — same approach already
-# used for the aarch64-none-elf toolchain above, so this addon no
-# longer depends on runner-image assumptions at all.
-# ---------------------------------------------------------
+# Android NDK, required to build kpatch (userspace binary). See CODEX.md.
 
 KPATCH_NDK_VERSION="r27c"
 KPATCH_NDK_CACHE_DIR="${HOME}/kpatch-ndk-cache"
@@ -114,9 +93,7 @@ fi
 
 log "KPatch-Next: using NDK at ${KPATCH_NDK_DIR}"
 
-# ---------------------------------------------------------
-# Build kpimg (bare-metal ELF, takes over kernel boot to patch it)
-# ---------------------------------------------------------
+# kpimg: bare-metal ELF, takes over kernel boot to patch it.
 
 log "🩹 Building kpimg..."
 (
@@ -130,20 +107,13 @@ log "🩹 Building kpimg..."
 KPATCH_NEXT_KPIMG="${KPATCH_NEXT_SRC_DIR}/kernel/kpimg"
 [ -f "$KPATCH_NEXT_KPIMG" ] || error "KPatch-Next: kpimg build succeeded but output file missing!"
 
-# ---------------------------------------------------------
-# Build kptools (host tool — patches the kernel Image post-build,
-# doesn't need to run on-device, so plain host GCC is fine)
-# ---------------------------------------------------------
+# kptools: host tool, patches Image post-build. See CODEX.md.
 
 log "🩹 Building kptools..."
 (
     cd "${KPATCH_NEXT_SRC_DIR}/tools"
     make clean > /dev/null 2>&1 || true
-    # tools/Makefile's `clean` target does `rm -rf preset.h`, but preset.h
-    # is only ever placed here as a side effect of the kernel/ build
-    # (kernel/Makefile: `cp -f include/preset.h ../tools/`). Nothing
-    # re-copies it before `make` runs here, so kptools.c fails to find it
-    # after a clean. Restore it explicitly before building.
+    # Restore preset.h — clean removes it, nothing else re-copies it. See CODEX.md.
     cp -f "${KPATCH_NEXT_SRC_DIR}/kernel/include/preset.h" .
     make
 ) || error "KPatch-Next: kptools build failed!"
@@ -151,9 +121,7 @@ log "🩹 Building kptools..."
 KPATCH_NEXT_KPTOOLS="${KPATCH_NEXT_SRC_DIR}/tools/kptools"
 [ -f "$KPATCH_NEXT_KPTOOLS" ] || error "KPatch-Next: kptools build succeeded but output file missing!"
 
-# ---------------------------------------------------------
-# Build kpatch (Android userspace binary, via NDK)
-# ---------------------------------------------------------
+# kpatch: Android userspace binary, via NDK.
 
 log "🩹 Building kpatch (Android)..."
 (

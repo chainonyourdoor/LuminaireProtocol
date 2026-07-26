@@ -1752,6 +1752,65 @@ The defconfig heredoc's inline comment used to restate the full
 "selectable, not default" rationale — trimmed to a one-liner pointing
 here, since this section already covers it in full.
 
+## `kernel/addons/kpatch-next/kpatch-next.sh`
+
+**Purpose of this file**: addon — KPatch-Next (kernel patch/hook
+framework, KPM module support). Repo:
+https://github.com/KernelSU-Next/KPatch-Next.
+
+Builds three artifacts from that source: `kpimg` (bare-metal aarch64
+ELF that takes over kernel boot to patch it — needs the
+`aarch64-none-elf` toolchain, NOT `TOOL_CROSS_COMPILE`'s
+`aarch64-linux-gnu-`, since `kpimg` is freestanding, not a
+userspace/kernel-module binary), `kptools` (host-side tool that patches
+the built kernel Image post-build — plain host GCC, doesn't run
+on-device), and `kpatch` (the on-device Android userspace binary, built
+via NDK).
+
+Toolchain/NDK are downloaded once and cached (`~/kpatch-toolchain-cache`,
+`~/kpatch-ndk-cache`, plus the source itself in
+`~/kpatch-next-src-cache`) — restored/saved by the "Cache KPatch-Next"
+step in `build.yml`; this script only checks whether they're already
+populated. NDK version is pinned (`r27c`); the toolchain URL is also
+pinned — bump either deliberately and re-verify (toolchain: confirm
+`aarch64-none-elf-gcc` still extracts to `bin/`; NDK: confirm
+`build/cmake/android.toolchain.cmake` still exists at that path).
+
+The NDK download-ourselves approach exists because relying on the
+runner's preinstalled NDK (env vars, then scanning
+`${ANDROID_SDK_ROOT}/ndk`, then `sdkmanager`) failed in CI across all
+three attempts — root cause was never confirmed (maybe
+`ANDROID_SDK_ROOT`/`ANDROID_HOME` aren't set on this runner class, maybe
+the image just doesn't ship the SDK here). Rather than keep guessing at
+runner internals, it downloads a pinned NDK itself, the same approach
+already used for the `aarch64-none-elf` toolchain — so the addon no
+longer depends on any runner-image assumptions.
+
+`tools/Makefile`'s `clean` target removes `preset.h`, but that file only
+ever lands in `tools/` as a side effect of the `kernel/` build
+(`kernel/Makefile` copies it there) — nothing re-copies it before this
+script's `make clean && make` in `tools/`, so building `kptools` after a
+clean fails to find it. Restored explicitly (`cp -f
+.../kernel/include/preset.h .`) before that build.
+
+Exports `KPATCH_NEXT_KPIMG`, `KPATCH_NEXT_KPTOOLS`,
+`KPATCH_NEXT_KPATCH_BIN` for `postbuild.sh` (below) to actually patch
+the kernel Image with.
+
+---
+
+## `kernel/addons/kpatch-next/postbuild.sh`
+
+**Purpose of this file**: post-build stage for KPatch-Next — patches
+the built `arch/${ARCH}/boot/Image` using `kptools` (from
+`kpatch-next.sh` above), embedding the `kpatch` userspace binary into
+the patched image (via `-K`) if one was built, so it can be extracted
+and used on-device without shipping it as a separate file.
+
+The unpatched Image is kept alongside as `Image.orig` (for
+debugging/rollback) before the patched one is swapped into the path the
+packaging stage (AnyKernel3) expects.
+
 ---
 
 ## `kernel/tuning/workqueue_catchup/workqueue_catchup.sh`
@@ -2211,3 +2270,107 @@ this document for the CC_VERSION/LD_VERSION mechanics).
 source from cache when available, otherwise clones
 `LuminaireKernel-${KERNEL_VERSION}` at `$KERNEL_BRANCH` and saves the
 result to cache for next time.
+
+---
+
+## `kernel/addons/bbg/kconfig_inject.py`
+
+**Purpose of this file**: injects `baseband_guard` into the `config
+LSM` block's `default` line in `security/Kconfig` (anchored on
+`selinux`, e.g. `default "..., selinux"` →
+`"..., selinux,baseband_guard"`). Idempotent (skips if
+`baseband_guard` is already present); errors out loudly if the
+`selinux` anchor or the `config LSM` block itself isn't found, since
+either means upstream `Kconfig` changed shape.
+
+---
+
+## `kernel/core/module_bypass/patch.py`
+
+**Purpose of this file**: flips a `return 0;` to `return 1;` in
+`version.c`, anchored on the first `return 0;` found after a
+`bad_version:` label. Idempotent (detects an already-patched
+`return 1;` and skips); errors out if the anchor or the expected
+`return 0;` after it isn't found, since that means upstream
+`version.c` was refactored.
+
+---
+
+## `kernel/ksu/kconfig_inject.py`
+
+**Purpose of this file**: appends the full `KSU_SUSFS` Kconfig menu
+block (all `KSU_SUSFS_*` sub-options — SUS_PATH, SUS_MOUNT, SUS_KSTAT,
+SUS_OVERLAYFS, TRY_UMOUNT, SUS_SU, SPOOF_UNAME, ENABLE_LOG,
+HIDE_KSU_SUSFS_SYMBOLS, SPOOF_CMDLINE_OR_BOOTCONFIG, OPEN_REDIRECT,
+SUS_MAP — each defaulting to `y`) to the target Kconfig file if
+`config KSU_SUSFS` isn't already present. Idempotent by that same
+check.
+
+---
+
+## `kernel/ksu/fix_task_mmu_sus_map.py`
+
+**Purpose of this file**: fixes a mis-landed SUSFS patch hunk in
+`task_mmu.c`. susfs4ksu's
+`50_add_susfs_in_gki-android16-6.12.patch` inserts a
+`CONFIG_KSU_SUSFS_SUS_MAP` guard into `show_smap()` right after
+`struct mem_size_stats mss = {};`, anchored on the context line
+`if (!vma_pages(vma))`. Newer gki-android16-6.12 sublevels renamed
+that function to `vma_data_pages()` (plus added VMA-padding helpers
+around it), so the context line stops matching — `patch --fuzz=3`
+still "succeeds" but anchors on the nearest similar-looking context
+instead, landing the guard mid-argument-list inside the unrelated
+`SEQ_PUT_DEC(...)` call for SwapPss in `__show_smap()`, producing a
+syntax error ("expected expression").
+
+Rather than depend on the upstream patch being fixed, this detects
+that specific mis-landing, removes it, and re-inserts the guard where
+it actually belongs: right after `struct mem_size_stats mss = {};`
+inside `show_smap()` itself — independent of whatever the following
+line is named (`vma_pages`/`vma_data_pages`), so it stays correct even
+if that helper gets renamed again later.
+
+---
+
+## `kernel/ksu/variants/resukisu/branding.py`
+
+**Purpose of this file**: rebrands ReSukiSU's `KSU_VERSION_FULL` string
+(appends `$(KSU_TAG_NAME) Luminaire`) and switches the `ccflags-y`
+`-DKSU_VERSION_FULL` quoting style to match. Idempotent (skips if the
+Luminaire suffix is already present); errors if either anchor line is
+missing, since that means upstream's `Makefile` changed.
+
+---
+
+## `kernel/ksu/variants/resukisu/ksunext_compat.py`
+
+**Purpose of this file**: adds two IOCTL shims to ReSukiSU so it
+responds to KSU-Next's compat probes the same way KSU-Next itself
+would: `GET_VERSION_TAG` (IOCTL 99, returns `KSU_VERSION_FULL` as a
+tag string) and `GET_HOOK_MODE` (IOCTL 98). Exists because some
+userspace tooling (Manager apps, root checkers) built against
+KSU-Next's IOCTL contract probes for these specifically — without
+this shim, ReSukiSU would report as an unrecognized/incompatible
+fork to that tooling even though it's functionally a KSU-Next fork.
+
+---
+
+## `kernel/ksu/variants/resukisu/multimanager.py`
+
+**Purpose of this file**: extends ReSukiSU's manager-APK signature
+allowlist to accept the other major fork managers too (KernelSU-Next,
+MamboSU, VortexSU, etc. — each identified by an expected APK size +
+SHA-256 hash pair), not just the original KOWX712/KernelSU signature.
+Lets a single ReSukiSU build recognize multiple managers' APKs as
+valid instead of hard-rejecting any manager that isn't KOWX712's own.
+
+---
+
+## `kernel/ksu/variants/sukisu/branding.py`
+
+**Purpose of this file**: same rebranding job as
+`resukisu/branding.py` above, adapted to SukiSU's differently-shaped
+`KSU_VERSION_FULL` line (git-short-sha/branch-based fallback chain
+instead of a plain `$(subst ...)`). Appends `Luminaire` to the
+resolved version string and switches the `ccflags-y` quoting style to
+match. Idempotent; errors if either anchor line is missing.

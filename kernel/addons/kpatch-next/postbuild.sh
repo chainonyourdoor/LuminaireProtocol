@@ -15,8 +15,7 @@ KPATCH_NEXT_PATCH_ARGS=(
     -o "${KPATCH_NEXT_IMAGE}.kpatched"
 )
 
-# Embed the kpatch userspace binary into the patched image if we built one,
-# so it can be extracted/used on-device without shipping it separately.
+# Embed kpatch binary if built. See CODEX.md.
 [ -n "${KPATCH_NEXT_KPATCH_BIN:-}" ] && KPATCH_NEXT_PATCH_ARGS+=(-K "$KPATCH_NEXT_KPATCH_BIN")
 
 "${KPATCH_NEXT_KPTOOLS}" "${KPATCH_NEXT_PATCH_ARGS[@]}" \
@@ -24,8 +23,7 @@ KPATCH_NEXT_PATCH_ARGS=(
 
 [ -f "${KPATCH_NEXT_IMAGE}.kpatched" ] || error "KPatch-Next: patch command exited 0 but output file missing!"
 
-# Keep the unpatched Image around as .orig for debugging/rollback, then swap
-# the patched one into the path the packaging stage (AnyKernel3) expects.
+# Keep unpatched Image as .orig, swap patched one into AnyKernel3's expected path.
 mv "$KPATCH_NEXT_IMAGE" "${KPATCH_NEXT_IMAGE}.orig"
 mv "${KPATCH_NEXT_IMAGE}.kpatched" "$KPATCH_NEXT_IMAGE"
 
