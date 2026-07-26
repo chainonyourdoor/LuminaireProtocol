@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 
 declare -A ADDON_SUPPORTED_VERSIONS=(
-    [rekernel]="5.10 5.15 6.1 6.6 6.12"
+    [nomount]="5.10 5.15 6.1 6.6 6.12"
+    [zeromount]="5.10 5.15 6.1 6.6 6.12"
     [bbrv3]="5.10 5.15 6.1 6.6"
     [bbg]="5.10 5.15 6.1 6.6 6.12"
-    [droidspaces]="5.10 5.15 6.1 6.6 6.12"
-    [ntsync]="5.10 5.15 6.1 6.6"
     [wireguard]="5.10 5.15 6.1 6.6 6.12"
+    [droidspaces]="5.10 5.15 6.1 6.6 6.12"
+    [rekernel]="5.10 5.15 6.1 6.6 6.12"
+    [kpatch-next]="5.10 5.15 6.1 6.6 6.12"
+    [ntsync]="5.10 5.15 6.1 6.6"
     [lz4zstd]="6.1"
     [lz4kd]="5.10 5.15 6.1 6.6"
     [kasumi]="5.10 5.15 6.1 6.6 6.12"
-    [nomount]="5.10 5.15 6.1 6.6 6.12"
-    [zeromount]="5.10 5.15 6.1 6.6 6.12"
-    [kpatch-next]="5.10 5.15 6.1 6.6 6.12"
 )
 
-ADDON_ORDER=(rekernel bbrv3 bbg droidspaces ntsync wireguard lz4zstd lz4kd kasumi nomount zeromount kpatch-next)
+ADDON_ORDER=(nomount zeromount bbrv3 bbg wireguard droidspaces rekernel kpatch-next ntsync lz4zstd lz4kd kasumi)
 
 ADDON_MOUNTLESS_TOKENS=(nomount zeromount)
 
