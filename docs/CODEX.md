@@ -1748,6 +1748,10 @@ to show in release captions — see `TUNING_DISPLAY_NAMES` /
 version exists right now, so this is mostly future-proofing/consistency
 with `BORE_VERSION` in `bore.sh`.
 
+The defconfig heredoc's inline comment used to restate the full
+"selectable, not default" rationale — trimmed to a one-liner pointing
+here, since this section already covers it in full.
+
 ---
 
 ## `kernel/tuning/workqueue_catchup/workqueue_catchup.sh`
