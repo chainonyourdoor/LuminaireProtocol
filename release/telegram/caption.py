@@ -160,8 +160,8 @@ FRAGMENT_FEATURES = {
         "I/O Scheduler (MQ-Deadline, Kyber)",
     ],
     "Network": [
-        "TCP Congestion Control (BBR, BIC, CUBIC, Westwood, HTCP)",
-        "Network Schedulers (FQ, FQ_CoDel, CAKE, PIE, FQ-PIE)",
+        ("TCP Congestion Control", ["BBR", "BIC", "CUBIC", "Westwood", "HTCP"]),
+        ("Network Schedulers", ["FQ", "FQ_CoDel", "CAKE", "PIE", "FQ-PIE"]),
         "IP Set",
         "IPv6 NAT",
         "TTL Target (Netfilter)",
@@ -370,10 +370,23 @@ def build_telegraph_content(env):
     ]
     for category, items in FRAGMENT_FEATURES.items():
         content.append({"tag": "h4", "children": [category]})
-        content.append({
-            "tag": "ul",
-            "children": [{"tag": "li", "children": [item]} for item in items],
-        })
+        li_nodes = []
+        for item in items:
+            if isinstance(item, tuple):
+                label, sub_items = item
+                li_nodes.append({
+                    "tag": "li",
+                    "children": [
+                        label,
+                        {
+                            "tag": "ul",
+                            "children": [{"tag": "li", "children": [sub]} for sub in sub_items],
+                        },
+                    ],
+                })
+            else:
+                li_nodes.append({"tag": "li", "children": [item]})
+        content.append({"tag": "ul", "children": li_nodes})
     def addon_status_icon(token):
         if token in skipped_tokens:
             return "\u2796"
@@ -401,7 +414,6 @@ def build_telegraph_content(env):
         for token in tuning_order(env)
     ]
     content.append({"tag": "h3", "children": ["Luminaire Tuning"]})
-    content.append({"tag": "p", "children": ["Always-on, no toggle — active whenever this kernel version has the backport."]})
     content.append(make_status_table(tuning_rows))
     addon_rows = [
         (addon_display_name(token), addon_status_icon(token))
@@ -418,7 +430,8 @@ def build_telegraph_content(env):
     # of these two mutually-exclusive options is active" reads clearer
     # as one line than as a ✅/❌ pair.
     addon_rows.append(("Mountless Engine", resolve_mountless_engine(env)))
-    content.append({"tag": "h3", "children": ["Optional Add-ons"]})
+    content.append({"tag": "h3", "children": ["Add-ons"]})
+    content.append({"tag": "p", "children": ["Opt-in, not default — these exist to give more options, not to define the standard config, so you can choose what you prefer."]})
     content.append(make_status_table(addon_rows))
     return content
 
