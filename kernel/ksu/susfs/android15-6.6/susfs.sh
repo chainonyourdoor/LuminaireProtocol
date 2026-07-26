@@ -1,21 +1,8 @@
 #!/usr/bin/env bash
 
-# ======================================================
-# 🧬 SuSFS — shared apply logic (any KSU fork, android15-6.6)
-# ======================================================
+# SuSFS — shared apply logic (any KSU fork, android15-6.6).
 # Repo: https://gitlab.com/simonpunk/susfs4ksu
-#
-# NOTE: unlike the android12-5.10/android13-5.15/android14-6.1
-# copies of this script, this one intentionally does NOT carry the
-# "SUBLEVEL >= 157 → strip/restore blk.h in namespace.c" workaround.
-# That workaround exists because a specific point in Linux 6.1.x's
-# upstream history dropped a trace/hooks/blk.h include that SuSFS's
-# patch context depends on — it's tied to 6.1's own commit history,
-# not a general GKI/SuSFS quirk, so blindly carrying it over to 6.6
-# (an entirely different source tree) would be guessing. If patching
-# ever fails here for a similar reason, add an equivalent guard after
-# confirming the actual upstream diff for the affected 6.6.x sublevel
-# — don't re-add this one unmodified.
+# No blk.h workaround here (6.1-specific history, doesn't apply). See CODEX.md.
 
 if [ "$KERNEL_VARIANT" = "SUKISU" ]; then
     SUSFS_REF="${SUSFS_SUKISU_REF:-}"

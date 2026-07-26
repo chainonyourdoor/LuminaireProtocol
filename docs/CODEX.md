@@ -1691,6 +1691,20 @@ luminaire/*`) apply their own `patches/<owner>/` file directly and are
 not read by this loop, so an unchecked addon toggle actually disables
 it.
 
+**`ld-wrapper` / link-time memory bounding (added 2026-07-26)** —
+`ld.lld`'s own worker pool (codegen/writing) scales with `nproc`
+regardless of LTO mode, and `make -j` throttling doesn't touch it since
+it's one single link process. `THIN` bounds this via
+`--thinlto-jobs=nproc/2` (ThinLTO's own partitioning); `NONE`/`FULL`
+have no such partitioning to fall back on, so they're pushed to
+`--threads=1` instead — measured: still OOM'd at `--threads=2` on a
+5.10 build with a full addon load (bbrv3/bbg/rekernel/droidspaces/
+ntsync/wireguard/lz4kd/kpatch-next), even with the wrapper. Slower for
+NONE/FULL, but the biggest lever available over this link's peak
+memory on a standard GitHub-hosted runner. See also `build.yml`'s swap
+size (24GB) and `vm.swappiness` (80) tuning, added alongside this for
+the same OOM.
+
 ---
 
 ## `release/anykernel.sh`
@@ -2168,11 +2182,19 @@ HASS, Scene) to react to app kills and freezes in real time.
 ## `kernel/addons/droidspaces/droidspaces.sh`
 
 **Purpose of this file**: addon — Droidspaces (LXC container runtime).
-Requires: `001_GKI-below-6_12-fix_sysvipc_kabi_6_7_8.patch`. Docs:
-https://github.com/ravindu644/Droidspaces-OSS. Already minimal — no
-further stripping needed beyond the header banner and generated-config
-comments (which describe sections of `gki_defconfig` itself, not the
-script's own logic).
+Docs: https://github.com/ravindu644/Droidspaces-OSS.
+
+Which KaBI-safety patch applies depends on kernel version (per
+upstream's `Documentation/Kernel-Configuration.md`): below 6.12
+(5.10/5.15/6.1/6.6) uses
+`001_GKI-below-6_12-fix_sysvipc_kabi_6_7_8.patch` (verified
+byte-identical to upstream's recommended variant); 6.12+ uses a
+different patch, since the `task_struct` layout fix differs there.
+Kernel 5.10 also needs an extra POSIX_MQUEUE padding patch — not
+referenced explicitly in this script, it's picked up automatically by
+`build/make.sh`'s generic `${PATCHES_DIR}/required/*.patch` loop since
+it lives in the same directory
+(`kernel/patches/android12-5.10/required/`).
 
 ---
 

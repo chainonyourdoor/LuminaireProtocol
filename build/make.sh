@@ -19,19 +19,11 @@ MAKE_ARGS=(
 
 mkdir -p "$LTO_CACHE_DIR"
 
-# ld.lld's own worker pool (codegen/writing) scales with nproc regardless of
-# LTO mode. Left unbounded, the final vmlinux link can spike past available
-# RAM+swap on runners with many cores, since this is one big single-process
-# link (non-LTO/FULL) or a wide ThinLTO backend fan-out — not something
-# `make -j` throttling touches. Bound it to half the cores for every mode so
-# NONE/FULL don't OOM the same way THIN already avoided doing.
+# ld-wrapper: bounds link-time memory. See CODEX.md.
 LD_JOBS=$(( $(nproc --all) / 2 ))
 [ "$LD_JOBS" -ge 1 ] || LD_JOBS=1
 
-# NONE/FULL do one single monolithic link with no ThinLTO partitioning to
-# fall back on, so they're pushed to 1 thread — slower, but the biggest
-# lever we have over this link's peak memory (measured: still OOM'd at 2
-# threads even with the wrapper, on a 5.10 build with a full addon load).
+# NONE/FULL forced to 1 thread — no ThinLTO partitioning to lean on. See CODEX.md.
 LD_THREADS="$LD_JOBS"
 [ "${LTO_MODE}" = "THIN" ] || LD_THREADS=1
 
