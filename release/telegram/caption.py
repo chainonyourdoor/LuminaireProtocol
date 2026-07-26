@@ -52,10 +52,7 @@ def addon_order(env):
     order = [t for t in raw.split(",") if t]
     if order:
         return order
-    # Fallback if ADDON_ORDER wasn't exported (older workflow run):
-    # degrades gracefully to only the addons actually touched this
-    # build — addons the user didn't select at all won't show as an
-    # explicit "Disable" line, unlike the normal path.
+    # Fallback if ADDON_ORDER wasn't exported (older workflow run). See CODEX.md.
     applied = [t for t in env.get("APPLIED_ADDONS", "").split(",") if t]
     skipped = [t for t in env.get("SKIPPED_ADDONS", "").split(",") if t]
     return applied + skipped
@@ -116,9 +113,7 @@ def tuning_order(env):
     order = [t for t in raw.split(",") if t]
     if order:
         return order
-    # Fallback if TUNING_FEATURE_ORDER wasn't exported (older
-    # workflow run, or manual/local testing): best-effort reconstruct
-    # from the two lists that are always present.
+    # Fallback if TUNING_FEATURE_ORDER wasn't exported. See CODEX.md.
     applied = [t for t in env.get("APPLIED_TUNING", "").split(",") if t]
     skipped = [t for t in env.get("SKIPPED_TUNING", "").split(",") if t]
     return applied + skipped
@@ -245,10 +240,7 @@ def build_blocks(env):
     skipped_tokens = [t for t in env.get("SKIPPED_ADDONS", "").split(",") if t]
     mountless = mdv2_code_escape(resolve_mountless_engine(env))
     toggle_order = toggle_addon_order(env)
-    # +1 for the trailing space before ":". "Mountless Engine" is
-    # included here too since it shares this column via the hardcoded
-    # line below — otherwise its colon drifts out of alignment
-    # whenever every addon's display name is shorter than 16 chars.
+    # Column width for this block — see CODEX.md.
     addon_name_width = max(
         [len(addon_display_name(t)) for t in toggle_order] + [len("Mountless Engine")]
     ) + 1
@@ -265,9 +257,7 @@ def build_blocks(env):
     tuning_tokens = [t for t in env.get("APPLIED_TUNING", "").split(",") if t]
     tuning_skipped_tokens = [t for t in env.get("SKIPPED_TUNING", "").split(",") if t]
     tuning_order_list = tuning_order(env)
-    # Separate width from the addons block's fixed 16 — core patch
-    # names (e.g. "UFS WriteBooster Catch-up") can run longer than any
-    # addon name, and a shared fixed width would misalign the colons.
+    # Separate width from the addons block's — see CODEX.md.
     tuning_name_width = max((len(tuning_display_name(t)) for t in tuning_order_list), default=16) + 1
     tuning_status_lines = []
     for token in tuning_order_list:
@@ -419,16 +409,8 @@ def build_telegraph_content(env):
         (addon_display_name(token), addon_status_icon(token))
         for token in toggle_addon_order(env)
     ]
-    # toggle_addon_order() deliberately excludes nomount/zeromount (see
-    # its docstring) since they're mutually-exclusive variants of one
-    # choice, not independent toggles — but that choice still needs to
-    # be visible somewhere on this page, or a build with e.g. ZeroMount
-    # active would show literally no trace of it here. Appended as its
-    # own row (status is a name, not an icon, same precedent as the
-    # Luminaire Tuning table's version strings above) rather than
-    # showing nomount/zeromount as two more icon rows, since "which one
-    # of these two mutually-exclusive options is active" reads clearer
-    # as one line than as a ✅/❌ pair.
+    # nomount/zeromount shown as their own row here — see CODEX.md
+    # (resolve_mountless_engine section).
     addon_rows.append(("Mountless Engine", resolve_mountless_engine(env)))
     content.append({"tag": "h3", "children": ["Add-ons"]})
     content.append({"tag": "p", "children": ["Opt-in, not default — these exist to give more options, not to define the standard config, so you can choose what you prefer."]})

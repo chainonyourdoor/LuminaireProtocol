@@ -521,6 +521,19 @@ caption which always had its own explicit line for it).
 **`build_blocks()`, toggle addon status** — `"N/A"` means not backported
 for this kernel version yet, distinct from a user's own `"Disable"`.
 
+**`build_blocks()`, column-width computation** — `addon_name_width` and
+`tuning_name_width` are computed separately (not a single shared
+width) because a fixed width sized for one block can misalign the
+other: addon display names are short and bounded (max ~16 chars), but
+Tuning feature names can run longer (e.g. "UFS WriteBooster
+Catch-up"), so sharing one width would push Tuning's colons out of
+alignment. `addon_name_width` also folds in `len("Mountless Engine")`
+even though that row is appended separately/hardcoded below the loop
+— otherwise, on a build where every selected addon's display name is
+shorter than "Mountless Engine", that row's own colon would drift out
+of alignment with the rest of the block. Both widths add `+1` for the
+trailing space before the `:`.
+
 **`build_blocks()`, tuning status** — no Disable state here: these are
 never user-toggled, only `"Active"` (this kernel version has the backport)
 or `"N/A"` (it doesn't yet).
