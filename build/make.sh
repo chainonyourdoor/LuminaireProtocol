@@ -57,6 +57,11 @@ source "${LUMINAIRE_PATCH_DIR}/kernel/config/defconfig.sh"
 log "Syncing config..."
 make "${MAKE_ARGS[@]}" olddefconfig || error "olddefconfig failed!"
 
+log "Debug-info config (diagnosing link memory usage):"
+grep -E "^CONFIG_DEBUG_INFO|^# CONFIG_DEBUG_INFO" "${OUT_DIR}/.config" | while read -r line; do
+    log "  ${line}"
+done
+
 log "Applying version patches..."
 for patch in "${PATCHES_DIR}/required/"*.patch; do
     [ -f "$patch" ] || continue
