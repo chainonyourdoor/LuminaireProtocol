@@ -28,6 +28,10 @@ on:
         description: "KernelSU-Next"
         type: boolean
         default: true
+      kowsu:
+        description: "KowSU"
+        type: boolean
+        default: false
       resukisu:
         description: "ReSukiSU"
         type: boolean
@@ -191,6 +195,7 @@ jobs:
           ${{ inputs.resukisu }} && variants+=("{\"kernel_variant\":\"RESUKISU\",\"susfs\":${SUSFS_ENABLED}}")
           ${{ inputs.sukisu }}   && variants+=("{\"kernel_variant\":\"SUKISU\",\"susfs\":${SUSFS_ENABLED}}")
           ${{ inputs.ksunext }} && variants+=("{\"kernel_variant\":\"KSUNEXT\",\"susfs\":${SUSFS_ENABLED}}")
+          ${{ inputs.kowsu }}   && variants+=("{\"kernel_variant\":\"KOWSU\",\"susfs\":false}")
 
           if [ ${#variants[@]} -eq 0 ]; then
             echo "No root solutions selected!"

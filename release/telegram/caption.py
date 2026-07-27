@@ -23,6 +23,7 @@ VARIANT_DISPLAY = {
     "SUKISU_SUSFS":   "SukiSU\\-Ultra\\+SUSFS",
     "KSUNEXT":        "KernelSU\\-Next",
     "KSUNEXT_SUSFS":  "KernelSU\\-Next\\+SUSFS",
+    "KOWSU":          "KowSU",
 }
 
 
