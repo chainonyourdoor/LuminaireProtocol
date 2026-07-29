@@ -251,6 +251,7 @@ jobs:
             /var/lib/docker /var/cache/snapd /home/linuxbrew \
           ) &
           mkdir -p /dev/shm/ldcache
+          wait
 
       - name: "Setup Swap Space"
         uses: thejerrybao/setup-swap-space@v1
