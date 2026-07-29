@@ -7,7 +7,7 @@ on:
       build_system:
         description: "Build System"
         type: choice
-        default: ""
+        default: "Make - Zyc"
         options:
           - "Make - AOSP"
           - "Make - Cirrus"
@@ -17,7 +17,7 @@ on:
       kernel_version:
         description: "Kernel Version"
         type: choice
-        default: ""
+        default: "6.1"
         options:
           - "5.10"
           - "5.15"
@@ -128,23 +128,8 @@ on:
           - "yes"
           - "no"
 
-# No workflow-level concurrency lock: each dispatch is left free to run
-# in parallel with others (including same kernel_version), so different
-# variant/LTO/build-system combos can be tried side by side. This is
-# safe for kernel/ksu/manifests/<android_ver>-<kernel_version>.json — kernel/ksu/checkpoint/engine.sh already
-# handles concurrent writers via its fetch-rebase-push retry loop
-# (originally built for the matrix jobs within a single run, but it
-# doesn't care whether the writer is from this run or another one).
-# ccache-ECS is a remote cache, also fine under concurrent access.
-# Re-add a `concurrency:` block here if runner-minute usage or GH API
-# rate limits from many simultaneous runs become a real problem.
-
 env:
   DEBIAN_FRONTEND: noninteractive
-  # Single source of truth for "is this a Make build" — referenced via
-  # env.IS_MAKE in step-level `if:` conditions below. Job-level `env:` blocks
-  # can't use the env context to reference this (GitHub Actions limitation),
-  # so those re-derive startsWith(inputs.build_system, 'Make') inline instead.
   IS_MAKE: ${{ startsWith(inputs.build_system, 'Make') }}
 
 jobs:
@@ -158,17 +143,8 @@ jobs:
     outputs:
       matrix: ${{ steps.set.outputs.matrix }}
       addons: ${{ steps.set.outputs.addons }}
-      # github.ref_name as-is (e.g. "test/luminaire-kernel-source") breaks
-      # anywhere it's used as a filesystem path component — the "/" turns
-      # ccache-prefix/lto-asset-name into a bogus extra directory level tar
-      # can't write to. Sanitized once here, reused by Start-Build instead
-      # of every consumer re-deriving (and re-risking) it independently.
       safe_ref: ${{ steps.set.outputs.safe_ref }}
-      # Whether Prepare Arsenal just force-refreshed the shared clang/kernel/AK3
-      # caches this run. Start-Build's own USE_*_CACHE flags are hardcoded
-      # "true" (it always restores — never independently re-downloads), so
-      # this is the only way the scripts it runs can tell an honestly-fresh
-      # restore apart from a pre-existing-cache restore in their log output.
+
       cache_refreshed: ${{ inputs.update_arsenal == 'yes' }}
 
     env:
@@ -243,10 +219,6 @@ jobs:
       USE_KERNEL_CACHE:            "true"
       USE_AK3_CACHE:               "true"
       USE_CLANG_CACHE:             "true"
-      # Always restores — Prepare Arsenal is the single choke point that
-      # decides whether the shared cache is fresh (see its cache_refreshed
-      # output). Passed through so restore-path log messages can say which
-      # case they're in instead of a bare "restored from cache".
       CACHE_REFRESHED:             ${{ needs.prepare-matrix.outputs.cache_refreshed }}
       KERNEL_VARIANT:               ${{ matrix.kernel_variant }}
       SUSFS_ENABLED:               ${{ matrix.susfs }}
@@ -263,13 +235,6 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@v7
         with:
-          # v6+ persists creds via a global includeIf.gitdir config pointing
-          # at a file under $RUNNER_TEMP, not .git/config in this repo — so
-          # it can't be locally unset by a later step (see kernel/ksu/checkpoint/engine.sh
-          # for the fallout this caused). Nothing else in this job needs git
-          # auth against LuminaireProtocol itself: kernel/addon sources are
-          # public clones, and kernel/ksu/checkpoint/engine.sh brings its own
-          # PERSONAL_TOKEN-embedded remote for its push.
           persist-credentials: false
 
       - name: "Free Disk Space"
@@ -331,12 +296,6 @@ jobs:
         run: bash build.sh
 
       - name: "Upload Kernel Build Artifact"
-        # ZIP_PATH is only exported (via anykernel.sh → $GITHUB_ENV) once
-        # run_release() runs in build.sh — Warm Run mode exits main() before
-        # that point, so there's nothing to upload there. Uploaded via the
-        # built-in Actions token, no PERSONAL_TOKEN/secrets needed at all —
-        # this is what lets a fork with zero secrets configured still get
-        # its build output, instead of it only ever reaching Telegram.
         if: always() && steps.build.outcome == 'success' && env.ZIP_PATH != ''
         uses: actions/upload-artifact@v7
         with:
@@ -382,29 +341,11 @@ jobs:
 
       - name: "Save Build Caches"  # LTO and ccache, both to GH Release
         if: always() && env.IS_MAKE == 'true'
-        # All matrix variants upload to the same shared "cache" GH Release
-        # concurrently. A stuck/slow upload here previously ran unbounded
-        # up to the job's 90-minute timeout instead of failing fast — cap
-        # it well below that so a hang surfaces quickly instead of quietly
-        # eating most of the job's time budget.
         timeout-minutes: 15
         uses: ./.github/actions/save-build-caches
         with:
           build-system:   ${{ inputs.build_system }}
           lto-mode:     ${{ inputs.lto_mode }}
-          # Both filenames share the same field order — {type}-data,
-          # kernel_version, kernel_variant(+SUSFS), clang variant (upper) +
-          # lto_mode, ref — so the two asset types line up visually in the
-          # Release's Assets list, and sort next to each other since the
-          # type prefix is the only difference. Both include susfs: the LTO
-          # one didn't before, which meant a SUSFS and non-SUSFS build of
-          # the same variant/clang/ref silently clobbered and restored each
-          # other's LTO cache (their compiled IR differs, since susfs
-          # patches add code that feeds into LTO). clang-variant-upper is a
-          # separate output from setup-build-env specifically for these
-          # filenames — GitHub Actions expressions have no uppercase
-          # function, and the original clang-variant output still needs to
-          # stay as-is for the clang cache key elsewhere.
           lto-asset-name: lto-data-${{ inputs.kernel_version }}-${{ matrix.kernel_variant }}${{ matrix.susfs && '+SUSFS' || '' }}-${{ steps.setup-build-env.outputs.clang-variant-upper }}${{ inputs.lto_mode != 'NONE' && format('-{0}', inputs.lto_mode) || '' }}-${{ needs.prepare-matrix.outputs.safe_ref }}.tar.zst
           ccache-filename: ccache-data-${{ inputs.kernel_version }}-${{ matrix.kernel_variant }}${{ matrix.susfs && '+SUSFS' || '' }}-${{ steps.setup-build-env.outputs.clang-variant-upper }}${{ inputs.lto_mode != 'NONE' && format('-{0}', inputs.lto_mode) || '' }}-${{ needs.prepare-matrix.outputs.safe_ref }}.tar.zst
           gh-token:       ${{ secrets.PERSONAL_TOKEN }}
@@ -418,7 +359,7 @@ jobs:
           if-no-files-found: ignore
 
   # ======================================================
-  # NOTIFY CHANNEL (after all builds)
+  # NOTIFY CHANNEL
   # ======================================================
   notify-channel:
     name: "Notify Channel"
@@ -446,12 +387,6 @@ jobs:
           KERNEL_VERSION:      ${{ inputs.kernel_version }}
           ADDONS:              ${{ needs.prepare-matrix.outputs.addons }}
           CHANGELOG:           ${{ inputs.changelog }}
-          # Lets channel_post.sh diff "variants selected for this run" against
-          # "variants that actually produced a download link", so a matrix
-          # job that failed (e.g. SUKISU with no promoted pin yet) surfaces
-          # as an explicit warning in the post instead of silently vanishing
-          # from the Download list while a stale manual changelog entry still
-          # claims it shipped.
           EXPECTED_MATRIX_JSON: ${{ needs.prepare-matrix.outputs.matrix }}
           GITHUB_SHA:          ${{ github.sha }}
           GITHUB_SERVER_URL:   ${{ github.server_url }}
