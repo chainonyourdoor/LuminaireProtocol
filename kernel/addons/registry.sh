@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 
 declare -A ADDON_SUPPORTED_VERSIONS=(
-    [nomount]="5.10 5.15 6.1 6.6 6.12"
-    [zeromount]="5.10 5.15 6.1 6.6 6.12"
-    [bbrv3]="5.10 5.15 6.1 6.6"
-    [bbg]="5.10 5.15 6.1 6.6 6.12"
-    [wireguard]="5.10 5.15 6.1 6.6 6.12"
-    [droidspaces]="5.10 5.15 6.1 6.6 6.12"
-    [rekernel]="5.10 5.15 6.1 6.6 6.12"
-    [kpatch-next]="5.10 5.15 6.1 6.6 6.12"
-    [ntsync]="5.10 5.15 6.1 6.6"
+    [nomount]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
+    [zeromount]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
+    [bbrv3]="5.10 5.15 6.1 6.6 6.6-konoha"
+    [bbg]="5.10 5.15 6.1 6.6 6.12 16.6-konoha"
+    [wireguard]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
+    [droidspaces]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
+    [rekernel]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
+    [kpatch-next]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
+    [ntsync]="5.10 5.15 6.1 6.6 6.6-konoha"
     [lz4zstd]="6.1"
-    [lz4kd]="5.10 5.15 6.1 6.6"
-    [kasumi]="5.10 5.15 6.1 6.6 6.12"
+    [lz4kd]="5.10 5.15 6.1 6.6 6.6-konoha"
+    [kasumi]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
 )
 
 ADDON_ORDER=(nomount zeromount bbrv3 bbg wireguard droidspaces rekernel kpatch-next ntsync lz4zstd lz4kd kasumi)
