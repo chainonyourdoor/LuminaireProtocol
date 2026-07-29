@@ -37,12 +37,17 @@ done
 log "LZ4KD source files staged ✅"
 
 case "${KERNEL_VERSION}" in
-    5.10|5.15|6.1|6.6) : ;;
+    5.10|5.15|6.1|6.6|6.6-konoha) : ;;
     *) error "LZ4KD: no known SukiSU_patch zram_patch/ for kernel ${KERNEL_VERSION} yet — this addon should have been gated out before reaching here (check registry.sh's ADDON_SUPPORTED_VERSIONS)." ;;
 esac
 
+# Upstream only publishes zram_patch/ per bare kernel version (e.g. "6.6"),
+# not per device-fork variant — konoha is a 6.6 fork, so reuse the 6.6 patch.
+LZ4KD_UPSTREAM_VERSION="${KERNEL_VERSION}"
+[ "${KERNEL_VERSION}" = "6.6-konoha" ] && LZ4KD_UPSTREAM_VERSION="6.6"
+
 LZ4KD_PATCH=$(curl -LSs --fail --retry 3 --retry-all-errors --connect-timeout 30 \
-    "${LZ4KD_RAW_BASE}/zram_patch/${KERNEL_VERSION}/lz4kd.patch") \
+    "${LZ4KD_RAW_BASE}/zram_patch/${LZ4KD_UPSTREAM_VERSION}/lz4kd.patch") \
     || error "LZ4KD: failed to download lz4kd.patch!"
 [ -n "$LZ4KD_PATCH" ] || error "LZ4KD: downloaded patch is empty!"
 

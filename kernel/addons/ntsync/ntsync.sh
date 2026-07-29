@@ -13,6 +13,7 @@ case "${KERNEL_VERSION}" in
     5.15) NTSYNC_COMPAT="ntsync_compat_android13-5.15.patch" ;;
     6.1)  NTSYNC_COMPAT="ntsync_compat_android14-6.1.patch"  ;;
     6.6)  NTSYNC_COMPAT="ntsync_compat_android15-6.6.patch"  ;;
+    6.6-konoha) NTSYNC_COMPAT="ntsync_compat_android15-6.6.patch"  ;;
     6.12) NTSYNC_COMPAT="ntsync_compat_android16-6.12.patch" ;;
     *)    error "NTSync: unsupported kernel version '${KERNEL_VERSION}'" ;;
 esac

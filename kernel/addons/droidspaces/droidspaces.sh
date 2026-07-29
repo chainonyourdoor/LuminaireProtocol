@@ -6,7 +6,7 @@
 log "Enabling Droidspaces support..."
 
 case "${KERNEL_VERSION}" in
-    5.10|5.15|6.1|6.6) KABI_PATCH_NAME="001_GKI-below-6_12-fix_sysvipc_kabi_6_7_8.patch" ;;
+    5.10|5.15|6.1|6.6|6.6-konoha) KABI_PATCH_NAME="001_GKI-below-6_12-fix_sysvipc_kabi_6_7_8.patch" ;;
     6.12)              KABI_PATCH_NAME="001_GKI-6.12-or-above-fix_sysvipc_kabi.patch" ;;
     *)                 error "Droidspaces: no known KaBI-safety patch for kernel ${KERNEL_VERSION} yet — this addon should have been gated out before reaching here (check registry.sh's ADDON_SUPPORTED_VERSIONS)." ;;
 esac

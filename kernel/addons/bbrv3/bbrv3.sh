@@ -13,6 +13,7 @@ case "${KERNEL_VERSION}" in
     5.15) BBRV3_PATCH="0001-net-tcp-backport-BBRv3-to-android13-5.15.patch" ;;
     6.1)  BBRV3_PATCH="0001-net-tcp-backport-BBRv3-to-android14-6.1.patch"  ;;
     6.6)  BBRV3_PATCH="0001-net-tcp-backport-BBRv3-to-android15-6.6.patch"  ;;
+    6.6-konoha) BBRV3_PATCH="0001-net-tcp-backport-BBRv3-to-android15-6.6.patch"  ;;
     *)    error "BBRv3: unsupported kernel version '${KERNEL_VERSION}'" ;;
 esac
 
