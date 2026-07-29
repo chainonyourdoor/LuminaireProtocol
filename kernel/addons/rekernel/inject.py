@@ -21,6 +21,8 @@ REKERNEL_HEADER = """\
 #include <linux/proc_fs.h>
 #include <linux/freezer.h>
 #include <linux/sched/jobctl.h>
+#include <linux/workqueue.h>
+#include <linux/atomic.h>
 
 #define NETLINK_REKERNEL_MAX    26
 #define NETLINK_REKERNEL_MIN    22
@@ -34,6 +36,8 @@ REKERNEL_HEADER = """\
 static struct sock *rekernel_netlink;
 extern struct net init_net;
 static int netlink_unit = NETLINK_REKERNEL_MIN;
+static struct work_struct rekernel_start_work;
+static atomic_t rekernel_start_requested = ATOMIC_INIT(0);
 
 static inline bool line_is_frozen(struct task_struct *task)
 {
@@ -87,10 +91,14 @@ static const struct proc_ops rekernel_unit_fops = {
 
 static struct proc_dir_entry *rekernel_dir, *rekernel_unit_entry;
 
-static int start_rekernel_server(void)
+/*
+ * Re:Kernel: the actual netlink_kernel_create() call can sleep (GFP_KERNEL
+ * allocations, mutex locks). This function must therefore NEVER be invoked
+ * directly from atomic/spinlock context. It only runs deferred via
+ * schedule_work() from start_rekernel_server() below.
+ */
+static void rekernel_start_work_fn(struct work_struct *work)
 {
-\tif (rekernel_netlink != NULL)
-\t\treturn 0;
 \tfor (netlink_unit = NETLINK_REKERNEL_MIN;
 \t     netlink_unit < NETLINK_REKERNEL_MAX; netlink_unit++) {
 \t\trekernel_netlink = (struct sock *)netlink_kernel_create(
@@ -100,7 +108,7 @@ static int start_rekernel_server(void)
 \t}
 \tif (rekernel_netlink == NULL) {
 \t\tprintk("rekernel: failed to create netlink server!\\n");
-\t\treturn -1;
+\t\treturn;
 \t}
 \tprintk("rekernel: netlink server created, unit=%d\\n", netlink_unit);
 \trekernel_dir = proc_mkdir("rekernel", NULL);
@@ -115,7 +123,24 @@ static int start_rekernel_server(void)
 \t\tif (!rekernel_unit_entry)
 \t\t\tprintk("rekernel: create unit procfs entry failed\\n");
 \t}
-\treturn 0;
+}
+
+/*
+ * Re:Kernel: safe to call from ANY context, including atomic/spinlock
+ * context (e.g. binder_alloc.c's async-space check). Never blocks. Returns
+ * 0 only once the server is actually up; otherwise schedules deferred
+ * creation (at most once) and returns -1 so callers just skip sending
+ * this particular event.
+ */
+static int start_rekernel_server(void)
+{
+\tif (rekernel_netlink != NULL)
+\t\treturn 0;
+\tif (atomic_cmpxchg(&rekernel_start_requested, 0, 1) == 0) {
+\t\tINIT_WORK(&rekernel_start_work, rekernel_start_work_fn);
+\t\tschedule_work(&rekernel_start_work);
+\t}
+\treturn -1;
 }
 
 #endif /* _REKERNEL_H */
