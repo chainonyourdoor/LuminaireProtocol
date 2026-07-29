@@ -23,6 +23,7 @@ on:
           - "5.15"
           - "6.1"
           - "6.6"
+          - "6.6-konoha"
           - "6.12"
       ksunext:
         description: "KernelSU-Next"

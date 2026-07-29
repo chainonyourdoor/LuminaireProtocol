@@ -52,6 +52,7 @@ resolve_android_version() {
         "5.15") echo "android13" ;;
         "6.1")  echo "android14" ;;
         "6.6")  echo "android15" ;;
+        "6.6-konoha") echo "android15" ;;
         "6.12") echo "android16" ;;
         *) error "Unknown kernel version: ${KERNEL_VERSION}" ;;
     esac
