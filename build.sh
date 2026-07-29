@@ -83,7 +83,16 @@ run_branding() {
 }
 
 run_variant() {
-    [ "$KERNEL_VARIANT" = "VANILLA" ] && return 0
+    if [ "$KERNEL_VARIANT" = "VANILLA" ]; then
+        local ksu_kconfig_hook="${KERNEL_SRC}/drivers/kernelsu/Kconfig"
+        if grep -q '^source "drivers/kernelsu/Kconfig"' "${KERNEL_SRC}/drivers/Kconfig" 2>/dev/null \
+                && [ ! -f "$ksu_kconfig_hook" ]; then
+            warn "Kernel source pre-wires a drivers/kernelsu/Kconfig hook (drivers/Kconfig) with no root solution selected — stubbing an empty Kconfig so olddefconfig doesn't choke on the missing file."
+            mkdir -p "$(dirname "$ksu_kconfig_hook")"
+            printf '# Stub — no root solution selected for this VANILLA build.\n' > "$ksu_kconfig_hook"
+        fi
+        return 0
+    fi
 
     ksu_variant_supports_kernel_version "${KERNEL_VARIANT,,}" \
         || error "Root solution '${KERNEL_VARIANT}' is not available for kernel ${KERNEL_VERSION} — not listed in KSU_VARIANT_SUPPORTED_VERSIONS (kernel/ksu/registry.sh)."
