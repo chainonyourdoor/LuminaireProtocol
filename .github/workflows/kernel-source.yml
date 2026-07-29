@@ -36,6 +36,14 @@ on:
         description: "Adopt live ACK as a fresh base via a clean clone + force-push (normally only needed once, on the first run, or if history has diverged)"
         type: boolean
         default: false
+      source_repo_url:
+        description: "Override source repo for adopt (default: ACK). For one-off adopts of a non-ACK source (e.g. a device-specific fork), not for recurring sync."
+        type: string
+        default: ""
+      source_branch:
+        description: "Override source branch for adopt (default: {android_version}-{kernel_version}-lts, ACK convention). Only used with force_adopt."
+        type: string
+        default: ""
 
 jobs:
   upstream-sync:
@@ -110,10 +118,15 @@ jobs:
       - name: "Adopt live ACK (full clone, adaptive chunked push)"
         if: ${{ inputs.force_adopt == true }}
         run: |
-          ACK_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-lts"
+          SOURCE_URL="${{ inputs.source_repo_url }}"
+          [ -n "$SOURCE_URL" ] || SOURCE_URL="https://android.googlesource.com/kernel/common"
 
-          git clone --branch "${ACK_BRANCH}" --progress \
-            "https://android.googlesource.com/kernel/common" ack-fresh
+          SOURCE_BRANCH="${{ inputs.source_branch }}"
+          [ -n "$SOURCE_BRANCH" ] || SOURCE_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-lts"
+
+          echo "Adopting from ${SOURCE_URL} @ ${SOURCE_BRANCH}"
+          git clone --branch "${SOURCE_BRANCH}" --progress \
+            "${SOURCE_URL}" ack-fresh
           cd ack-fresh
           git config user.name "chainonyourdoor"
           git config user.email "chainonyourdoor@gmail.com"
