@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 declare -A KSU_VARIANT_SUPPORTED_VERSIONS=(
-    [resukisu]="5.10 5.15 6.1 6.6 6.12"
-    [sukisu]="5.10 5.15 6.1 6.6 6.12"
-    [ksunext]="5.10 5.15 6.1 6.6 6.12"
-    [kowsu]="5.10 5.15 6.1 6.6 6.12"
+    [resukisu]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
+    [sukisu]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
+    [ksunext]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
+    [kowsu]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
 )
 
 ksu_variant_supports_kernel_version() {
