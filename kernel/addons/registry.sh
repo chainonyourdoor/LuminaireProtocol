@@ -37,17 +37,21 @@ run_addons() {
     ADDONS="$(echo "$ADDONS" | sed 's/^,*//;s/,*$//;s/,,*/,/g')"
     [ -z "${ADDONS}" ] && return 0
     echo "::group::⚡ Addons"
-    IFS=',' read -ra ADDON_LIST <<< "$ADDONS"
 
     if [[ ",${ADDONS}," == *,nomount,* ]] && [[ ",${ADDONS}," == *,zeromount,* ]]; then
         error "Addon conflict: 'nomount' and 'zeromount' both redirect VFS paths and cannot be combined — pick one."
     fi
-    if [[ ",${ADDONS}," == *,zeromount,* ]] && addon_supports_kernel_version "zeromount" \
-            && [ "${SUSFS_ENABLED:-false}" != "true" ]; then
-        error "Addon conflict: 'zeromount' requires SuSFS (its readdir.c/namei.c/task_mmu.c hooks are SuSFS-baseline only, no non-SuSFS fallback) — enable SuSFS or pick a different mountless engine."
-    fi
 
     export APPLIED_ADDONS="" SKIPPED_ADDONS=""
+
+    if [[ ",${ADDONS}," == *,zeromount,* ]] && addon_supports_kernel_version "zeromount" \
+            && [ "${SUSFS_ENABLED:-false}" != "true" ]; then
+        warn "Addon 'zeromount' requires SuSFS (its readdir.c/namei.c/task_mmu.c hooks are SuSFS-baseline only, no non-SuSFS fallback) — skipping (SuSFS not enabled for this build)."
+        ADDONS="$(printf ',%s,' "$ADDONS" | sed 's/,zeromount,/,/g' | sed 's/^,//;s/,$//')"
+        SKIPPED_ADDONS="zeromount"
+    fi
+
+    IFS=',' read -ra ADDON_LIST <<< "$ADDONS"
     for addon in "${ADDON_LIST[@]}"; do
         addon="${addon// /}"
         [ -z "$addon" ] && continue
