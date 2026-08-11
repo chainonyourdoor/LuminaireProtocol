@@ -1,10 +1,10 @@
 {
   "resukisu": {
-    "good": "b0b73beb24341b7029a866005e9578ab58aa2df7",
+    "good": "",
     "bad": []
   },
   "susfs_resukisu": {
-    "good": "0e43d12a6cb5e6b2814c8214466784285d64ebec",
+    "good": "",
     "bad": []
   },
   "sukisu": {
@@ -24,11 +24,11 @@
     "bad": []
   },
   "ksunext_susfs_fork": {
-    "good": "d03021727ec68b9a6a486abb6629426f267c177e",
+    "good": "",
     "bad": []
   },
   "susfs_ksunext": {
-    "good": "ffda479cd65f6dfeee25f52b4db4835eeecb2cd0",
+    "good": "",
     "bad": []
   }
 }

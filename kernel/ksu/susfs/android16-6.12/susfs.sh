@@ -9,44 +9,56 @@ if [ "$KERNEL_VARIANT" = "SUKISU" ]; then
     [ -n "$SUSFS_REF" ] || warn "SuSFS+SukiSU: no pin resolved — build will likely fail (see wishlist for known-good combos)"
     SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
     SUSFS_BRANCH="gki-android16-6.12"
+    SUSFS_MIRROR_KEY="susfs_sukisu"
 elif [ "$KERNEL_VARIANT" = "KSUNEXT" ]; then
     SUSFS_REF="${SUSFS_KSUNEXT_REF:-}"
     SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
     SUSFS_BRANCH="gki-android16-6.12-dev"
+    SUSFS_MIRROR_KEY="susfs_ksunext"
 else
     SUSFS_REF="${SUSFS_RESUKISU_REF:-}"
     SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
     SUSFS_BRANCH="gki-android16-6.12"
+    SUSFS_MIRROR_KEY="susfs_resukisu"
 fi
 
 KSU_DIR="${KSU_DIR:-${KERNEL_SRC}/KernelSU}"
 SUSFS_DIR="/tmp/susfs4ksu"
 KSU_SHARED_DIR="${LUMINAIRE_PATCH_DIR}/kernel/ksu"
 
-log "Cloning SuSFS (${SUSFS_BRANCH})..."
-[ -d "$SUSFS_DIR" ] && rm -rf "$SUSFS_DIR"
-git config --global http.connectTimeout 30
-git config --global http.lowSpeedLimit 1000
-git config --global http.lowSpeedTime 30
-if [ -n "${SUSFS_REF:-}" ]; then
-    log "Pinning SuSFS to ${SUSFS_REF}"
-    mkdir -p "$SUSFS_DIR"
-    (
-        cd "$SUSFS_DIR"
-        git init -q
-        git remote add origin "$SUSFS_REPO"
-        run_quiet git fetch --depth=1 origin "$SUSFS_REF" && git checkout -q FETCH_HEAD
-    ) || {
-        warn "SuSFS: server doesn't support fetching bare SHA — falling back to full clone"
-        rm -rf "$SUSFS_DIR"
-        retry 3 run_quiet git clone -q -b "$SUSFS_BRANCH" "$SUSFS_REPO" "$SUSFS_DIR" \
-            || error "SuSFS: full clone fallback failed after 3 attempts!"
-        (cd "$SUSFS_DIR" && git checkout -q "$SUSFS_REF") \
-            || error "SuSFS: ${SUSFS_REF} not found on ${SUSFS_BRANCH} even after full clone!"
-    }
+source "${LUMINAIRE_PATCH_DIR}/kernel/ksu/checkpoint/mirrors.sh"
+CANDIDATE_VAR="CANDIDATE_${SUSFS_MIRROR_KEY^^}"
+SUSFS_MIRRORED="false"
+mirror_preseed "$SUSFS_MIRROR_KEY" "$SUSFS_DIR" "$SUSFS_REF" "${!CANDIDATE_VAR:-false}" "$(resolve_android_version)-${KERNEL_VERSION}" && SUSFS_MIRRORED="true"
+
+if [ "$SUSFS_MIRRORED" = "true" ]; then
+    log "SuSFS: using pre-seeded mirror copy, skipping upstream clone"
 else
-    retry 3 run_quiet git clone -q --depth=1 -b "$SUSFS_BRANCH" "$SUSFS_REPO" "$SUSFS_DIR" \
-        || error "SuSFS clone failed after 3 attempts!"
+    log "Cloning SuSFS (${SUSFS_BRANCH})..."
+    [ -d "$SUSFS_DIR" ] && rm -rf "$SUSFS_DIR"
+    git config --global http.connectTimeout 30
+    git config --global http.lowSpeedLimit 1000
+    git config --global http.lowSpeedTime 30
+    if [ -n "${SUSFS_REF:-}" ]; then
+        log "Pinning SuSFS to ${SUSFS_REF}"
+        mkdir -p "$SUSFS_DIR"
+        (
+            cd "$SUSFS_DIR"
+            git init -q
+            git remote add origin "$SUSFS_REPO"
+            run_quiet git fetch --depth=1 origin "$SUSFS_REF" && git checkout -q FETCH_HEAD
+        ) || {
+            warn "SuSFS: server doesn't support fetching bare SHA — falling back to full clone"
+            rm -rf "$SUSFS_DIR"
+            retry 3 run_quiet git clone -q -b "$SUSFS_BRANCH" "$SUSFS_REPO" "$SUSFS_DIR" \
+                || error "SuSFS: full clone fallback failed after 3 attempts!"
+            (cd "$SUSFS_DIR" && git checkout -q "$SUSFS_REF") \
+                || error "SuSFS: ${SUSFS_REF} not found on ${SUSFS_BRANCH} even after full clone!"
+        }
+    else
+        retry 3 run_quiet git clone -q --depth=1 -b "$SUSFS_BRANCH" "$SUSFS_REPO" "$SUSFS_DIR" \
+            || error "SuSFS clone failed after 3 attempts!"
+    fi
 fi
 
 log "Copying SuSFS source files..."

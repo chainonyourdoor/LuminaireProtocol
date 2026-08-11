@@ -19,30 +19,34 @@ MAKE_ARGS=(
 
 mkdir -p "$LTO_CACHE_DIR"
 
-# ld-wrapper: bounds link-time memory. See CODEX.md.
 LD_JOBS=$(( $(nproc --all) / 2 ))
 [ "$LD_JOBS" -ge 1 ] || LD_JOBS=1
 
-# NONE/FULL forced to 1 thread — no ThinLTO partitioning to lean on. See CODEX.md.
-LD_THREADS="$LD_JOBS"
-[ "${LTO_MODE}" = "THIN" ] || LD_THREADS=1
-
-LD_WRAPPER="${KERNEL_SRC}/ld-wrapper"
-{
-    echo '#!/usr/bin/env bash'
-    if [ "${LTO_MODE}" = "THIN" ]; then
-        echo "exec ld.lld \"\$@\" --thinlto-cache-dir=/dev/shm/ldcache --thinlto-jobs=${LD_JOBS} --threads=${LD_JOBS}"
-    else
-        echo "exec ld.lld \"\$@\" --threads=${LD_THREADS}"
-    fi
-} > "$LD_WRAPPER"
-chmod +x "$LD_WRAPPER"
-MAKE_ARGS+=(LD="$LD_WRAPPER" HOSTLD="$LD_WRAPPER")
-
+NEEDS_WRAPPER=0
 if [ "${LTO_MODE}" = "THIN" ]; then
-    log "ThinLTO ld-wrapper enabled (cache: /dev/shm/ldcache, jobs/threads: ${LD_JOBS}) ✅"
-else
-    log "ld-wrapper enabled for LTO_MODE=${LTO_MODE} (threads: ${LD_THREADS}, memory-bounded link) ✅"
+    NEEDS_WRAPPER=1
+elif [ "${LTO_MODE}" = "NONE" ] && [[ "${KERNEL_VERSION}" == 5.* ]]; then
+    NEEDS_WRAPPER=1
+fi
+
+if [ "$NEEDS_WRAPPER" = "1" ]; then
+    LD_WRAPPER="${KERNEL_SRC}/ld-wrapper"
+    {
+        echo '#!/usr/bin/env bash'
+        if [ "${LTO_MODE}" = "THIN" ]; then
+            echo "exec ld.lld \"\$@\" --thinlto-cache-dir=/dev/shm/ldcache --thinlto-jobs=${LD_JOBS} --threads=${LD_JOBS}"
+        else
+            echo "exec ld.lld \"\$@\" --threads=1"
+        fi
+    } > "$LD_WRAPPER"
+    chmod +x "$LD_WRAPPER"
+    MAKE_ARGS+=(LD="$LD_WRAPPER" HOSTLD="$LD_WRAPPER")
+
+    if [ "${LTO_MODE}" = "THIN" ]; then
+        log "ThinLTO ld-wrapper enabled (cache: /dev/shm/ldcache, jobs/threads: ${LD_JOBS}) ✅"
+    else
+        log "ld-wrapper enabled: kernel ${KERNEL_VERSION} + LTO_MODE=NONE (threads: 1, memory-bounded link) ✅"
+    fi
 fi
 
 touch "${KERNEL_SRC}/.scmversion"

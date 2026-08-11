@@ -7,6 +7,7 @@
 
 KSU_DIR="${KERNEL_SRC}/KernelSU-Next"
 PATCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${LUMINAIRE_PATCH_DIR}/kernel/ksu/checkpoint/mirrors.sh"
 
 log "Integrating KernelSU-Next..."
 cd "$KERNEL_SRC"
@@ -14,6 +15,7 @@ if [ "${SUSFS_ENABLED:-false}" = "true" ]; then
     log "SUSFS enabled — using pershoot/KernelSU-Next's dev-susfs fork"
     KSUNEXT_SETUP_URL="https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh"
     KSUNEXT_SETUP_REF="${KSUNEXT_SUSFS_FORK_REF:-dev-susfs}"
+    mirror_preseed "ksunext_susfs_fork" "$KSU_DIR" "${KSUNEXT_SUSFS_FORK_REF:-}" "${CANDIDATE_KSUNEXT_SUSFS_FORK:-false}" "$(resolve_android_version)-${KERNEL_VERSION}"
 else
     KSUNEXT_SETUP_URL="https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/dev/kernel/setup.sh"
     KSUNEXT_SETUP_REF="${KSUNEXT_REF:-}"
@@ -30,6 +32,7 @@ else
     echo "$KSUNEXT_SETUP" | bash || error "KernelSU-Next: setup.sh failed!"
 fi
 [ -d "$KSU_DIR" ] || error "KernelSU-Next: KernelSU-Next dir not found after setup!"
+verify_pinned_ref "KernelSU-Next" "$KSU_DIR" "$KSUNEXT_SETUP_REF"
 cd "$ROOT_DIR"
 log "KernelSU-Next integrated ✅"
 

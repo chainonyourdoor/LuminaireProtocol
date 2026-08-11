@@ -7,9 +7,11 @@
 
 KSU_DIR="${KERNEL_SRC}/KernelSU"
 PATCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${LUMINAIRE_PATCH_DIR}/kernel/ksu/checkpoint/mirrors.sh"
 
 log "Integrating ReSukiSU..."
 cd "$KERNEL_SRC"
+mirror_preseed "resukisu" "$KSU_DIR" "${RESUKISU_REF:-}" "${CANDIDATE_RESUKISU:-false}" "$(resolve_android_version)-${KERNEL_VERSION}"
 RESUKISU_SETUP=$(curl -LSs --fail --retry 3 --retry-all-errors --connect-timeout 30 \
     "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh") \
     || error "ReSukiSU: failed to download setup.sh!"
@@ -22,6 +24,7 @@ else
     echo "$RESUKISU_SETUP" | bash || error "ReSukiSU: setup.sh failed!"
 fi
 [ -d "${KERNEL_SRC}/KernelSU" ] || error "ReSukiSU: KernelSU dir not found after setup!"
+verify_pinned_ref "ReSukiSU" "$KSU_DIR" "${RESUKISU_REF:-}"
 cd "$ROOT_DIR"
 log "ReSukiSU integrated ✅"
 

@@ -126,17 +126,18 @@ def tuning_display_name(token):
     return " ".join(w.capitalize() for w in token.split("_"))
 
 
-def tuning_status_plain(env, token, skipped_tokens):
-    """Plain-text status for the Markdown code-block caption. Shows the
-    active patch version (e.g. 'v6.8.0-rc1') when the feature's .sh
-    script exported one via f"{TOKEN}_VERSION" (see BORE_VERSION in
-    kernel/tuning/bore/bore.sh) instead of a generic 'Active', since
-    for versioned features like BORE which version is running is the
-    actually useful information."""
-    if token in skipped_tokens:
-        return "N/A"
+def tuning_active_line(env, token):
+    """Display text for an ACTIVE tuning feature only — caller is
+    expected to have already skipped inactive/skipped tokens, since
+    both the zip caption and the Telegraph page only list features
+    that are actually on. Appends the patch version (e.g.
+    'v6.8.0-rc1') when the feature's .sh script exported one via
+    f"{TOKEN}_VERSION" (see BORE_VERSION in kernel/tuning/bore/bore.sh)
+    — for versioned features like BORE, which version is running is
+    the actually useful information."""
+    name = tuning_display_name(token)
     version = env.get(f"{token.upper()}_VERSION", "").strip()
-    return version if version else "Active"
+    return f"{name} {version}" if version else name
 
 
 FRAGMENT_FEATURES = {
@@ -255,16 +256,13 @@ def build_blocks(env):
         else:
             status = "Disable"
         addon_status_lines.append(f"{name.ljust(addon_name_width)}: {mdv2_code_escape(status)}")
-    tuning_tokens = [t for t in env.get("APPLIED_TUNING", "").split(",") if t]
     tuning_skipped_tokens = [t for t in env.get("SKIPPED_TUNING", "").split(",") if t]
     tuning_order_list = tuning_order(env)
-    # Separate width from the addons block's — see CODEX.md.
-    tuning_name_width = max((len(tuning_display_name(t)) for t in tuning_order_list), default=16) + 1
-    tuning_status_lines = []
-    for token in tuning_order_list:
-        name = tuning_display_name(token)
-        status = tuning_status_plain(env, token, tuning_skipped_tokens)
-        tuning_status_lines.append(f"{name.ljust(tuning_name_width)}: {mdv2_code_escape(status)}")
+    tuning_active_lines = [
+        mdv2_code_escape(tuning_active_line(env, token))
+        for token in tuning_order_list
+        if token not in tuning_skipped_tokens
+    ]
     commit_short    = env.get("GITHUB_SHA", "")[:7]
     commit_url      = "{}/{}/commit/{}".format(
                         env.get("GITHUB_SERVER_URL", ""),
@@ -303,11 +301,11 @@ def build_blocks(env):
         + "\n".join(addon_status_lines) +
         "```"
     )
-    has_active_tuning = any(t not in tuning_skipped_tokens for t in tuning_order_list)
+    has_active_tuning = bool(tuning_active_lines)
     if has_active_tuning:
         block_tuning = (
             "```Tuning\n"
-            + "\n".join(tuning_status_lines) +
+            + "\n".join(tuning_active_lines) +
             "```"
         )
     else:
@@ -324,7 +322,6 @@ def build_blocks(env):
 def build_telegraph_content(env):
     addon_tokens = [t for t in env.get("ADDONS", "").split(",") if t]
     skipped_tokens = [t for t in env.get("SKIPPED_ADDONS", "").split(",") if t]
-    tuning_tokens = [t for t in env.get("APPLIED_TUNING", "").split(",") if t]
     tuning_skipped_tokens = [t for t in env.get("SKIPPED_TUNING", "").split(",") if t]
     kernel_ver  = env.get("KERNEL_VERSION", "")
     linux_ver   = env.get("LINUX_VER", "N/A")
@@ -378,34 +375,29 @@ def build_telegraph_content(env):
             else:
                 li_nodes.append({"tag": "li", "children": [item]})
         content.append({"tag": "ul", "children": li_nodes})
+    def bullet_list(items):
+        items = items or ["None active this build"]
+        return {"tag": "ul", "children": [{"tag": "li", "children": [item]} for item in items]}
+    tuning_items = [
+        tuning_active_line(env, token)
+        for token in tuning_order(env)
+        if token not in tuning_skipped_tokens
+    ]
+    content.append({"tag": "h3", "children": ["Luminaire Tuning"]})
+    content.append(bullet_list(tuning_items))
     def addon_status_icon(token):
         if token in skipped_tokens:
             return "\u2796"
         return "\u2705" if token in addon_tokens else "\u274c"
-    def tuning_status_display(token):
-        """Same version-aware status as tuning_status_plain, but
-        prefixed with the check/dash icon to match this table's style
-        (see make_status_table below, shared with the addons table)."""
-        if token in tuning_skipped_tokens:
-            return "\u2796 N/A"
-        version = env.get(f"{token.upper()}_VERSION", "").strip()
-        return f"\u2705 {version}" if version else "\u2705"
     def make_status_table(rows):
         name_width = max(len(name) for name, _ in rows) + 2
-        lines = [f"{'Feature'.ljust(name_width)}Status"]
-        lines += [f"{name.ljust(name_width)}{status}" for name, status in rows]
+        lines = [f"{name.ljust(name_width)}{status}" for name, status in rows]
         children = []
         for i, line in enumerate(lines):
             if i > 0:
                 children.append({"tag": "br"})
             children.append(line)
         return {"tag": "pre", "children": [{"tag": "code", "children": children}]}
-    tuning_rows = [
-        (tuning_display_name(token), tuning_status_display(token))
-        for token in tuning_order(env)
-    ]
-    content.append({"tag": "h3", "children": ["Luminaire Tuning"]})
-    content.append(make_status_table(tuning_rows))
     addon_rows = [
         (addon_display_name(token), addon_status_icon(token))
         for token in toggle_addon_order(env)
@@ -414,7 +406,7 @@ def build_telegraph_content(env):
     # (resolve_mountless_engine section).
     addon_rows.append(("Mountless Engine", resolve_mountless_engine(env)))
     content.append({"tag": "h3", "children": ["Add-ons"]})
-    content.append({"tag": "p", "children": ["Opt-in, not default — these exist to give more options, not to define the standard config, so you can choose what you prefer."]})
+    content.append({"tag": "p", "children": ["Opt-in — these exist to give more options, not to define the standard config, so you can choose what you prefer."]})
     content.append(make_status_table(addon_rows))
     return content
 

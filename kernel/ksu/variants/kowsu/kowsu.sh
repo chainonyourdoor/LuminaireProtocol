@@ -26,6 +26,7 @@ else
     echo "$KOWSU_SETUP" | bash || error "KowSU: setup.sh failed!"
 fi
 [ -d "$KSU_DIR" ] || error "KowSU: KernelSU dir not found after setup!"
+verify_pinned_ref "KowSU" "$KSU_DIR" "${KOWSU_REF:-}"
 cd "$ROOT_DIR"
 log "KowSU integrated ✅"
 

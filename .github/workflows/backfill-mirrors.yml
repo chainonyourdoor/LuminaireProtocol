@@ -1,0 +1,19 @@
+name: "🪞 Backfill Checkpoint Mirrors"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    env:
+      PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: "Backfill Mirrors"
+        run: bash kernel/ksu/checkpoint/backfill_mirrors.sh

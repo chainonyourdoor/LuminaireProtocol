@@ -22,24 +22,38 @@ elif patch -p1 --fuzz=3 --dry-run --forward -d "$KERNEL_SRC" < "$KABI_PATCH" > /
 else
     warn "Droidspaces: KaBI patch does not apply cleanly — skipping, KaBI violations possible"
 fi
-if ! grep -q "^CONFIG_SYSVIPC=y" "${KERNEL_SRC}/arch/arm64/configs/gki_defconfig"; then
-    cat >> "${KERNEL_SRC}/arch/arm64/configs/gki_defconfig" << 'CONFIGS'
-# Droidspaces — Mandatory
-CONFIG_SYSVIPC=y
-CONFIG_PID_NS=y
-CONFIG_IPC_NS=y
-CONFIG_UTS_NS=y
-CONFIG_DEVTMPFS=y
-CONFIG_CGROUP_DEVICE=y
-
-# Droidspaces — Networking (NAT mode)
-CONFIG_NET_NS=y
-CONFIG_NETFILTER_XT_TARGET_LOG=y
-CONFIG_NETFILTER_XT_MATCH_RECENT=y
-
-# Droidspaces — Binfmt
-CONFIG_BINFMT_ELF=y
-CONFIG_BINFMT_SCRIPT=y
-CONFIGS
+# Per-config idempotent check — some kernel sources (e.g. 6.1 after the
+# upstream catch-up merge) may already carry a subset of these in
+# gki_defconfig directly. A single-flag guard (checking only one config)
+# would either skip the whole block once that one config is already present
+# — silently leaving the rest missing — or duplicate entries that are
+# already there. Checking each config individually avoids both.
+GKI_DEFCONFIG="${KERNEL_SRC}/arch/arm64/configs/gki_defconfig"
+DROIDSPACES_CONFIGS=(
+    CONFIG_SYSVIPC
+    CONFIG_PID_NS
+    CONFIG_IPC_NS
+    CONFIG_UTS_NS
+    CONFIG_DEVTMPFS
+    CONFIG_CGROUP_DEVICE
+    CONFIG_NET_NS
+    CONFIG_NETFILTER_XT_TARGET_LOG
+    CONFIG_NETFILTER_XT_MATCH_RECENT
+    CONFIG_BINFMT_ELF
+    CONFIG_BINFMT_SCRIPT
+)
+MISSING_CONFIGS=()
+for cfg in "${DROIDSPACES_CONFIGS[@]}"; do
+    grep -q "^${cfg}=y" "$GKI_DEFCONFIG" || MISSING_CONFIGS+=("${cfg}=y")
+done
+if [ "${#MISSING_CONFIGS[@]}" -gt 0 ]; then
+    {
+        echo ""
+        echo "# Droidspaces — added by addon (missing from base defconfig)"
+        printf '%s\n' "${MISSING_CONFIGS[@]}"
+    } >> "$GKI_DEFCONFIG"
+    log "Droidspaces: added ${#MISSING_CONFIGS[@]} missing config(s): ${MISSING_CONFIGS[*]}"
+else
+    log "Droidspaces: all required configs already present"
 fi
 log "Droidspaces configs enabled ✅"

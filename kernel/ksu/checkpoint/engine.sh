@@ -3,6 +3,7 @@ set -eo pipefail
 
 LUMINAIRE_PATCH_DIR="${LUMINAIRE_PATCH_DIR:-$GITHUB_WORKSPACE}"
 source "${LUMINAIRE_PATCH_DIR}/functions.sh"
+source "${LUMINAIRE_PATCH_DIR}/kernel/ksu/checkpoint/mirrors.sh"
 cd "$LUMINAIRE_PATCH_DIR"
 
 BUILD_OUTCOME="$1"
@@ -101,6 +102,7 @@ for key in "${COMPONENTS[@]}"; do
     if [ "$BUILD_OUTCOME" = "success" ]; then
         log "checkpoint: promoting ${key} pin to ${ref:0:12} (kernel ${KERNEL_VERSION})"
         apply_and_push ".${key}.good = \"${ref}\" | .${key}.bad = ((.${key}.bad // []) - [\"${ref}\"])" "chore: bump ${key} pin to ${ref:0:12} for kernel ${KERNEL_VERSION} (verified via run ${GITHUB_RUN_ID})"
+        mirror_promote "$key" "$ref" "$(resolve_android_version)-${KERNEL_VERSION}"
         close_issue_if_open "$key"
         continue
     fi

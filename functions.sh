@@ -127,6 +127,16 @@ cache_freshness_note() {
     fi
 }
 
+verify_pinned_ref() {
+    local label="$1" dir="$2" expected="$3" actual
+    [[ "$expected" =~ ^[0-9a-f]{7,40}$ ]] || return 0
+    actual="$(git -C "$dir" rev-parse HEAD 2>/dev/null || echo "")"
+    if [ -z "$actual" ] || [[ "$actual" != "$expected"* ]]; then
+        error "${label}: pinned ref ${expected} did not check out (HEAD is ${actual:-unknown}) — pin is likely stale/unreachable upstream, needs re-pin in the manifest"
+    fi
+    log "${label}: pin verified at ${actual:0:12} ✅"
+}
+
 mode_emoji() {
     case "$1" in
         "Dry Run")  echo "🧪" ;;

@@ -7,9 +7,13 @@
 
 KSU_DIR="${KERNEL_SRC}/KernelSU"
 PATCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${LUMINAIRE_PATCH_DIR}/kernel/ksu/checkpoint/mirrors.sh"
 
 log "Integrating SukiSU-Ultra..."
 cd "$KERNEL_SRC"
+if [ "${SUSFS_ENABLED:-false}" = "true" ]; then
+    mirror_preseed "sukisu_builtin" "$KSU_DIR" "${SUKISU_BUILTIN_REF:-}" "${CANDIDATE_SUKISU_BUILTIN:-false}" "$(resolve_android_version)-${KERNEL_VERSION}"
+fi
 SUKISU_SETUP=$(curl -LSs --fail --retry 3 --retry-all-errors --connect-timeout 30 \
     "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh") \
     || error "SukiSU-Ultra: failed to download setup.sh!"
@@ -25,6 +29,7 @@ else
     echo "$SUKISU_SETUP" | bash || error "SukiSU-Ultra: setup.sh failed!"
 fi
 [ -d "${KERNEL_SRC}/KernelSU" ] || error "SukiSU-Ultra: KernelSU dir not found after setup!"
+verify_pinned_ref "SukiSU-Ultra" "$KSU_DIR" "${SUKISU_REF:-}"
 cd "$ROOT_DIR"
 log "SukiSU-Ultra integrated ✅"
 

@@ -297,14 +297,6 @@ jobs:
         id: build
         run: bash build.sh
 
-      - name: "Upload Kernel Build Artifact"
-        if: always() && steps.build.outcome == 'success' && env.ZIP_PATH != ''
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.ZIP_NAME }}
-          path: ${{ env.ZIP_PATH }}
-          if-no-files-found: warn
-
       - name: "Ccache Stats"
         if: always() && env.IS_MAKE == 'true'
         run: ~/ccache-bin/ccache --show-stats
