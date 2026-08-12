@@ -12,7 +12,7 @@ retry 3 run_quiet curl -fL \
     -o antman || error "Neutron: antman download failed!"
 chmod +x antman
 
-./antman -S || error "Neutron: antman sync failed!"
+retry 3 ./antman -S || error "Neutron: antman sync failed!"
 ./antman --patch=glibc || warn "Neutron: glibc patch failed — continuing"
 
 if ! ./bin/clang --version > /dev/null 2>&1; then
