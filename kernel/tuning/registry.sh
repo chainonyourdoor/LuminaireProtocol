@@ -3,12 +3,14 @@
 declare -A TUNING_SUPPORTED_VERSIONS=(
     [bore]="6.1"
     [adios]="6.1"
+    [le9uo]="6.1"
+    [kcompressd]="6.1"
     [workqueue_catchup]="6.1"
     [schedutil_catchup]="6.1"
     [ufs_writebooster_catchup]="6.1"
 )
 
-TUNING_FEATURE_ORDER=(bore adios workqueue_catchup schedutil_catchup ufs_writebooster_catchup)
+TUNING_FEATURE_ORDER=(bore adios le9uo kcompressd workqueue_catchup schedutil_catchup ufs_writebooster_catchup)
 
 run_tuning() {
     echo "::group::✨ Tuning Features"

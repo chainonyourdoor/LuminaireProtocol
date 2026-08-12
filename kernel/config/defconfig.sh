@@ -12,6 +12,7 @@ log "Fragment merged ✅"
 
 if [ "${LTO_MODE}" = "THIN" ]; then
     config --disable CONFIG_LTO_NONE
+    config --disable CONFIG_LTO_CLANG_FULL
     config --enable  CONFIG_LTO_CLANG_THIN
     log "LTO: THIN ✅"
 elif [ "${LTO_MODE}" = "FULL" ]; then
@@ -22,8 +23,9 @@ elif [ "${LTO_MODE}" = "FULL" ]; then
 else
     [ "${LTO_MODE}" = "NONE" ] \
         || warn "Unknown LTO_MODE value '${LTO_MODE}', defaulting to NONE"
-    config --enable  CONFIG_LTO_NONE
+    config --disable CONFIG_LTO_CLANG_FULL
     config --disable CONFIG_LTO_CLANG_THIN
+    config --enable  CONFIG_LTO_NONE
     log "LTO: NONE ✅"
 fi
 

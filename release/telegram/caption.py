@@ -99,6 +99,8 @@ def resolve_mountless_engine(env):
 TUNING_DISPLAY_NAMES = {
     "bore":                     "BORE",
     "adios":                    "ADIOS",
+    "le9uo":                    "le9uo",
+    "kcompressd":               "Kcompressd",
     "workqueue_catchup":        "Workqueue Catch-up",
     "schedutil_catchup":        "Schedutil Catch-up",
     "ufs_writebooster_catchup": "UFS WriteBooster Catch-up",

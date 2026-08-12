@@ -82,7 +82,7 @@ new file mode 100644
 index 000000000..6e54b5c3b
 --- /dev/null
 +++ b/block/adios.c
-@@ -0,0 +1,2076 @@
+@@ -0,0 +1,2093 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Adaptive Deadline I/O Scheduler (ADIOS)
@@ -2157,7 +2157,24 @@ index 000000000..6e54b5c3b
 +	elv_unregister(&mq_adios);
 +}
 +
-+module_init(adios_init);
++/*
++ * subsys_initcall, not module_init (== device_initcall): the UFS-MTK
++ * platform driver that actually creates these block devices registers
++ * at device_initcall too (module_platform_driver() in ufs-mediatek.c),
++ * so it's a link-order coin flip which one wins the race to run first —
++ * and elevator_init_mq() only ever calls elevator_get_default() once,
++ * at queue creation, before the disk is even added. Lose that race and
++ * elevator_get(q, "adios", false) below finds nothing registered yet,
++ * elevator_init_mq() just returns with no scheduler set, and nothing
++ * ever retries — that queue is stuck without a default forever. Same
++ * reasoning as why CONFIG_MQ_IOSCHED_DEFAULT_ADIOS alone doesn't
++ * reliably win: it only changes *which* elevator_get_default() asks
++ * for, not *when* elevator_init_mq() runs relative to UFS-MTK probe.
++ * subsys_initcall strictly precedes every device_initcall system-wide
++ * (no exceptions, no probe-deferral timing games), so this closes the
++ * race outright instead of leaving it to link order.
++ */
++subsys_initcall(adios_init);
 +module_exit(adios_exit);
 +
 +MODULE_AUTHOR(ADIOS_AUTHOR);
@@ -2184,3 +2201,76 @@ index a7644462d..64211ff49 100644
  }
  
  /*
+diff --git a/block/genhd.c b/block/genhd.c
+index c9dc2f2c..a17b7705 100644
+--- a/block/genhd.c
++++ b/block/genhd.c
+@@ -1525,3 +1525,67 @@ void inc_diskseq(struct gendisk *disk)
+ {
+ 	disk->diskseq = atomic64_inc_return(&diskseq);
+ }
++
++/*
++ * SAGA: ADIOS default-scheduler enforcer
++ *
++ * CONFIG_MQ_IOSCHED_DEFAULT_ADIOS only changes what elevator_get_default()
++ * asks for — it doesn't guarantee *when* elevator_init_mq() runs for a
++ * given block device relative to whichever driver actually registers
++ * "adios" with elv_register() (adios_init(), moved to subsys_initcall()
++ * specifically to close most of that race — see adios.c). Confirmed on
++ * real hardware that this alone isn't enough: some devices' vendor init
++ * still writes a different scheduler back after boot, the same class of
++ * problem as BBRv3's tcp_congestion_control override (see
++ * net/ipv4/tcp_cong.c) — re-asserts "adios" on every disk queue a handful
++ * of times during early-to-mid boot so it wins that race too, then stops
++ * for good.
++ */
++#ifdef CONFIG_MQ_IOSCHED_DEFAULT_ADIOS
++#include <linux/workqueue.h>
++
++#define SAGA_ADIOS_ENFORCE_TRIES 5
++
++static struct delayed_work saga_adios_enforce_work;
++static int saga_adios_enforce_count;
++
++static void saga_adios_enforce_fn(struct work_struct *work)
++{
++	struct class_dev_iter iter;
++	struct device *dev;
++
++	class_dev_iter_init(&iter, &block_class, NULL, &disk_type);
++	while ((dev = class_dev_iter_next(&iter))) {
++		struct gendisk *disk = dev_to_disk(dev);
++		struct request_queue *q = disk->queue;
++
++		/* elv_iosched_store() itself already no-ops safely on a
++		 * queue that doesn't support scheduling (elv_support_iosched()
++		 * check inside it) — only need to skip not-yet-populated
++		 * disks here. */
++		if (!q || get_capacity(disk) == 0)
++			continue;
++
++		mutex_lock(&q->sysfs_lock);
++		elv_iosched_store(q, "adios", 5);
++		mutex_unlock(&q->sysfs_lock);
++	}
++	class_dev_iter_exit(&iter);
++
++	if (++saga_adios_enforce_count < SAGA_ADIOS_ENFORCE_TRIES)
++		schedule_delayed_work(&saga_adios_enforce_work, 20 * HZ);
++}
++
++static int __init saga_adios_enforce_init(void)
++{
++	INIT_DELAYED_WORK(&saga_adios_enforce_work, saga_adios_enforce_fn);
++	/* Same 20s-first-shot reasoning as BBRv3's enforcer: late enough to
++	 * land after typical vendor "on boot"/"on property:sys.boot_completed=1"
++	 * triggers. Repeats every 20s up to SAGA_ADIOS_ENFORCE_TRIES, then
++	 * stops for good — so it never fights a choice made later by the
++	 * user (e.g. manually switching scheduler via a kernel manager app). */
++	schedule_delayed_work(&saga_adios_enforce_work, 20 * HZ);
++	return 0;
++}
++late_initcall(saga_adios_enforce_init);
++#endif /* CONFIG_MQ_IOSCHED_DEFAULT_ADIOS */
+

@@ -1,0 +1,205 @@
+--- a/block/adios.c	2026-08-11 01:54:07.045164366 +0000
++++ b/block/adios.c	2026-08-11 01:54:07.053910279 +0000
+@@ -26,7 +26,7 @@
+ #include "blk-mq.h"
+ #include "blk-mq-sched.h"
+ 
+-#define ADIOS_VERSION "3.2.0"
++#define ADIOS_VERSION "3.2.0-tunable-lm.2"
+ 
+ /* Request Types:
+  *
+@@ -135,10 +135,13 @@
+ };
+ 
+ // Thresholds for latency model control
+-#define LM_BLOCK_SIZE_THRESHOLD 4096
++// NOTE: block size / outlier / interval thresholds were hardcoded #defines
++// upstream (ADIOS 3.2.0). They are now per-model runtime fields, tunable
++// via sysfs, defaulting to the original upstream values below.
++#define LM_BLOCK_SIZE_THRESHOLD_DEFAULT 4096
+ #define LM_SAMPLES_THRESHOLD    1024
+-#define LM_INTERVAL_THRESHOLD   1500
+-#define LM_OUTLIER_PERCENTILE     99
++#define LM_INTERVAL_THRESHOLD_DEFAULT   1500
++#define LM_OUTLIER_PERCENTILE_DEFAULT     99
+ #define LM_LAT_BUCKET_COUNT       64
+ 
+ #define ADIOS_PQ_LEVELS 2
+@@ -212,6 +215,11 @@
+ 	u32 lm_shrink_at_kreqs;
+ 	u32 lm_shrink_at_gbytes;
+ 	u8  lm_shrink_resist;
++
++	// Formerly hardcoded #defines, now tunable at runtime (see sysfs below)
++	u32 lm_block_size_threshold;   // bytes; small vs large bucket boundary
++	u8  lm_outlier_percentile;     // 1-100; percentile used to cut outliers
++	u32 lm_interval_threshold_ms;  // ms; min interval between forced updates
+ };
+ 
+ struct adios_pcpu_completion {
+@@ -333,7 +341,7 @@
+ 	u64 sum_weight = 0;
+ 	u64 cumulative_weight = 0, threshold_weight = 0;
+ 	u8  outlier_threshold_bucket = 0;
+-	u8  outlier_percentile = LM_OUTLIER_PERCENTILE;
++	u8  outlier_percentile = model->lm_outlier_percentile;
+ 	u8  reduction;
+ 
+ 	if (count_all)
+@@ -406,7 +414,7 @@
+ 	u64 cumulative_weight = 0, threshold_weight = 0;
+ 	u64 sum_weight = 0;
+ 	u8  outlier_threshold_bucket = 0;
+-	u8  outlier_percentile = LM_OUTLIER_PERCENTILE;
++	u8  outlier_percentile = model->lm_outlier_percentile;
+ 	u8  reduction;
+ 
+ 	if (count_all)
+@@ -549,7 +557,7 @@
+ 	now = jiffies;
+ 	time_elapsed = unlikely(!new_params->base) ||
+ 		new_params->last_update_jiffies +
+-		msecs_to_jiffies(LM_INTERVAL_THRESHOLD) <= now;
++		msecs_to_jiffies(model->lm_interval_threshold_ms) <= now;
+ 
+ 	// Update small buckets
+ 	if (small_weight && (time_elapsed ||
+@@ -621,7 +629,7 @@
+ 	current_base = params->base;
+ 	rcu_read_unlock();
+ 
+-	if (block_size <= LM_BLOCK_SIZE_THRESHOLD) {
++	if (block_size <= model->lm_block_size_threshold) {
+ 		// Handle small requests
+ 		bucket_index = lm_input_bucket_index(latency, current_base ?: 1);
+ 
+@@ -663,9 +671,9 @@
+ 	params = rcu_dereference(model->params);
+ 
+ 	result = params->base;
+-	if (block_size > LM_BLOCK_SIZE_THRESHOLD)
++	if (block_size > model->lm_block_size_threshold)
+ 		result += params->slope *
+-			DIV_ROUND_UP_ULL(block_size - LM_BLOCK_SIZE_THRESHOLD, 1024);
++			DIV_ROUND_UP_ULL(block_size - model->lm_block_size_threshold, 1024);
+ 
+ 	rcu_read_unlock();
+ 
+@@ -1594,6 +1602,10 @@
+ 		model->lm_shrink_at_kreqs  = default_lm_shrink_at_kreqs;
+ 		model->lm_shrink_at_gbytes = default_lm_shrink_at_gbytes;
+ 		model->lm_shrink_resist    = default_lm_shrink_resist;
++
++		model->lm_block_size_threshold  = LM_BLOCK_SIZE_THRESHOLD_DEFAULT;
++		model->lm_outlier_percentile    = LM_OUTLIER_PERCENTILE_DEFAULT;
++		model->lm_interval_threshold_ms = LM_INTERVAL_THRESHOLD_DEFAULT;
+ 	}
+ 
+ 	for (optype = 0; optype < ADIOS_OPTYPES; optype++) {
+@@ -1987,6 +1999,92 @@
+ SHRINK_THRESHOLD_ATTR_RW(at_gbytes, lm_shrink_at_gbytes, 1,   1000)
+ SHRINK_THRESHOLD_ATTR_RW(resist,    lm_shrink_resist,    1,      3)
+ 
++/* Formerly hardcoded #defines, now runtime-tunable per-model fields.
++ * Reuses the same macro pattern as SHRINK_THRESHOLD_ATTR_RW: one sysfs
++ * knob applies uniformly to all optype models (read/write/discard/other). */
++#define LM_CONST_ATTR_RW(name, model_field, min_value, max_value) \
++static ssize_t adios_##name##_store( \
++		struct elevator_queue *e, const char *page, size_t count) { \
++	struct adios_data *ad = e->elevator_data; \
++	unsigned long val; \
++	int ret; \
++	ret = kstrtoul(page, 10, &val); \
++	if (ret || val < (min_value) || val > (max_value)) \
++		return -EINVAL; \
++	for (u8 i = 0; i < ADIOS_OPTYPES; i++) { \
++		struct latency_model *model = &ad->latency_model[i]; \
++		unsigned long flags; \
++		spin_lock_irqsave(&model->update_lock, flags); \
++		model->model_field = val; \
++		spin_unlock_irqrestore(&model->update_lock, flags); \
++	} \
++	return count; \
++} \
++static ssize_t adios_##name##_show( \
++		struct elevator_queue *e, char *page) { \
++	struct adios_data *ad = e->elevator_data; \
++	u32 val = 0; \
++	unsigned long flags; \
++	struct latency_model *model = &ad->latency_model[0]; \
++	spin_lock_irqsave(&model->update_lock, flags); \
++	val = model->model_field; \
++	spin_unlock_irqrestore(&model->update_lock, flags); \
++	return sprintf(page, "%u\n", val); \
++}
++
++LM_CONST_ATTR_RW(lm_block_size_threshold,  lm_block_size_threshold,   512, 1048576)
++LM_CONST_ATTR_RW(lm_outlier_percentile,    lm_outlier_percentile,       1,     100)
++LM_CONST_ATTR_RW(lm_interval_threshold_ms, lm_interval_threshold_ms,    50,   60000)
++
++/* Model seed/persist: read current base+slope (ns) for READ/WRITE models,
++ * and let userspace write them back at boot to skip the cold-start period
++ * (model normally begins at base=0/slope=0 on every module load/mount and
++ * needs real samples to become accurate again). Format for store: "base slope"
++ * Format for show: "base slope" (nanoseconds). A companion userspace script
++ * (not included here) can snapshot these on shutdown and restore on boot. */
++#define LM_SEED_ATTR_RW(name, optype_idx) \
++static ssize_t adios_##name##_store( \
++		struct elevator_queue *e, const char *page, size_t count) { \
++	struct adios_data *ad = e->elevator_data; \
++	struct latency_model *model = &ad->latency_model[optype_idx]; \
++	struct latency_model_params *old_params, *new_params; \
++	unsigned long flags; \
++	u64 base, slope; \
++	if (sscanf(page, "%llu %llu", &base, &slope) != 2) \
++		return -EINVAL; \
++	spin_lock_irqsave(&model->update_lock, flags); \
++	old_params = rcu_dereference_protected(model->params, \
++				lockdep_is_held(&model->update_lock)); \
++	new_params = kmemdup(old_params, sizeof(*new_params), GFP_ATOMIC); \
++	if (!new_params) { \
++		spin_unlock_irqrestore(&model->update_lock, flags); \
++		return -ENOMEM; \
++	} \
++	new_params->base  = base; \
++	new_params->slope = slope; \
++	new_params->last_update_jiffies = jiffies; \
++	rcu_assign_pointer(model->params, new_params); \
++	spin_unlock_irqrestore(&model->update_lock, flags); \
++	kfree_rcu(old_params, rcu); \
++	return count; \
++} \
++static ssize_t adios_##name##_show( \
++		struct elevator_queue *e, char *page) { \
++	struct adios_data *ad = e->elevator_data; \
++	struct latency_model *model = &ad->latency_model[optype_idx]; \
++	struct latency_model_params *params; \
++	u64 base, slope; \
++	rcu_read_lock(); \
++	params = rcu_dereference(model->params); \
++	base = params->base; \
++	slope = params->slope; \
++	rcu_read_unlock(); \
++	return sprintf(page, "%llu %llu\n", base, slope); \
++}
++
++LM_SEED_ATTR_RW(lm_seed_read,  ADIOS_READ)
++LM_SEED_ATTR_RW(lm_seed_write, ADIOS_WRITE)
++
+ // Define sysfs attributes
+ #define AD_ATTR(name, show_func, store_func) \
+ 	__ATTR(name, 0644, show_func, store_func)
+@@ -2022,6 +2120,12 @@
+ 	AD_ATTR_RW(shrink_at_gbytes),
+ 	AD_ATTR_RW(shrink_resist),
+ 
++	AD_ATTR_RW(lm_block_size_threshold),
++	AD_ATTR_RW(lm_outlier_percentile),
++	AD_ATTR_RW(lm_interval_threshold_ms),
++	AD_ATTR_RW(lm_seed_read),
++	AD_ATTR_RW(lm_seed_write),
++
+ 	AD_ATTR_RW(read_priority),
+ 
+ 	AD_ATTR_WO(reset_bq_stats),

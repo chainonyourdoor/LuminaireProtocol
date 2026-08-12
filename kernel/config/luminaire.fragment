@@ -31,13 +31,6 @@ CONFIG_TCP_CONG_BIC=y
 CONFIG_TCP_CONG_CUBIC=y
 CONFIG_TCP_CONG_WESTWOOD=y
 CONFIG_TCP_CONG_HTCP=y
-# NOTE: CONFIG_DEFAULT_TCP_CONG is intentionally NOT set here.
-# It has no Kconfig prompt (pure "default X if DEFAULT_Y" string), so any
-# literal value written in a defconfig/fragment is discarded and recomputed
-# from the DEFAULT_BBR/DEFAULT_CUBIC/DEFAULT_BBR3/etc. choice state during
-# `make olddefconfig`. To change the actual default congestion control,
-# set the corresponding CONFIG_DEFAULT_<ALGO>=y choice member instead
-# (see kernel/addons/bbrv3/bbrv3.sh for the working pattern).
 CONFIG_NET_SCH_FQ=y
 CONFIG_NET_SCH_FQ_CODEL=y
 CONFIG_NET_SCH_CAKE=y
@@ -80,10 +73,5 @@ CONFIG_UBSAN=n
 CONFIG_PAGE_OWNER=n
 CONFIG_RCU_TRACE=n
 
-# Disable BTF generation: apt's pahole (dwarves) on the CI runner emits
-# BTF_KIND_ENUM64 records that this kernel tree's resolve_btfids can't parse
-# ("FAILED: load BTF from vmlinux: Invalid argument") since scripts/pahole-flags.sh
-# (which would auto-skip enum64 encoding for incompatible pahole versions) isn't
-# present in this tree. No addon here needs BTF, so skip the step entirely rather
-# than depend on pinning a specific pahole version.
+# Disable BTF generation
 CONFIG_DEBUG_INFO_BTF=n

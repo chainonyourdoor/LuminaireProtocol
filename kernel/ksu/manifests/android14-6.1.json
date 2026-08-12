@@ -1,6 +1,6 @@
 {
   "resukisu": {
-    "good": "beaaea0eb895dc41e7b9bf5e3f39e57aa9635bab",
+    "good": "ca62a37fc328e6cb836ea6d77b7eab0c073104a6",
     "bad": []
   },
   "susfs_resukisu": {
@@ -24,7 +24,7 @@
     "bad": []
   },
   "ksunext_susfs_fork": {
-    "good": "daf1347b3ca1b8bd78d37a9024e6e7de6863534c",
+    "good": "1ce76ef55805697fcfa56aa18fb8dacd06b0dafb",
     "bad": []
   },
   "susfs_ksunext": {
