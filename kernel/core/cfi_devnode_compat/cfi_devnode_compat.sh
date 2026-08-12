@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 
-CORE_C="${KERNEL_SRC}/drivers/base/core.c"
+BASE_MK="${KERNEL_SRC}/drivers/base/Makefile"
 PATCHER="${LUMINAIRE_PATCH_DIR}/kernel/core/cfi_devnode_compat/patch.py"
 
-[ -f "$CORE_C" ] || { warn "drivers/base/core.c not found, skipping cfi_devnode_compat"; return 0; }
+[ -f "$BASE_MK" ] || { warn "drivers/base/Makefile not found, skipping cfi_devnode_compat"; return 0; }
 
-python3 "$PATCHER" "$CORE_C" \
+grep -q "CFLAGS_trace.o" "$BASE_MK" \
+    || { warn "CFLAGS_trace.o anchor not found — drivers/base/Makefile shape changed, skipping cfi_devnode_compat"; return 0; }
+
+python3 "$PATCHER" "$BASE_MK" \
     || error "cfi_devnode_compat: patch script failed!"
 
 log "cfi_devnode_compat applied ✅"

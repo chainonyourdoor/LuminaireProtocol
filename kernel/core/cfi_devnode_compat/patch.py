@@ -1,17 +1,12 @@
 import sys
 
-MARKER = "__nocfi *device_get_devnode"
+MARKER = "CFLAGS_REMOVE_core.o"
 
-OLD_SIG = (
-    "const char *device_get_devnode(struct device *dev,\n"
-    "\t\t\t       umode_t *mode, kuid_t *uid, kgid_t *gid,\n"
-    "\t\t\t       const char **tmp)"
-)
+ANCHOR = "CFLAGS_trace.o\t\t:= -I$(src)"
 
-NEW_SIG = (
-    "const char __nocfi *device_get_devnode(struct device *dev,\n"
-    "\t\t\t       umode_t *mode, kuid_t *uid, kgid_t *gid,\n"
-    "\t\t\t       const char **tmp)"
+REPLACEMENT = (
+    ANCHOR + "\n\n"
+    "CFLAGS_REMOVE_core.o\t+= $(CC_FLAGS_CFI)"
 )
 
 
@@ -24,20 +19,20 @@ def main():
         print("[info] cfi_devnode_compat: already patched — skipping", flush=True)
         sys.exit(0)
 
-    if OLD_SIG not in content:
+    if ANCHOR not in content:
         print(
-            "[error] cfi_devnode_compat: device_get_devnode signature not found "
-            "in expected form — upstream may have changed it, refusing to guess",
+            "[error] cfi_devnode_compat: CFLAGS_trace.o anchor not found in "
+            "drivers/base/Makefile — upstream may have changed it, refusing to guess",
             flush=True,
         )
         sys.exit(1)
 
-    content = content.replace(OLD_SIG, NEW_SIG, 1)
+    content = content.replace(ANCHOR, REPLACEMENT, 1)
 
     with open(path, "w") as f:
         f.write(content)
 
-    print("[info] cfi_devnode_compat: __nocfi applied to device_get_devnode ✅", flush=True)
+    print("[info] cfi_devnode_compat: CFI disabled for core.o at the Makefile level ✅", flush=True)
 
 
 if __name__ == "__main__":
