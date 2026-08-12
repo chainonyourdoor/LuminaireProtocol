@@ -265,16 +265,6 @@ def build_blocks(env):
         for token in tuning_order_list
         if token not in tuning_skipped_tokens
     ]
-    commit_short    = env.get("GITHUB_SHA", "")[:7]
-    commit_url      = "{}/{}/commit/{}".format(
-                        env.get("GITHUB_SERVER_URL", ""),
-                        env.get("GITHUB_REPOSITORY", ""),
-                        env.get("GITHUB_SHA", ""))
-    run_url         = "{}/{}/actions/runs/{}".format(
-                        env.get("GITHUB_SERVER_URL", ""),
-                        env.get("GITHUB_REPOSITORY", ""),
-                        env.get("GITHUB_RUN_ID", ""))
-    run_id          = env.get("GITHUB_RUN_ID", "")
     block_luminaire = (
         "```Luminaire\n"
         f"Kernel    : Linux {linux_ver}\n"
@@ -312,13 +302,7 @@ def build_blocks(env):
         )
     else:
         block_tuning = None
-    footer = "[{}]({}) \\| [Run \\#{}]({})".format(
-        mdv2_escape(commit_short),
-        mdv2_escape_url(commit_url),
-        mdv2_escape(run_id),
-        mdv2_escape_url(run_url),
-    )
-    return block_luminaire, block_root, block_tuning, block_addons, footer
+    return block_luminaire, block_root, block_tuning, block_addons
 
 
 def build_telegraph_content(env):
@@ -482,24 +466,6 @@ def build_channel_caption(env, variant_links, variant_versions=None):
         changelog_block = truncate(changelog_block, CHANGELOG_MAX_LEN)
         sections.append(changelog_block)
         changelog_added = True
-    commit_short = env.get("GITHUB_SHA", "")[:7]
-    commit_url = "{}/{}/commit/{}".format(
-        env.get("GITHUB_SERVER_URL", ""),
-        env.get("GITHUB_REPOSITORY", ""),
-        env.get("GITHUB_SHA", ""))
-    commits_url = "{}/{}/commits/main/".format(
-        env.get("GITHUB_SERVER_URL", ""),
-        env.get("GITHUB_REPOSITORY", ""))
-    run_url = "{}/{}/actions/runs/{}".format(
-        env.get("GITHUB_SERVER_URL", ""),
-        env.get("GITHUB_REPOSITORY", ""),
-        env.get("GITHUB_RUN_ID", ""))
-    trace_line = "[Commits]({}) \\| [Workflows]({})".format(
-        mdv2_escape_url(commits_url), mdv2_escape_url(run_url))
-    if changelog_added:
-        sections[-1] = sections[-1] + "\n" + trace_line
-    else:
-        sections.append(trace_line)
     donate_url = mdv2_escape_url("https://sociabuzz.com/chainonyourdoor")
     sections.append(f"[Support]({donate_url})")
     group_url = mdv2_escape_url("https://t.me/{}".format(env.get("TELEGRAM_GROUP", "")))
@@ -524,9 +490,9 @@ def main():
     out_group   = sys.argv[1]
     out_channel = sys.argv[2]
     env = os.environ
-    block_luminaire, block_root, block_tuning, block_addons, footer = build_blocks(env)
+    block_luminaire, block_root, block_tuning, block_addons = build_blocks(env)
     caption_group = "\n".join(
-        b for b in [block_luminaire, block_root, block_tuning, block_addons, footer] if b is not None
+        b for b in [block_luminaire, block_root, block_tuning, block_addons] if b is not None
     )
     caption_group = truncate(caption_group, CAPTION_LIMIT)
     variant_links_json = env.get("VARIANT_LINKS_JSON", "")
