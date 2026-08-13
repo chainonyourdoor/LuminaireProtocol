@@ -103,7 +103,7 @@ on:
       lto_mode:
         description: "LTO"
         type: choice
-        default: "NONE"
+        default: "THIN"
         options:
           - "NONE"
           - "THIN"
