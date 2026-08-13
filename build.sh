@@ -115,7 +115,6 @@ run_core() {
         "${core_dir}/compiler_string/compiler_string.sh"
         "${core_dir}/module_bypass/module_bypass.sh"
         "${core_dir}/openssl3_compat/openssl3_compat.sh"
-        "${core_dir}/cfi_devnode_compat/cfi_devnode_compat.sh"
         "${core_dir}/mglru_force_enable/mglru_force_enable.sh"
     )
     for script in "${scripts[@]}"; do
