@@ -6,6 +6,9 @@ inputs:
     required: true
   kernel-version:
     required: true
+  kernel-branch-override:
+    required: false
+    default: ""
   ref-name:
     required: true
   kernel-variant:
@@ -42,6 +45,14 @@ runs:
         echo "clang_variant=${variant}" >> $GITHUB_OUTPUT
         echo "clang_variant_upper=${variant^^}" >> $GITHUB_OUTPUT
 
+    - name: "Derive Arsenal Cache Key"  # keep in sync with setup-arsenal
+      id: arsenal-key
+      shell: bash
+      run: |
+        suffix="${{ inputs.kernel-branch-override }}"
+        suffix="${suffix//\//-}"
+        echo "key=arsenal-MAKE-${{ inputs.kernel-version }}${suffix:+-${suffix}}" >> $GITHUB_OUTPUT
+
     - name: "Restore Clang Cache"
       if: startsWith(inputs.build-system, 'Make')
       uses: actions/cache/restore@v6
@@ -64,7 +75,7 @@ runs:
           ~/ak3-cache
           ~/kernel-cache
           ~/.apt-cache
-        key: arsenal-MAKE-${{ inputs.kernel-version }}
+        key: ${{ steps.arsenal-key.outputs.key }}
 
     - name: "Restore ccache"
       if: startsWith(inputs.build-system, 'Make')

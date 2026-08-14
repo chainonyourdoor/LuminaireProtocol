@@ -204,6 +204,7 @@ jobs:
         with:
           build-system:   ${{ inputs.build_system }}
           kernel-version: ${{ inputs.kernel_version }}
+          kernel-branch-override: ${{ inputs.kernel_branch_override }}
           update-arsenal: ${{ inputs.update_arsenal }}
           gh-token:       ${{ secrets.PERSONAL_TOKEN }}
 
@@ -274,6 +275,7 @@ jobs:
         with:
           build-system:   ${{ inputs.build_system }}
           kernel-version: ${{ inputs.kernel_version }}
+          kernel-branch-override: ${{ inputs.kernel_branch_override }}
           ref-name:       ${{ needs.prepare-matrix.outputs.safe_ref }}
           kernel-variant:  ${{ matrix.kernel_variant }}
           susfs:          ${{ matrix.susfs }}

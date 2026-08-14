@@ -6,6 +6,9 @@ inputs:
     required: true
   kernel-version:
     required: true
+  kernel-branch-override:
+    required: false
+    default: ""
   update-arsenal:
     required: true
   gh-token:
@@ -28,13 +31,21 @@ runs:
         variant="${variant#Make - }"
         echo "clang_variant=${variant}" >> $GITHUB_OUTPUT
 
+    - name: "Derive Arsenal Cache Key"  # keep in sync with setup-build-env
+      id: arsenal-key
+      shell: bash
+      run: |
+        suffix="${{ inputs.kernel-branch-override }}"
+        suffix="${suffix//\//-}"
+        echo "key=arsenal-MAKE-${{ inputs.kernel-version }}${suffix:+-${suffix}}" >> $GITHUB_OUTPUT
+
     - name: "Force Refresh (delete old caches)"
       if: inputs.update-arsenal == 'yes'
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.gh-token }}
       run: |
-        gh cache delete "arsenal-MAKE-${{ inputs.kernel-version }}" -R "${{ github.repository }}" 2>/dev/null || true
+        gh cache delete "${{ steps.arsenal-key.outputs.key }}" -R "${{ github.repository }}" 2>/dev/null || true
         if [ "${{ startsWith(inputs.build-system, 'Make') }}" = "true" ]; then
           gh cache delete "clang-${{ steps.clang-key.outputs.clang_variant }}" -R "${{ github.repository }}" 2>/dev/null || true
         fi
@@ -54,7 +65,7 @@ runs:
           ~/ak3-cache
           ~/kernel-cache
           ~/.apt-cache
-        key: arsenal-MAKE-${{ inputs.kernel-version }}
+        key: ${{ steps.arsenal-key.outputs.key }}
 
     - name: "Run Arsenal"
       shell: bash
