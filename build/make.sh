@@ -88,9 +88,32 @@ else
     log "Building kernel..."
     START_TIME=$(date +%s)
 
-    make "${MAKE_ARGS[@]}" CC="$CC_ARG" || error "Build failed!"
+    KBUILD_LOG="${OUT_DIR}/.luminaire_kbuild.log"
+    make "${MAKE_ARGS[@]}" CC="$CC_ARG" | tee "$KBUILD_LOG" || error "Build failed!"
 
     BUILD_SECONDS=$(( $(date +%s) - START_TIME ))
     log "Build completed in ${BUILD_SECONDS}s ✅"
 fi
 echo "BUILD_SECONDS=${BUILD_SECONDS}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
+
+if [ "${DRY_RUN:-false}" != "true" ] && [ -f "${KBUILD_LOG:-}" ]; then
+    real_code=""
+    case "$KERNEL_VARIANT" in
+        KSUNEXT)  version_var="KSUNEXT_VERSION_DISPLAY";  real_code=$(grep -oP -- '-- KernelSU-Next version: \K[0-9]+' "$KBUILD_LOG" | tail -1) ;;
+        RESUKISU) version_var="RESUKISU_VERSION_DISPLAY"; real_code=$(grep -oP -- '-- ReSukiSU version code: \K[0-9]+' "$KBUILD_LOG" | tail -1) ;;
+        SUKISU)   version_var="SUKISU_VERSION_DISPLAY";   real_code=$(grep -oP -- '-- SukiSU-Ultra version: \K[0-9]+' "$KBUILD_LOG" | tail -1) ;;
+        KOWSU)    version_var="KOWSU_VERSION_DISPLAY";    real_code=$(grep -oP -- '-- KernelSU version: \K[0-9]+' "$KBUILD_LOG" | tail -1) ;;
+        *) version_var="" ;;
+    esac
+    if [ -n "$real_code" ] && [ -n "${version_var}" ] && [ -n "${KSU_TAG_NAME:-}" ]; then
+        if [ -n "${KSU_UAPI_VERSION:-}" ]; then
+            real_display="${KSU_TAG_NAME} (${real_code}/${KSU_UAPI_VERSION})"
+        else
+            real_display="${KSU_TAG_NAME} (${real_code})"
+        fi
+        [ "$real_display" = "${!version_var:-}" ] \
+            || log "Correcting ${version_var} to match real Kbuild-computed version: ${real_display} (was: ${!version_var:-unset})"
+        export "${version_var}=${real_display}"
+        echo "${version_var}=${real_display}" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
+    fi
+fi
