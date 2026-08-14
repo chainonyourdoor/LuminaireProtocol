@@ -41,19 +41,7 @@ python3 "${PATCHER_DIR}/branding.py" "${KSU_DIR}/kernel/Kbuild" \
     || error "KernelSU-Next: branding patch failed!"
 log "Branding applied ✅"
 
-if [ "${SUSFS_ENABLED:-false}" = "true" ]; then
-    KSUNEXT_CUR_BRANCH=$(git -C "$KSU_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "HEAD")
-    KSUNEXT_BASE_BRANCH="${KSUNEXT_CUR_BRANCH%%-*}"
-    git -C "$KSU_DIR" remote get-url ksunext-upstream &>/dev/null \
-        || git -C "$KSU_DIR" remote add ksunext-upstream "https://github.com/pershoot/KernelSU-Next" 2>/dev/null
-    git -C "$KSU_DIR" fetch -q ksunext-upstream "$KSUNEXT_BASE_BRANCH" 2>/dev/null
-    KSUNEXT_BASE_COMMIT=$(git -C "$KSU_DIR" merge-base HEAD FETCH_HEAD 2>/dev/null \
-        || git -C "$KSU_DIR" merge-base HEAD "refs/remotes/origin/${KSUNEXT_BASE_BRANCH}" 2>/dev/null \
-        || git -C "$KSU_DIR" merge-base HEAD refs/remotes/origin/main 2>/dev/null \
-        || echo HEAD)
-else
-    KSUNEXT_BASE_COMMIT="HEAD"
-fi
+KSUNEXT_BASE_COMMIT="HEAD"
 
 KSU_LOCAL_VERSION=$(git -C "$KSU_DIR" rev-list --count "$KSUNEXT_BASE_COMMIT" 2>/dev/null || echo 0)
 KSU_VERSION_CODE=$((30000 + KSU_LOCAL_VERSION))
