@@ -350,13 +350,7 @@ def build_telegraph_content(env):
                 label, sub_items = item
                 li_nodes.append({
                     "tag": "li",
-                    "children": [
-                        label,
-                        {
-                            "tag": "ul",
-                            "children": [{"tag": "li", "children": [sub]} for sub in sub_items],
-                        },
-                    ],
+                    "children": [f"{label}: {', '.join(sub_items)}"],
                 })
             else:
                 li_nodes.append({"tag": "li", "children": [item]})
