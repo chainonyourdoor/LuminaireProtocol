@@ -25,6 +25,10 @@ on:
           - "6.6"
           - "6.6-konoha"
           - "6.12"
+      kernel_branch_override:
+        description: "Kernel Branch Override"
+        type: string
+        default: ""
       ksunext:
         description: "KernelSU-Next"
         type: boolean
@@ -154,6 +158,7 @@ jobs:
       USE_AK3_CACHE:    ${{ inputs.update_arsenal != 'yes' }}
       USE_CLANG_CACHE:  ${{ inputs.update_arsenal != 'yes' }}
       KERNEL_VERSION:   ${{ inputs.kernel_version }}
+      KERNEL_BRANCH_OVERRIDE: ${{ inputs.kernel_branch_override }}
       BUILD_SYSTEM:     ${{ inputs.build_system }}
       CCACHE_DIR:       ${{ startsWith(inputs.build_system, 'Make') && format('{0}/.ccache', github.workspace) || '' }}
       CCACHE_MAXSIZE:   ${{ startsWith(inputs.build_system, 'Make') && '900M' || '' }}
@@ -224,6 +229,7 @@ jobs:
       KERNEL_VARIANT:               ${{ matrix.kernel_variant }}
       SUSFS_ENABLED:               ${{ matrix.susfs }}
       KERNEL_VERSION:              ${{ inputs.kernel_version }}
+      KERNEL_BRANCH_OVERRIDE:      ${{ inputs.kernel_branch_override }}
       LTO_MODE:                  ${{ inputs.lto_mode }}
       RUN_MODE:                    ${{ inputs.run_mode }}
       DRY_RUN:                     ${{ inputs.run_mode == 'Dry Run' }}
