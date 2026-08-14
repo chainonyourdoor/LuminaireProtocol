@@ -347,14 +347,20 @@ def build_telegraph_content(env):
         li_nodes = []
         for item in items:
             if isinstance(item, tuple):
+                if li_nodes:
+                    content.append({"tag": "ul", "children": li_nodes})
+                    li_nodes = []
                 label, sub_items = item
-                li_nodes.append({
-                    "tag": "li",
-                    "children": [f"{label}: {', '.join(sub_items)}"],
-                })
+                content.append({"tag": "ul", "children": [
+                    {"tag": "li", "children": [{"tag": "b", "children": [f"{label}:"]}]},
+                ]})
+                content.append({"tag": "ul", "children": [
+                    {"tag": "li", "children": [sub]} for sub in sub_items
+                ]})
             else:
                 li_nodes.append({"tag": "li", "children": [item]})
-        content.append({"tag": "ul", "children": li_nodes})
+        if li_nodes:
+            content.append({"tag": "ul", "children": li_nodes})
     def bullet_list(items):
         items = items or ["None active this build"]
         return {"tag": "ul", "children": [{"tag": "li", "children": [item]} for item in items]}
