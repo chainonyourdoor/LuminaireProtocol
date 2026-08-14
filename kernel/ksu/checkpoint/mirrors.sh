@@ -15,12 +15,12 @@ declare -gA MIRROR_SOURCE_URL=(
 )
 
 declare -gA MIRROR_REPO=(
-    [resukisu]="chainonyourdoor/ReSukiSU"
-    [sukisu_builtin]="chainonyourdoor/SukiSU-Ultra"
-    [ksunext_susfs_fork]="chainonyourdoor/KernelSU-Next"
-    [susfs_resukisu]="chainonyourdoor/susfs4ksu-mirror"
-    [susfs_sukisu]="chainonyourdoor/susfs4ksu-mirror"
-    [susfs_ksunext]="chainonyourdoor/susfs4ksu-mirror"
+    [resukisu]="dikafarabian/ReSukiSU"
+    [sukisu_builtin]="dikafarabian/SukiSU-Ultra"
+    [ksunext_susfs_fork]="dikafarabian/KernelSU-Next"
+    [susfs_resukisu]="dikafarabian/susfs4ksu-mirror"
+    [susfs_sukisu]="dikafarabian/susfs4ksu-mirror"
+    [susfs_ksunext]="dikafarabian/susfs4ksu-mirror"
 )
 
 mirror_clone_url() {
