@@ -33,6 +33,16 @@ else
 fi
 [ -d "$KSU_DIR" ] || error "KernelSU-Next: KernelSU-Next dir not found after setup!"
 verify_pinned_ref "KernelSU-Next" "$KSU_DIR" "$KSUNEXT_SETUP_REF"
+
+if [ "${SUSFS_ENABLED:-false}" = "true" ]; then
+    git -C "$KSU_DIR" fetch --force "https://github.com/pershoot/KernelSU-Next" \
+        "refs/heads/dev:refs/remotes/origin/dev" 2>/dev/null || true
+else
+    git -C "$KSU_DIR" fetch --force "https://github.com/KernelSU-Next/KernelSU-Next" \
+        "refs/heads/dev:refs/remotes/origin/dev" 2>/dev/null || true
+fi
+[ -f "$KSU_DIR/.git/shallow" ] && git -C "$KSU_DIR" fetch --unshallow 2>/dev/null || true
+
 cd "$ROOT_DIR"
 log "KernelSU-Next integrated ✅"
 
@@ -41,7 +51,15 @@ python3 "${PATCHER_DIR}/branding.py" "${KSU_DIR}/kernel/Kbuild" \
     || error "KernelSU-Next: branding patch failed!"
 log "Branding applied ✅"
 
-KSUNEXT_BASE_COMMIT="HEAD"
+if [ "${SUSFS_ENABLED:-false}" = "true" ]; then
+    KSUNEXT_CUR_BRANCH=$(git -C "$KSU_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "HEAD")
+    KSUNEXT_BASE_BRANCH="${KSUNEXT_CUR_BRANCH%%-*}"
+    KSUNEXT_BASE_COMMIT=$(git -C "$KSU_DIR" merge-base HEAD "refs/remotes/origin/${KSUNEXT_BASE_BRANCH}" 2>/dev/null \
+        || git -C "$KSU_DIR" merge-base HEAD refs/remotes/origin/main 2>/dev/null \
+        || echo HEAD)
+else
+    KSUNEXT_BASE_COMMIT="HEAD"
+fi
 
 KSU_LOCAL_VERSION=$(git -C "$KSU_DIR" rev-list --count "$KSUNEXT_BASE_COMMIT" 2>/dev/null || echo 0)
 KSU_VERSION_CODE=$((30000 + KSU_LOCAL_VERSION))
