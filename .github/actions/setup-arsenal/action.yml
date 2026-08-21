@@ -31,13 +31,19 @@ runs:
         variant="${variant#Make - }"
         echo "clang_variant=${variant}" >> $GITHUB_OUTPUT
 
-    - name: "Derive Arsenal Cache Key"  # keep in sync with setup-build-env
-      id: arsenal-key
+    - name: "Derive Cache Keys"  # keep in sync with setup-build-env
+      id: cache-keys
       shell: bash
+      working-directory: ${{ github.workspace }}
       run: |
-        suffix="${{ inputs.kernel-branch-override }}"
-        suffix="${suffix//\//-}"
-        echo "key=arsenal-MAKE-${{ inputs.kernel-version }}${suffix:+-${suffix}}" >> $GITHUB_OUTPUT
+        source functions.sh
+        KERNEL_VERSION="${{ inputs.kernel-version }}"
+        ANDROID_VERSION="$(resolve_android_version)"
+        OVERRIDE="${{ inputs.kernel-branch-override }}"
+        OVERRIDE="${OVERRIDE//\//-}"
+        KERNEL_BRANCH="${OVERRIDE:-${ANDROID_VERSION}-${KERNEL_VERSION}}"
+        echo "arsenal_key=arsenal" >> $GITHUB_OUTPUT
+        echo "kernel_key=kernel-${KERNEL_BRANCH}" >> $GITHUB_OUTPUT
 
     - name: "Force Refresh (delete old caches)"
       if: inputs.update-arsenal == 'yes'
@@ -45,7 +51,8 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.gh-token }}
       run: |
-        gh cache delete "${{ steps.arsenal-key.outputs.key }}" -R "${{ github.repository }}" 2>/dev/null || true
+        gh cache delete "${{ steps.cache-keys.outputs.arsenal_key }}" -R "${{ github.repository }}" 2>/dev/null || true
+        gh cache delete "${{ steps.cache-keys.outputs.kernel_key }}" -R "${{ github.repository }}" 2>/dev/null || true
         if [ "${{ startsWith(inputs.build-system, 'Make') }}" = "true" ]; then
           gh cache delete "clang-${{ steps.clang-key.outputs.clang_variant }}" -R "${{ github.repository }}" 2>/dev/null || true
         fi
@@ -57,15 +64,20 @@ runs:
         path: ~/clang-cache
         key: clang-${{ steps.clang-key.outputs.clang_variant }}
 
-    - name: "Cache Arsenal"  # restores if present; auto-saves at end of job if it was missing
+    - name: "Cache Arsenal"  # restores if present; auto-saves at end of job if it was missing — tools only (ccache binary, AK3, apt deps), no kernel source
       uses: actions/cache@v6
       with:
         path: |
           ~/ccache-bin
           ~/ak3-cache
-          ~/kernel-cache
           ~/.apt-cache
-        key: ${{ steps.arsenal-key.outputs.key }}
+        key: ${{ steps.cache-keys.outputs.arsenal_key }}
+
+    - name: "Cache Kernel Source"  # restores if present; auto-saves at end of job if it was missing — one cache per resolved kernel branch, never shared across branches
+      uses: actions/cache@v6
+      with:
+        path: ~/kernel-cache
+        key: ${{ steps.cache-keys.outputs.kernel_key }}
 
     - name: "Run Arsenal"
       shell: bash

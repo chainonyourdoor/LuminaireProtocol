@@ -11,6 +11,9 @@ inputs:
     default: ""
   ref-name:
     required: true
+  kernel-branch-suffix:
+    required: false
+    default: ""
   kernel-variant:
     required: true
   susfs:
@@ -75,7 +78,7 @@ runs:
         # Must match the Save step's ccache-filename in build.yml exactly
         # (same field order, same susfs/mode handling) or restore silently
         # misses the asset the save step actually wrote.
-        ccache-filename: ccache-data-${{ inputs.kernel-version }}-${{ inputs.kernel-variant }}${{ inputs.susfs == 'true' && '+SUSFS' || '' }}-${{ steps.clang-key.outputs.clang_variant_upper }}${{ inputs.lto-mode != 'NONE' && format('-{0}', inputs.lto-mode) || '' }}-${{ inputs.ref-name }}.tar.zst
+        ccache-filename: ccache-data-${{ inputs.kernel-version }}${{ inputs.kernel-branch-suffix != '' && format('-{0}', inputs.kernel-branch-suffix) || '' }}-${{ inputs.kernel-variant }}${{ inputs.susfs == 'true' && '+SUSFS' || '' }}-${{ steps.clang-key.outputs.clang_variant_upper }}${{ inputs.lto-mode != 'NONE' && format('-{0}', inputs.lto-mode) || '' }}-${{ inputs.ref-name }}.tar.zst
         gh-token: ${{ inputs.gh-token }}
 
     - name: "Restore LTO Cache"
@@ -83,5 +86,5 @@ runs:
       uses: ./.github/actions/restore-lto-cache
       with:
         # Must match the Save step's lto-asset-name in build.yml exactly.
-        asset-name: lto-data-${{ inputs.kernel-version }}-${{ inputs.kernel-variant }}${{ inputs.susfs == 'true' && '+SUSFS' || '' }}-${{ steps.clang-key.outputs.clang_variant_upper }}${{ inputs.lto-mode != 'NONE' && format('-{0}', inputs.lto-mode) || '' }}-${{ inputs.ref-name }}.tar.zst
+        asset-name: lto-data-${{ inputs.kernel-version }}${{ inputs.kernel-branch-suffix != '' && format('-{0}', inputs.kernel-branch-suffix) || '' }}-${{ inputs.kernel-variant }}${{ inputs.susfs == 'true' && '+SUSFS' || '' }}-${{ steps.clang-key.outputs.clang_variant_upper }}${{ inputs.lto-mode != 'NONE' && format('-{0}', inputs.lto-mode) || '' }}-${{ inputs.ref-name }}.tar.zst
         gh-token:   ${{ inputs.gh-token }}

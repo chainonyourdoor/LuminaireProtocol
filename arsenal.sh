@@ -9,7 +9,7 @@ source "$(cd "$(dirname "$0")" && pwd)/functions.sh"
 KERNEL_VERSION="${KERNEL_VERSION:?KERNEL_VERSION is not set}"
 
 ANDROID_VERSION="$(resolve_android_version)"
-KERNEL_BRANCH="${KERNEL_BRANCH_OVERRIDE:-${ANDROID_VERSION}-${KERNEL_VERSION}-live}"
+KERNEL_BRANCH="${KERNEL_BRANCH_OVERRIDE:-${ANDROID_VERSION}-${KERNEL_VERSION}}"
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LUMINAIRE_PATCH_DIR="${ROOT_DIR}"
