@@ -96,10 +96,6 @@ on:
         description: "LZ4KD"
         type: boolean
         default: true
-      kpatch_next:
-        description: "KPatch-Next"
-        type: boolean
-        default: true
       kasumi:
         description: "Kasumi (Experimental)"
         type: boolean
@@ -190,7 +186,7 @@ jobs:
           # Single source of truth for the ADDONS list — reused by Start-Build
           # and notify-channel via this job's output, instead of each job
           # rebuilding the same string from inputs independently.
-          ADDONS="${{ inputs.bbrv3 && 'bbrv3,' || '' }}${{ inputs.bbg && 'bbg,' || '' }}${{ inputs.rekernel && 'rekernel,' || '' }}${{ inputs.droidspaces && 'droidspaces,' || '' }}${{ inputs.ntsync && 'ntsync,' || '' }}${{ inputs.wireguard && 'wireguard,' || '' }}${{ inputs.lz4zstd && 'lz4zstd,' || '' }}${{ inputs.lz4kd && 'lz4kd,' || '' }}${{ inputs.mountless_engine != 'none' && format('{0},', inputs.mountless_engine) || '' }}${{ inputs.kasumi && 'kasumi,' || '' }}${{ inputs.kpatch_next && 'kpatch-next,' || '' }}"
+          ADDONS="${{ inputs.bbrv3 && 'bbrv3,' || '' }}${{ inputs.bbg && 'bbg,' || '' }}${{ inputs.rekernel && 'rekernel,' || '' }}${{ inputs.droidspaces && 'droidspaces,' || '' }}${{ inputs.ntsync && 'ntsync,' || '' }}${{ inputs.wireguard && 'wireguard,' || '' }}${{ inputs.lz4zstd && 'lz4zstd,' || '' }}${{ inputs.lz4kd && 'lz4kd,' || '' }}${{ inputs.mountless_engine != 'none' && format('{0},', inputs.mountless_engine) || '' }}${{ inputs.kasumi && 'kasumi,' || '' }}"
           echo "addons=${ADDONS}" >> $GITHUB_OUTPUT
 
           # "/" -> "-" so this is safe to use as a filesystem path component
@@ -282,20 +278,9 @@ jobs:
           lto-mode:     ${{ inputs.lto_mode }}
           gh-token:       ${{ secrets.PERSONAL_TOKEN }}
           update-arsenal: ${{ inputs.update_arsenal }}
-          kpatch-next-selected: ${{ contains(needs.prepare-matrix.outputs.addons, 'kpatch-next') }}
 
       - name: "Disk Usage"
         run: df -h && du -sh ~/kernel-cache/ 2>/dev/null || true
-
-      - name: "Cache KPatch-Next"  # source clone + aarch64-none-elf toolchain + Android NDK — restores if present; auto-saves at end of job if it was missing
-        if: contains(needs.prepare-matrix.outputs.addons, 'kpatch-next')
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/kpatch-next-src-cache
-            ~/kpatch-toolchain-cache
-            ~/kpatch-ndk-cache
-          key: kpatch-next-cache
 
       - name: "Scout Upstream Refs"  # decides pinned vs candidate ref for KSU fork / SuSFS
         if: matrix.kernel_variant != 'VANILLA'

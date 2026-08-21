@@ -8,14 +8,13 @@ declare -A ADDON_SUPPORTED_VERSIONS=(
     [wireguard]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
     [droidspaces]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
     [rekernel]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
-    [kpatch-next]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
     [ntsync]="5.10 5.15 6.1 6.6 6.6-konoha"
     [lz4zstd]="6.1"
     [lz4kd]="5.10 5.15 6.1 6.6 6.6-konoha"
     [kasumi]="5.10 5.15 6.1 6.6 6.12 6.6-konoha"
 )
 
-ADDON_ORDER=(nomount zeromount bbrv3 bbg wireguard droidspaces rekernel kpatch-next ntsync lz4zstd lz4kd kasumi)
+ADDON_ORDER=(nomount zeromount bbrv3 bbg wireguard droidspaces rekernel ntsync lz4zstd lz4kd kasumi)
 
 ADDON_MOUNTLESS_TOKENS=(nomount zeromount)
 

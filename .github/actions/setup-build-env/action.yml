@@ -1,5 +1,5 @@
 name: "Setup Build Environment"
-description: "Clang, arsenal, ccache, and LTO cache restore for Start-Build job (plus conditional KPatch-Next cache force-refresh)"
+description: "Clang, arsenal, ccache, and LTO cache restore for Start-Build job"
 
 inputs:
   build-system:
@@ -20,8 +20,6 @@ inputs:
   gh-token:
     required: true
   update-arsenal:
-    required: true
-  kpatch-next-selected:
     required: true
 
 outputs:
@@ -59,13 +57,6 @@ runs:
       with:
         path: ~/clang-cache
         key: clang-${{ steps.clang-key.outputs.clang_variant }}
-
-    - name: "Force Refresh (KPatch-Next Cache)"  # keeps this addon's cache honoring the same force-refresh toggle as arsenal/clang
-      if: inputs.update-arsenal == 'yes' && inputs.kpatch-next-selected == 'true'
-      shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.gh-token }}
-      run: gh cache delete "kpatch-next-cache" -R "${{ github.repository }}" 2>/dev/null || true
 
     - name: "Restore Arsenal Cache"
       uses: actions/cache/restore@v6
