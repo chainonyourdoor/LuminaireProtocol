@@ -4,16 +4,10 @@ description: "Clang, arsenal, ccache, and LTO cache restore for Start-Build job"
 inputs:
   build-system:
     required: true
-  kernel-version:
-    required: true
-  kernel-branch-override:
-    required: false
-    default: ""
   ref-name:
     required: true
-  kernel-branch-suffix:
-    required: false
-    default: ""
+  kernel-branch:
+    required: true
   kernel-variant:
     required: true
   susfs:
@@ -46,14 +40,6 @@ runs:
         echo "clang_variant=${variant}" >> $GITHUB_OUTPUT
         echo "clang_variant_upper=${variant^^}" >> $GITHUB_OUTPUT
 
-    - name: "Derive Arsenal Cache Key"  # keep in sync with setup-arsenal
-      id: arsenal-key
-      shell: bash
-      run: |
-        suffix="${{ inputs.kernel-branch-override }}"
-        suffix="${suffix//\//-}"
-        echo "key=arsenal-MAKE-${{ inputs.kernel-version }}${suffix:+-${suffix}}" >> $GITHUB_OUTPUT
-
     - name: "Restore Clang Cache"
       if: startsWith(inputs.build-system, 'Make')
       uses: actions/cache/restore@v6
@@ -61,15 +47,20 @@ runs:
         path: ~/clang-cache
         key: clang-${{ steps.clang-key.outputs.clang_variant }}
 
-    - name: "Restore Arsenal Cache"
+    - name: "Restore Arsenal Cache"  # tools only (ccache binary, AK3, apt deps), no kernel source
       uses: actions/cache/restore@v6
       with:
         path: |
           ~/ccache-bin
           ~/ak3-cache
-          ~/kernel-cache
           ~/.apt-cache
-        key: ${{ steps.arsenal-key.outputs.key }}
+        key: arsenal
+
+    - name: "Restore Kernel Source Cache"  # one cache per resolved kernel branch, never shared across branches
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/kernel-cache
+        key: kernel-${{ inputs.kernel-branch }}
 
     - name: "Restore ccache"
       if: startsWith(inputs.build-system, 'Make')
@@ -78,7 +69,7 @@ runs:
         # Must match the Save step's ccache-filename in build.yml exactly
         # (same field order, same susfs/mode handling) or restore silently
         # misses the asset the save step actually wrote.
-        ccache-filename: ccache-data-${{ inputs.kernel-version }}${{ inputs.kernel-branch-suffix != '' && format('-{0}', inputs.kernel-branch-suffix) || '' }}-${{ inputs.kernel-variant }}${{ inputs.susfs == 'true' && '+SUSFS' || '' }}-${{ steps.clang-key.outputs.clang_variant_upper }}${{ inputs.lto-mode != 'NONE' && format('-{0}', inputs.lto-mode) || '' }}-${{ inputs.ref-name }}.tar.zst
+        ccache-filename: ccache-data-${{ inputs.kernel-branch }}-${{ inputs.kernel-variant }}${{ inputs.susfs == 'true' && '+SUSFS' || '' }}-${{ steps.clang-key.outputs.clang_variant_upper }}${{ inputs.lto-mode != 'NONE' && format('-{0}', inputs.lto-mode) || '' }}-${{ inputs.ref-name }}.tar.zst
         gh-token: ${{ inputs.gh-token }}
 
     - name: "Restore LTO Cache"
@@ -86,5 +77,5 @@ runs:
       uses: ./.github/actions/restore-lto-cache
       with:
         # Must match the Save step's lto-asset-name in build.yml exactly.
-        asset-name: lto-data-${{ inputs.kernel-version }}${{ inputs.kernel-branch-suffix != '' && format('-{0}', inputs.kernel-branch-suffix) || '' }}-${{ inputs.kernel-variant }}${{ inputs.susfs == 'true' && '+SUSFS' || '' }}-${{ steps.clang-key.outputs.clang_variant_upper }}${{ inputs.lto-mode != 'NONE' && format('-{0}', inputs.lto-mode) || '' }}-${{ inputs.ref-name }}.tar.zst
+        asset-name: lto-data-${{ inputs.kernel-branch }}-${{ inputs.kernel-variant }}${{ inputs.susfs == 'true' && '+SUSFS' || '' }}-${{ steps.clang-key.outputs.clang_variant_upper }}${{ inputs.lto-mode != 'NONE' && format('-{0}', inputs.lto-mode) || '' }}-${{ inputs.ref-name }}.tar.zst
         gh-token:   ${{ inputs.gh-token }}

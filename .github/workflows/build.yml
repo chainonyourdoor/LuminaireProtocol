@@ -145,7 +145,7 @@ jobs:
       matrix: ${{ steps.set.outputs.matrix }}
       addons: ${{ steps.set.outputs.addons }}
       safe_ref: ${{ steps.set.outputs.safe_ref }}
-      safe_kernel_branch: ${{ steps.set.outputs.safe_kernel_branch }}
+      resolved_kernel_branch: ${{ steps.set.outputs.resolved_kernel_branch }}
 
       cache_refreshed: ${{ inputs.update_arsenal == 'yes' }}
 
@@ -195,12 +195,17 @@ jobs:
           SAFE_REF="$(echo '${{ github.ref_name }}' | tr '/' '-')"
           echo "safe_ref=${SAFE_REF}" >> $GITHUB_OUTPUT
 
-          # Same treatment for kernel_branch_override — only non-empty when
-          # a non-default kernel source branch is in use, so this becomes
-          # part of the ccache/LTO cache key and different kernel source
-          # branches never share (and silently corrupt) each other's cache.
-          SAFE_KERNEL_BRANCH="$(echo '${{ inputs.kernel_branch_override }}' | tr '/' '-')"
-          echo "safe_kernel_branch=${SAFE_KERNEL_BRANCH}" >> $GITHUB_OUTPUT
+          # Full resolved kernel source branch — same value setup-arsenal
+          # uses for the kernel-cache key, so ccache/LTO cache names reuse
+          # it directly instead of re-deriving kernel_version + a separate
+          # branch suffix (which duplicated the kernel_version that's
+          # already embedded in the branch name itself).
+          source functions.sh
+          KERNEL_VERSION="${{ inputs.kernel_version }}"
+          ANDROID_VERSION="$(resolve_android_version)"
+          OVERRIDE="$(echo '${{ inputs.kernel_branch_override }}' | tr '/' '-')"
+          RESOLVED_KERNEL_BRANCH="${OVERRIDE:-${ANDROID_VERSION}-${KERNEL_VERSION}}"
+          echo "resolved_kernel_branch=${RESOLVED_KERNEL_BRANCH}" >> $GITHUB_OUTPUT
 
       - name: "Setup Arsenal"  # restores clang+arsenal cache (auto-saved if missing), then runs arsenal.sh
         id: setup-arsenal
@@ -278,10 +283,8 @@ jobs:
         uses: ./.github/actions/setup-build-env
         with:
           build-system:   ${{ inputs.build_system }}
-          kernel-version: ${{ inputs.kernel_version }}
-          kernel-branch-override: ${{ inputs.kernel_branch_override }}
           ref-name:       ${{ needs.prepare-matrix.outputs.safe_ref }}
-          kernel-branch-suffix: ${{ needs.prepare-matrix.outputs.safe_kernel_branch }}
+          kernel-branch:  ${{ needs.prepare-matrix.outputs.resolved_kernel_branch }}
           kernel-variant:  ${{ matrix.kernel_variant }}
           susfs:          ${{ matrix.susfs }}
           lto-mode:     ${{ inputs.lto_mode }}
@@ -342,8 +345,8 @@ jobs:
         with:
           build-system:   ${{ inputs.build_system }}
           lto-mode:     ${{ inputs.lto_mode }}
-          lto-asset-name: lto-data-${{ inputs.kernel_version }}${{ needs.prepare-matrix.outputs.safe_kernel_branch != '' && format('-{0}', needs.prepare-matrix.outputs.safe_kernel_branch) || '' }}-${{ matrix.kernel_variant }}${{ matrix.susfs && '+SUSFS' || '' }}-${{ steps.setup-build-env.outputs.clang-variant-upper }}${{ inputs.lto_mode != 'NONE' && format('-{0}', inputs.lto_mode) || '' }}-${{ needs.prepare-matrix.outputs.safe_ref }}.tar.zst
-          ccache-filename: ccache-data-${{ inputs.kernel_version }}${{ needs.prepare-matrix.outputs.safe_kernel_branch != '' && format('-{0}', needs.prepare-matrix.outputs.safe_kernel_branch) || '' }}-${{ matrix.kernel_variant }}${{ matrix.susfs && '+SUSFS' || '' }}-${{ steps.setup-build-env.outputs.clang-variant-upper }}${{ inputs.lto_mode != 'NONE' && format('-{0}', inputs.lto_mode) || '' }}-${{ needs.prepare-matrix.outputs.safe_ref }}.tar.zst
+          lto-asset-name: lto-data-${{ needs.prepare-matrix.outputs.resolved_kernel_branch }}-${{ matrix.kernel_variant }}${{ matrix.susfs && '+SUSFS' || '' }}-${{ steps.setup-build-env.outputs.clang-variant-upper }}${{ inputs.lto_mode != 'NONE' && format('-{0}', inputs.lto_mode) || '' }}-${{ needs.prepare-matrix.outputs.safe_ref }}.tar.zst
+          ccache-filename: ccache-data-${{ needs.prepare-matrix.outputs.resolved_kernel_branch }}-${{ matrix.kernel_variant }}${{ matrix.susfs && '+SUSFS' || '' }}-${{ steps.setup-build-env.outputs.clang-variant-upper }}${{ inputs.lto_mode != 'NONE' && format('-{0}', inputs.lto_mode) || '' }}-${{ needs.prepare-matrix.outputs.safe_ref }}.tar.zst
           gh-token:       ${{ secrets.PERSONAL_TOKEN }}
 
       - name: "Upload Variant Link"  # for channel post aggregation
