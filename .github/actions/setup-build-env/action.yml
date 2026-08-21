@@ -16,8 +16,6 @@ inputs:
     required: true
   gh-token:
     required: true
-  update-arsenal:
-    required: true
 
 outputs:
   clang-variant:

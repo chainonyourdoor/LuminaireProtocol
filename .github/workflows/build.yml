@@ -289,7 +289,6 @@ jobs:
           susfs:          ${{ matrix.susfs }}
           lto-mode:     ${{ inputs.lto_mode }}
           gh-token:       ${{ secrets.PERSONAL_TOKEN }}
-          update-arsenal: ${{ inputs.update_arsenal }}
 
       - name: "Disk Usage"
         run: df -h && du -sh ~/kernel-cache/ 2>/dev/null || true
