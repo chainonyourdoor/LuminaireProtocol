@@ -39,6 +39,7 @@ ADDON_DISPLAY_NAMES = {
     "wireguard":   "WireGuard",
     "lz4zstd":     "LZ4+ZSTD",
     "lz4kd":       "LZ4KD",
+    "mglru":       "MGLRU Force-Enable",
 }
 
 
